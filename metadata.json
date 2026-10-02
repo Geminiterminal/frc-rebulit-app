@@ -1,0 +1,6 @@
+{
+  "name": "FRC REBUILT Scouting",
+  "description": "Fast, offline-first FRC robotics pit and match scouting application with interactive field mapping, autonomous routine drawing, and team profiles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
