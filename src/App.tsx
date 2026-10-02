@@ -31,8 +31,8 @@ export default function App() {
   const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
 
   useEffect(() => {
-    // Seed sample data on first run if empty
-    scoutingDB.seedInitialDataIfEmpty().finally(() => {
+    // Initialize local database on app start without seeding default mock data
+    scoutingDB.init().finally(() => {
       setIsDbLoaded(true);
     });
   }, []);

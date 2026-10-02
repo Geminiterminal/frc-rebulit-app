@@ -16,7 +16,7 @@ class ScoutingDB {
     this.init();
   }
 
-  private init(): Promise<void> {
+  public init(): Promise<void> {
     if (this.isReadyPromise) return this.isReadyPromise;
 
     this.isReadyPromise = new Promise((resolve, reject) => {
@@ -405,16 +405,9 @@ class ScoutingDB {
     });
   }
 
-  // Seed sample data if database is empty and user hasn't explicitly cleared it
+  // Seed sample data if database is empty - Disabled so app starts with clean slate
   async seedInitialDataIfEmpty(): Promise<boolean> {
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('frc_has_cleared_data') === 'true') {
-      return false;
-    }
-
-    const teams = await this.getAllTeams();
-    if (teams.length > 0) return false;
-
-    return this.seedSampleData();
+    return false;
   }
 
   // Force seed sample competition data (Team 9751, 254, 1678)

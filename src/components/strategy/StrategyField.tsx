@@ -19,8 +19,8 @@ interface StrategyFieldProps {
 
 export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
   const [teams, setTeams] = useState<TeamProfile[]>([]);
-  const [blueTeams, setBlueTeams] = useState<number[]>([9751, 254, 1678]);
-  const [redTeams, setRedTeams] = useState<number[]>([118, 2056, 148]);
+  const [blueTeams, setBlueTeams] = useState<number[]>([0, 0, 0]);
+  const [redTeams, setRedTeams] = useState<number[]>([0, 0, 0]);
 
   // Overlay toggles (clean slate by default)
   const [showAutoPaths, setShowAutoPaths] = useState<boolean>(false);
@@ -36,12 +36,12 @@ export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
 
   // Robot tokens
   const [tokens, setTokens] = useState<StrategyRobotToken[]>([
-    { id: 'b1', teamNumber: 9751, alliance: 'BLUE', x: 78, y: 22, role: 'Scorer', label: 'B1' },
-    { id: 'b2', teamNumber: 254, alliance: 'BLUE', x: 50, y: 22, role: 'Scorer', label: 'B2' },
-    { id: 'b3', teamNumber: 1678, alliance: 'BLUE', x: 22, y: 22, role: 'Support', label: 'B3' },
-    { id: 'r1', teamNumber: 118, alliance: 'RED', x: 78, y: 78, role: 'Scorer', label: 'R1' },
-    { id: 'r2', teamNumber: 2056, alliance: 'RED', x: 50, y: 78, role: 'Scorer', label: 'R2' },
-    { id: 'r3', teamNumber: 148, alliance: 'RED', x: 22, y: 78, role: 'Defense', label: 'R3' },
+    { id: 'b1', teamNumber: 0, alliance: 'BLUE', x: 78, y: 22, role: 'Scorer', label: 'B1' },
+    { id: 'b2', teamNumber: 0, alliance: 'BLUE', x: 50, y: 22, role: 'Scorer', label: 'B2' },
+    { id: 'b3', teamNumber: 0, alliance: 'BLUE', x: 22, y: 22, role: 'Support', label: 'B3' },
+    { id: 'r1', teamNumber: 0, alliance: 'RED', x: 78, y: 78, role: 'Scorer', label: 'R1' },
+    { id: 'r2', teamNumber: 0, alliance: 'RED', x: 50, y: 78, role: 'Scorer', label: 'R2' },
+    { id: 'r3', teamNumber: 0, alliance: 'RED', x: 22, y: 78, role: 'Defense', label: 'R3' },
   ]);
 
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
@@ -566,7 +566,7 @@ export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
                     fontWeight="bold"
                     fontFamily="monospace"
                   >
-                    {token.teamNumber}
+                    {token.teamNumber && token.teamNumber > 0 ? token.teamNumber : '--'}
                   </text>
                 </g>
               </g>
