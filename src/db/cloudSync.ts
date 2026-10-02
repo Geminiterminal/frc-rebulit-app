@@ -295,6 +295,28 @@ class CloudSyncManager {
     return Array.from(map.values());
   }
 
+  // Deep sanitize objects to remove any `undefined` values before sending to Firestore
+  private cleanForFirestore<T>(data: T): T {
+    if (data === null || data === undefined) {
+      return null as any;
+    }
+    if (Array.isArray(data)) {
+      return data
+        .filter((item) => item !== undefined)
+        .map((item) => this.cleanForFirestore(item)) as any;
+    }
+    if (typeof data === 'object' && data !== null) {
+      const cleaned: Record<string, any> = {};
+      for (const [key, value] of Object.entries(data)) {
+        if (value !== undefined) {
+          cleaned[key] = this.cleanForFirestore(value);
+        }
+      }
+      return cleaned as T;
+    }
+    return data;
+  }
+
   // Push local changes to cloud
   public async pushLocalDataToCloud() {
     if (!this.activeRoomCode) return;
@@ -307,10 +329,10 @@ class CloudSyncManager {
 
     // Push Teams
     for (const team of teams) {
-      const cleanTeam = {
+      const cleanTeam = this.cleanForFirestore({
         ...team,
         updatedBy: uid,
-      };
+      });
       const teamDocPath = `rooms/${roomCode}/teams/${team.teamNumber}`;
       try {
         await setDoc(doc(db, 'rooms', roomCode, 'teams', team.teamNumber.toString()), cleanTeam, { merge: true });
@@ -321,9 +343,10 @@ class CloudSyncManager {
 
     // Push Matches
     for (const match of matches) {
+      const cleanMatch = this.cleanForFirestore(match);
       const matchDocPath = `rooms/${roomCode}/matches/${match.id}`;
       try {
-        await setDoc(doc(db, 'rooms', roomCode, 'matches', match.id), match, { merge: true });
+        await setDoc(doc(db, 'rooms', roomCode, 'matches', match.id), cleanMatch, { merge: true });
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, matchDocPath);
       }
@@ -331,9 +354,10 @@ class CloudSyncManager {
 
     // Push Strategies
     for (const strat of strategies) {
+      const cleanStrat = this.cleanForFirestore(strat);
       const stratDocPath = `rooms/${roomCode}/strategies/${strat.id}`;
       try {
-        await setDoc(doc(db, 'rooms', roomCode, 'strategies', strat.id), strat, { merge: true });
+        await setDoc(doc(db, 'rooms', roomCode, 'strategies', strat.id), cleanStrat, { merge: true });
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, stratDocPath);
       }
@@ -346,7 +370,8 @@ class CloudSyncManager {
     const roomCode = this.activeRoomCode;
     const teamDocPath = `rooms/${roomCode}/teams/${team.teamNumber}`;
     try {
-      await setDoc(doc(db, 'rooms', roomCode, 'teams', team.teamNumber.toString()), team, { merge: true });
+      const cleanTeam = this.cleanForFirestore(team);
+      await setDoc(doc(db, 'rooms', roomCode, 'teams', team.teamNumber.toString()), cleanTeam, { merge: true });
       this.lastSyncedAt = Date.now();
       this.notify();
     } catch (err) {
@@ -359,7 +384,8 @@ class CloudSyncManager {
     const roomCode = this.activeRoomCode;
     const matchDocPath = `rooms/${roomCode}/matches/${match.id}`;
     try {
-      await setDoc(doc(db, 'rooms', roomCode, 'matches', match.id), match, { merge: true });
+      const cleanMatch = this.cleanForFirestore(match);
+      await setDoc(doc(db, 'rooms', roomCode, 'matches', match.id), cleanMatch, { merge: true });
       this.lastSyncedAt = Date.now();
       this.notify();
     } catch (err) {
@@ -372,7 +398,8 @@ class CloudSyncManager {
     const roomCode = this.activeRoomCode;
     const stratDocPath = `rooms/${roomCode}/strategies/${strategy.id}`;
     try {
-      await setDoc(doc(db, 'rooms', roomCode, 'strategies', strategy.id), strategy, { merge: true });
+      const cleanStrat = this.cleanForFirestore(strategy);
+      await setDoc(doc(db, 'rooms', roomCode, 'strategies', strategy.id), cleanStrat, { merge: true });
       this.lastSyncedAt = Date.now();
       this.notify();
     } catch (err) {
