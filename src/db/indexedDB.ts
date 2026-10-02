@@ -5,6 +5,11 @@
 
 import { TeamProfile, MatchScoutingRecord, StrategyPlan, ScoutingDatabaseExport } from '../types/scouting';
 
+let onSaveHook: ((type: 'team' | 'match' | 'strategy', data: any) => void) | null = null;
+export function registerDBSaveHook(fn: (type: 'team' | 'match' | 'strategy', data: any) => void) {
+  onSaveHook = fn;
+}
+
 const DB_NAME = 'frc_rebuilt_scouting_db';
 const DB_VERSION = 2;
 
@@ -127,6 +132,8 @@ class ScoutingDB {
     team.updatedAt = Date.now();
     if (!team.createdAt) team.createdAt = Date.now();
 
+    onSaveHook?.('team', team);
+
     if (!this.db) {
       localStorage.setItem(`team_${team.teamNumber}`, JSON.stringify(team));
       return;
@@ -160,6 +167,8 @@ class ScoutingDB {
   // --- MATCHES ---
   async saveMatch(record: MatchScoutingRecord): Promise<void> {
     await this.init();
+    onSaveHook?.('match', record);
+
     if (!this.db) {
       localStorage.setItem(`match_${record.id}`, JSON.stringify(record));
       return;
@@ -199,6 +208,22 @@ class ScoutingDB {
     });
   }
 
+  async getMatch(id: string): Promise<MatchScoutingRecord | null> {
+    await this.init();
+    if (!this.db) {
+      const val = localStorage.getItem(`match_${id}`);
+      return val ? JSON.parse(val) : null;
+    }
+
+    return new Promise((resolve) => {
+      const tx = this.db!.transaction('matches', 'readonly');
+      const store = tx.objectStore('matches');
+      const req = store.get(id);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  }
+
   async getMatchesForTeam(teamNumber: number): Promise<MatchScoutingRecord[]> {
     const all = await this.getAllMatches();
     return all.filter((m) => m.teamNumber === teamNumber);
@@ -223,6 +248,8 @@ class ScoutingDB {
   // --- STRATEGY PLANS ---
   async saveStrategy(plan: StrategyPlan): Promise<void> {
     await this.init();
+    onSaveHook?.('strategy', plan);
+
     if (!this.db) {
       localStorage.setItem(`strat_${plan.id}`, JSON.stringify(plan));
       return;

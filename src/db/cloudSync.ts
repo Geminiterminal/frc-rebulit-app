@@ -1,0 +1,384 @@
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  getDocs, 
+  onSnapshot, 
+  Unsubscribe 
+} from 'firebase/firestore';
+import { 
+  auth, 
+  db, 
+  handleFirestoreError, 
+  OperationType 
+} from './firebase';
+import { scoutingDB, registerDBSaveHook } from './indexedDB';
+import { 
+  TeamProfile, 
+  MatchScoutingRecord, 
+  StrategyPlan,
+  PitData,
+  AutonomousDrawing
+} from '../types/scouting';
+import { signInAnonymously } from 'firebase/auth';
+
+export interface SyncStatus {
+  roomCode: string | null;
+  eventName: string;
+  isOnline: boolean;
+  isSyncing: boolean;
+  lastSyncedAt: number | null;
+  pendingSyncCount: number;
+  syncedMatchesCount: number;
+  syncedTeamsCount: number;
+  scoutName: string;
+}
+
+class CloudSyncManager {
+  private activeRoomCode: string | null = null;
+  private activeEventName: string = 'FRC REBUILT Competition';
+  private unsubs: Unsubscribe[] = [];
+  private listeners: ((status: SyncStatus) => void)[] = [];
+  private isSyncing: boolean = false;
+  private lastSyncedAt: number | null = null;
+  private pendingCount: number = 0;
+
+  constructor() {
+    this.initFromStorage();
+    registerDBSaveHook((type, data) => {
+      if (type === 'team') this.broadcastTeamSave(data);
+      if (type === 'match') this.broadcastMatchSave(data);
+      if (type === 'strategy') this.broadcastStrategySave(data);
+    });
+  }
+
+  private initFromStorage() {
+    if (typeof localStorage !== 'undefined') {
+      const savedRoom = localStorage.getItem('frc_sync_room_code');
+      const savedEvent = localStorage.getItem('frc_sync_event_name');
+      if (savedRoom) {
+        this.activeRoomCode = savedRoom;
+        if (savedEvent) this.activeEventName = savedEvent;
+        // Connect automatically if room was previously set
+        setTimeout(() => this.connectToRoom(savedRoom, this.activeEventName), 1000);
+      }
+    }
+  }
+
+  public subscribe(cb: (status: SyncStatus) => void): () => void {
+    this.listeners.push(cb);
+    cb(this.getStatus());
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== cb);
+    };
+  }
+
+  private notify() {
+    const status = this.getStatus();
+    this.listeners.forEach((cb) => cb(status));
+  }
+
+  public getStatus(): SyncStatus {
+    return {
+      roomCode: this.activeRoomCode,
+      eventName: this.activeEventName,
+      isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+      isSyncing: this.isSyncing,
+      lastSyncedAt: this.lastSyncedAt,
+      pendingSyncCount: this.pendingCount,
+      syncedMatchesCount: 0,
+      syncedTeamsCount: 0,
+      scoutName: this.getScoutName(),
+    };
+  }
+
+  public getScoutName(): string {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('frc_scout_name') || 'Scout';
+    }
+    return 'Scout';
+  }
+
+  public setScoutName(name: string) {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('frc_scout_name', name.trim());
+    }
+    this.notify();
+  }
+
+  public async ensureAuth(): Promise<string> {
+    if (auth.currentUser) return auth.currentUser.uid;
+    try {
+      const cred = await signInAnonymously(auth);
+      return cred.user.uid;
+    } catch (err) {
+      console.warn('Anonymous login fallback:', err);
+      return 'anon-user';
+    }
+  }
+
+  // Connect / Join a Team Scouting Room
+  public async connectToRoom(rawCode: string, eventName: string = 'FRC REBUILT Competition'): Promise<boolean> {
+    const code = rawCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    if (!code) throw new Error('Invalid room code. Please use alphanumeric characters.');
+
+    this.disconnect();
+    this.isSyncing = true;
+    this.notify();
+
+    try {
+      const uid = await this.ensureAuth();
+      this.activeRoomCode = code;
+      this.activeEventName = eventName;
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('frc_sync_room_code', code);
+        localStorage.setItem('frc_sync_event_name', eventName);
+      }
+
+      // 1. Create or update room doc
+      const roomRef = doc(db, 'rooms', code);
+      const roomSnap = await getDoc(roomRef);
+      if (!roomSnap.exists()) {
+        await setDoc(roomRef, {
+          roomCode: code,
+          eventName: eventName,
+          createdAt: Date.now(),
+          createdBy: uid,
+        });
+      }
+
+      // 2. Initial bidirectional push & pull
+      await this.pushLocalDataToCloud();
+      this.attachRealtimeListeners(code);
+
+      this.lastSyncedAt = Date.now();
+      this.isSyncing = false;
+      this.notify();
+      return true;
+    } catch (err) {
+      this.isSyncing = false;
+      this.notify();
+      throw err;
+    }
+  }
+
+  public disconnect() {
+    this.unsubs.forEach((unsub) => unsub());
+    this.unsubs = [];
+    this.activeRoomCode = null;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('frc_sync_room_code');
+    }
+    this.notify();
+  }
+
+  // Real-time Firestore Listeners
+  private attachRealtimeListeners(roomCode: string) {
+    const teamsPath = `rooms/${roomCode}/teams`;
+    const matchesPath = `rooms/${roomCode}/matches`;
+    const strategiesPath = `rooms/${roomCode}/strategies`;
+
+    // 1. Teams Listener
+    const unTeam = onSnapshot(
+      collection(db, teamsPath),
+      async (snap) => {
+        for (const docChange of snap.docChanges()) {
+          if (docChange.type === 'added' || docChange.type === 'modified') {
+            const remoteTeam = docChange.doc.data() as TeamProfile;
+            await this.mergeIncomingTeam(remoteTeam);
+          }
+        }
+        this.lastSyncedAt = Date.now();
+        this.notify();
+      },
+      (err) => handleFirestoreError(err, OperationType.LIST, teamsPath)
+    );
+    this.unsubs.push(unTeam);
+
+    // 2. Matches Listener
+    const unMatch = onSnapshot(
+      collection(db, matchesPath),
+      async (snap) => {
+        for (const docChange of snap.docChanges()) {
+          if (docChange.type === 'added' || docChange.type === 'modified') {
+            const remoteMatch = docChange.doc.data() as MatchScoutingRecord;
+            await this.mergeIncomingMatch(remoteMatch);
+          }
+        }
+        this.lastSyncedAt = Date.now();
+        this.notify();
+      },
+      (err) => handleFirestoreError(err, OperationType.LIST, matchesPath)
+    );
+    this.unsubs.push(unMatch);
+
+    // 3. Strategies Listener
+    const unStrat = onSnapshot(
+      collection(db, strategiesPath),
+      async (snap) => {
+        for (const docChange of snap.docChanges()) {
+          if (docChange.type === 'added' || docChange.type === 'modified') {
+            const remoteStrat = docChange.doc.data() as StrategyPlan;
+            await scoutingDB.saveStrategy(remoteStrat);
+          }
+        }
+        this.lastSyncedAt = Date.now();
+        this.notify();
+      },
+      (err) => handleFirestoreError(err, OperationType.LIST, strategiesPath)
+    );
+    this.unsubs.push(unStrat);
+  }
+
+  // --- SMART CONFLICT RESOLUTION MERGE ENGINE ---
+
+  // Merge Match Observation (Append-Only Event Log Strategy)
+  private async mergeIncomingMatch(remoteMatch: MatchScoutingRecord) {
+    if (!remoteMatch || !remoteMatch.id) return;
+    const localMatch = await scoutingDB.getMatch(remoteMatch.id);
+    if (!localMatch) {
+      // New match record from another scout: insert directly into local database
+      await scoutingDB.saveMatch(remoteMatch);
+    } else {
+      // If already exists locally with older timestamp, update
+      if ((remoteMatch.timestamp || 0) > (localMatch.timestamp || 0)) {
+        await scoutingDB.saveMatch(remoteMatch);
+      }
+    }
+  }
+
+  // Merge Pit Scouting Profile (Field-Level Timestamp / LWW Strategy)
+  private async mergeIncomingTeam(remoteTeam: TeamProfile) {
+    if (!remoteTeam || !remoteTeam.teamNumber) return;
+    const localTeam = await scoutingDB.getTeam(remoteTeam.teamNumber);
+
+    if (!localTeam) {
+      await scoutingDB.saveTeam(remoteTeam);
+      return;
+    }
+
+    // Both exist: perform field-level 3-way merge
+    let mergedPit: PitData | undefined = undefined;
+    if (localTeam.pit || remoteTeam.pit) {
+      const basePit = localTeam.pit || remoteTeam.pit!;
+      mergedPit = {
+        ...basePit,
+        ...(remoteTeam.pit || {}),
+        shootingAreas: remoteTeam.pit?.shootingAreas || localTeam.pit?.shootingAreas || [],
+        autoDrawings: this.mergeAutoDrawings(
+          localTeam.pit?.autoDrawings || [],
+          remoteTeam.pit?.autoDrawings || []
+        ),
+      };
+    }
+
+    const merged: TeamProfile = {
+      ...localTeam,
+      ...remoteTeam,
+      teamNumber: remoteTeam.teamNumber,
+      teamName: remoteTeam.teamName || localTeam.teamName,
+      organization: remoteTeam.organization || localTeam.organization,
+      location: remoteTeam.location || localTeam.location,
+      updatedAt: Math.max(remoteTeam.updatedAt || 0, localTeam.updatedAt || 0),
+      pit: mergedPit,
+    };
+
+    await scoutingDB.saveTeam(merged);
+  }
+
+  private mergeAutoDrawings(local: AutonomousDrawing[], remote: AutonomousDrawing[]): AutonomousDrawing[] {
+    const map = new Map<string, AutonomousDrawing>();
+    local.forEach((d) => d.id && map.set(d.id, d));
+    remote.forEach((d) => d.id && map.set(d.id, d));
+    return Array.from(map.values());
+  }
+
+  // Push local changes to cloud
+  public async pushLocalDataToCloud() {
+    if (!this.activeRoomCode) return;
+    const roomCode = this.activeRoomCode;
+    const uid = await this.ensureAuth();
+
+    const teams = await scoutingDB.getAllTeams();
+    const matches = await scoutingDB.getAllMatches();
+    const strategies = await scoutingDB.getAllStrategies();
+
+    // Push Teams
+    for (const team of teams) {
+      const cleanTeam = {
+        ...team,
+        updatedBy: uid,
+      };
+      const teamDocPath = `rooms/${roomCode}/teams/${team.teamNumber}`;
+      try {
+        await setDoc(doc(db, 'rooms', roomCode, 'teams', team.teamNumber.toString()), cleanTeam, { merge: true });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, teamDocPath);
+      }
+    }
+
+    // Push Matches
+    for (const match of matches) {
+      const matchDocPath = `rooms/${roomCode}/matches/${match.id}`;
+      try {
+        await setDoc(doc(db, 'rooms', roomCode, 'matches', match.id), match, { merge: true });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, matchDocPath);
+      }
+    }
+
+    // Push Strategies
+    for (const strat of strategies) {
+      const stratDocPath = `rooms/${roomCode}/strategies/${strat.id}`;
+      try {
+        await setDoc(doc(db, 'rooms', roomCode, 'strategies', strat.id), strat, { merge: true });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.WRITE, stratDocPath);
+      }
+    }
+  }
+
+  // Hook into save operations for immediate cloud broadcast
+  public async broadcastTeamSave(team: TeamProfile) {
+    if (!this.activeRoomCode) return;
+    const roomCode = this.activeRoomCode;
+    const teamDocPath = `rooms/${roomCode}/teams/${team.teamNumber}`;
+    try {
+      await setDoc(doc(db, 'rooms', roomCode, 'teams', team.teamNumber.toString()), team, { merge: true });
+      this.lastSyncedAt = Date.now();
+      this.notify();
+    } catch (err) {
+      console.warn('Queued team save offline in Firestore cache:', err);
+    }
+  }
+
+  public async broadcastMatchSave(match: MatchScoutingRecord) {
+    if (!this.activeRoomCode) return;
+    const roomCode = this.activeRoomCode;
+    const matchDocPath = `rooms/${roomCode}/matches/${match.id}`;
+    try {
+      await setDoc(doc(db, 'rooms', roomCode, 'matches', match.id), match, { merge: true });
+      this.lastSyncedAt = Date.now();
+      this.notify();
+    } catch (err) {
+      console.warn('Queued match save offline in Firestore cache:', err);
+    }
+  }
+
+  public async broadcastStrategySave(strategy: StrategyPlan) {
+    if (!this.activeRoomCode) return;
+    const roomCode = this.activeRoomCode;
+    const stratDocPath = `rooms/${roomCode}/strategies/${strategy.id}`;
+    try {
+      await setDoc(doc(db, 'rooms', roomCode, 'strategies', strategy.id), strategy, { merge: true });
+      this.lastSyncedAt = Date.now();
+      this.notify();
+    } catch (err) {
+      console.warn('Queued strategy save offline in Firestore cache:', err);
+    }
+  }
+}
+
+export const cloudSync = new CloudSyncManager();

@@ -10,11 +10,16 @@ import {
   Sliders, 
   ChevronRight,
   Share2,
-  QrCode
+  QrCode,
+  Cloud,
+  Radio,
+  Zap
 } from 'lucide-react';
 import { scoutingDB } from '../../db/indexedDB';
 import { TeamProfile } from '../../types/scouting';
 import { DistributeModal } from '../common/DistributeModal';
+import { TeamRoomSyncModal } from '../sync/TeamRoomSyncModal';
+import { cloudSync, SyncStatus } from '../../db/cloudSync';
 
 interface HomeScreenProps {
   onNavigate: (view: string, teamNumber?: number) => void;
@@ -24,9 +29,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const [teamSearch, setTeamSearch] = useState('');
   const [teams, setTeams] = useState<TeamProfile[]>([]);
   const [showDistribute, setShowDistribute] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(cloudSync.getStatus());
 
   useEffect(() => {
     loadSummary();
+    const unsub = cloudSync.subscribe((status) => {
+      setSyncStatus(status);
+    });
+    return () => unsub();
   }, []);
 
   const loadSummary = async () => {
@@ -44,7 +55,28 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
   return (
     <>
-      <div className="max-w-xl mx-auto px-3 sm:px-4 py-4 flex flex-col gap-4">
+      <div className="max-w-xl mx-auto px-3 sm:px-4 py-4 flex flex-col gap-3.5">
+        {/* Cloud Room Status Pill (if connected) */}
+        {syncStatus.roomCode && (
+          <div 
+            onClick={() => setShowSyncModal(true)}
+            className="px-3.5 py-2 rounded-xl bg-emerald-950/40 border border-emerald-800/80 flex items-center justify-between cursor-pointer hover:bg-emerald-900/30 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-bold text-emerald-300 font-mono">
+                ROOM: {syncStatus.roomCode}
+              </span>
+              <span className="text-[11px] text-emerald-400/80 hidden sm:inline">
+                • Live Auto-Syncing Active
+              </span>
+            </div>
+            <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider bg-emerald-900/60 px-2 py-0.5 rounded-md border border-emerald-700/60">
+              Manage
+            </span>
+          </div>
+        )}
+
         {/* Search Bar */}
         <form onSubmit={handleSearchSubmit} className="relative">
           <Search className="w-4 h-4 absolute left-3 top-3 text-slate-500" />
@@ -178,31 +210,70 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           </button>
         </div>
 
-        {/* Distribute & Install Banner */}
-        <div className="p-3.5 rounded-xl bg-gradient-to-r from-slate-900 to-slate-950 border border-slate-800 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-950/60 border border-blue-800/60 text-blue-400 flex items-center justify-center shrink-0">
-              <QrCode className="w-4 h-4" />
+        {/* Cloud Auto-Sync & Distribute Banners */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          {/* Cloud Auto-Sync Banner */}
+          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
+                syncStatus.roomCode 
+                  ? 'bg-emerald-950/60 border-emerald-800/80 text-emerald-400' 
+                  : 'bg-blue-950/60 border-blue-800/80 text-blue-400'
+              }`}>
+                <Cloud className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-200">
+                  {syncStatus.roomCode ? `Synced: ${syncStatus.roomCode}` : 'Team Cloud Auto-Sync'}
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  {syncStatus.roomCode ? 'Live multi-scout sync' : 'Sync scouts anywhere'}
+                </div>
+              </div>
             </div>
-            <div>
-              <div className="text-xs font-bold text-slate-200">Share App with Scouts</div>
-              <div className="text-[11px] text-slate-400">Scan QR code or install offline PWA on phones</div>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowSyncModal(true)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shrink-0 shadow-sm cursor-pointer ${
+                syncStatus.roomCode
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+              }`}
+            >
+              {syncStatus.roomCode ? 'Status' : 'Join'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowDistribute(!showDistribute)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-colors shrink-0 shadow-sm cursor-pointer"
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Distribute</span>
-          </button>
+
+          {/* Distribute Banner */}
+          <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 flex items-center justify-center shrink-0">
+                <QrCode className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-200">Share App Link</div>
+                <div className="text-[11px] text-slate-400">Install PWA on phones</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDistribute(true)}
+              className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-colors shrink-0 shadow-sm cursor-pointer"
+            >
+              Share
+            </button>
+          </div>
         </div>
       </div>
 
       <DistributeModal
         isOpen={showDistribute}
         onClose={() => setShowDistribute(false)}
+      />
+
+      <TeamRoomSyncModal
+        isOpen={showSyncModal}
+        onClose={() => setShowSyncModal(false)}
       />
     </>
   );

@@ -1,0 +1,177 @@
+{
+  "entities": {
+    "TeamRoom": {
+      "title": "TeamRoom",
+      "description": "A shared scouting session room for an FRC team event.",
+      "type": "object",
+      "properties": {
+        "roomCode": {
+          "type": "string",
+          "description": "Unique room code identifier (e.g. 9751-SVR)",
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "eventName": {
+          "type": "string",
+          "description": "Name of the FRC event or competition",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp in milliseconds"
+        },
+        "createdBy": {
+          "type": "string",
+          "description": "User UID who created the room",
+          "maxLength": 128
+        }
+      },
+      "required": ["roomCode", "eventName", "createdAt", "createdBy"]
+    },
+    "TeamProfile": {
+      "title": "TeamProfile",
+      "description": "FRC Team pit scouting data, robot specifications, and notes.",
+      "type": "object",
+      "properties": {
+        "teamNumber": {
+          "type": "number",
+          "description": "FRC team number (e.g. 9751)"
+        },
+        "teamName": {
+          "type": "string",
+          "description": "Team nickname / nickname string",
+          "maxLength": 128
+        },
+        "organization": {
+          "type": "string",
+          "description": "School or sponsor organization",
+          "maxLength": 128
+        },
+        "location": {
+          "type": "string",
+          "description": "City, State, Country",
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Last updated timestamp"
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "User UID or Scout Name of the last editor",
+          "maxLength": 128
+        },
+        "pit": {
+          "type": "object",
+          "description": "Pit scouting specifications and metrics"
+        }
+      },
+      "required": ["teamNumber", "updatedAt"]
+    },
+    "MatchRecord": {
+      "title": "MatchRecord",
+      "description": "An individual match scouting observation submitted by a scout.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique match log UUID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "matchNumber": {
+          "type": "number",
+          "description": "Match sequence number"
+        },
+        "teamNumber": {
+          "type": "number",
+          "description": "Team number scouted"
+        },
+        "scoutName": {
+          "type": "string",
+          "description": "Name of the scout",
+          "maxLength": 64
+        },
+        "scoutUid": {
+          "type": "string",
+          "description": "Auth UID of the scout",
+          "maxLength": 128
+        },
+        "matchType": {
+          "type": "string",
+          "description": "Qualification, Playoff, Practice",
+          "enum": ["Qualification", "Playoff", "Practice"]
+        },
+        "alliance": {
+          "type": "string",
+          "description": "RED or BLUE alliance",
+          "enum": ["RED", "BLUE"]
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "Submission timestamp"
+        }
+      },
+      "required": ["id", "matchNumber", "teamNumber", "matchType", "alliance", "timestamp"]
+    },
+    "StrategyBoard": {
+      "title": "StrategyBoard",
+      "description": "Shared whiteboard strategy, robot positions, and match plan.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Strategy plan ID",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Match strategy plan title",
+          "maxLength": 128
+        },
+        "notes": {
+          "type": "string",
+          "description": "Strategy drive coach notes",
+          "maxLength": 5000
+        },
+        "updatedAt": {
+          "type": "number",
+          "description": "Last updated timestamp"
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "User UID who saved the strategy",
+          "maxLength": 128
+        }
+      },
+      "required": ["id", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/rooms/{roomCode}": {
+      "schema": {
+        "$ref": "TeamRoom"
+      },
+      "description": "Stores shared scouting room session metadata."
+    },
+    "/rooms/{roomCode}/teams/{teamNumber}": {
+      "schema": {
+        "$ref": "TeamProfile"
+      },
+      "description": "Stores pit scouting data for each team in the room."
+    },
+    "/rooms/{roomCode}/matches/{matchId}": {
+      "schema": {
+        "$ref": "MatchRecord"
+      },
+      "description": "Stores individual match scouting observations for the room."
+    },
+    "/rooms/{roomCode}/strategies/{strategyId}": {
+      "schema": {
+        "$ref": "StrategyBoard"
+      },
+      "description": "Stores alliance match strategy whiteboards."
+    }
+  }
+}

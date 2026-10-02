@@ -1,12 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { DistributeModal } from './DistributeModal';
+import { TeamRoomSyncModal } from '../sync/TeamRoomSyncModal';
+import { cloudSync, SyncStatus } from '../../db/cloudSync';
 import { 
   Menu, 
   X, 
   Search,
   WifiOff,
-  Share2
+  Share2,
+  Cloud,
+  Radio
 } from 'lucide-react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
@@ -23,8 +27,17 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDistributeModal, setShowDistributeModal] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(cloudSync.getStatus());
   const isOnline = useOnlineStatus();
   const [searchInput, setSearchInput] = useState('');
+
+  useEffect(() => {
+    const unsub = cloudSync.subscribe((status) => {
+      setSyncStatus(status);
+    });
+    return () => unsub();
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +90,27 @@ export const Header: React.FC<HeaderProps> = ({
           </form>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Cloud Sync Status Button */}
+            <button
+              type="button"
+              onClick={() => setShowSyncModal(true)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors active:scale-95 cursor-pointer ${
+                syncStatus.roomCode
+                  ? 'bg-emerald-950/50 border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/50'
+                  : 'bg-slate-900 border-slate-750 text-slate-300 hover:bg-slate-800'
+              }`}
+              title={syncStatus.roomCode ? `Connected to Room ${syncStatus.roomCode}` : 'Join Team Cloud Sync Room'}
+            >
+              <Cloud className={`w-3.5 h-3.5 ${syncStatus.roomCode ? 'text-emerald-400' : 'text-blue-400'}`} />
+              <span className="hidden sm:inline font-mono">
+                {syncStatus.roomCode ? syncStatus.roomCode : 'Sync'}
+              </span>
+              {syncStatus.roomCode && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline" />
+              )}
+            </button>
+
             <button
               type="button"
               onClick={() => setShowDistributeModal(true)}
@@ -148,17 +181,31 @@ export const Header: React.FC<HeaderProps> = ({
                 ))}
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  setShowDistributeModal(true);
-                }}
-                className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-bold transition-colors cursor-pointer"
-              >
-                <Share2 className="w-4 h-4" />
-                <span>Distribute & Share App (QR Code / PWA)</span>
-              </button>
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setShowSyncModal(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800/80 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <Radio className="w-4 h-4" />
+                  <span>{syncStatus.roomCode ? `Connected: Room ${syncStatus.roomCode}` : 'Join Team Cloud Sync Room'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setShowDistributeModal(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span>Distribute & Share App</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -168,6 +215,12 @@ export const Header: React.FC<HeaderProps> = ({
       <DistributeModal
         isOpen={showDistributeModal}
         onClose={() => setShowDistributeModal(false)}
+      />
+
+      {/* Team Room Cloud Sync Modal */}
+      <TeamRoomSyncModal
+        isOpen={showSyncModal}
+        onClose={() => setShowSyncModal(false)}
       />
     </>
   );
