@@ -108,6 +108,7 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
       team,
       teamNum,
       officialRank: team?.officialRank ? `Rank ${team.officialRank}` : 'N/A',
+      stateRank: team?.stateRank ? `Rank ${team.stateRank}` : 'N/A',
       matchesScouted: count,
       autoSuccessStr,
       avgAutoFuel: avgAutoFuel.toFixed(1),
@@ -211,15 +212,28 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
             </thead>
 
             <tbody className="divide-y divide-slate-850">
-              {/* OFFICIAL RANK */}
+              {/* OFFICIAL EVENT RANK */}
               <tr className="bg-slate-900/50 font-bold">
                 <td className="p-3 font-mono uppercase text-amber-400 flex items-center gap-1.5">
                   <Trophy className="w-4 h-4" />
-                  <span>Official Rank</span>
+                  <span>Event Rank</span>
                 </td>
                 {comparedStats.map((s) => (
                   <td key={s.teamNum} className="p-3 text-center font-mono font-black text-amber-300">
                     {s.officialRank}
+                  </td>
+                ))}
+              </tr>
+
+              {/* STATE RANK */}
+              <tr className="bg-slate-900/50 font-bold border-b border-slate-800">
+                <td className="p-3 font-mono uppercase text-blue-400 flex items-center gap-1.5">
+                  <Trophy className="w-4 h-4 text-blue-400" />
+                  <span>State Rank</span>
+                </td>
+                {comparedStats.map((s) => (
+                  <td key={s.teamNum} className="p-3 text-center font-mono font-black text-blue-300">
+                    {s.stateRank}
                   </td>
                 ))}
               </tr>

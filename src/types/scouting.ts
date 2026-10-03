@@ -139,6 +139,7 @@ export interface TeamProfile {
   location?: string;
   pit?: PitData;
   officialRank?: number;
+  stateRank?: number;
   customPicklistRank?: number;
   createdAt: number;
   updatedAt: number;

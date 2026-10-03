@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { scoutingDB } from '../../db/indexedDB';
-import { importEventRosterAndRankings } from '../../utils/rankingsSync';
+import { importEventRosterAndRankings, bulkImportTeams } from '../../utils/rankingsSync';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 import { 
   Sliders, 
@@ -19,8 +19,9 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
   const [scoutName, setScoutName] = useState('');
-  const [eventCode, setEventCode] = useState('2026REBUILT');
+  const [eventCode, setEventCode] = useState('2025micmp');
   const [tbaApiKey, setTbaApiKey] = useState('');
+  const [bulkInput, setBulkInput] = useState('');
   const [teamCount, setTeamCount] = useState(0);
   const [matchCount, setMatchCount] = useState(0);
   const [savedToast, setSavedToast] = useState(false);
@@ -129,6 +130,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             <p className="text-[11px] text-slate-400">
               Optional API Key for live qualification event rankings from The Blue Alliance.
             </p>
+          </div>
+
+          {/* Manual Bulk Team Import */}
+          <div className="space-y-2 pt-3 border-t border-slate-800">
+            <label className="text-xs font-mono font-bold uppercase text-slate-300 block flex items-center gap-2">
+              <Database className="w-4 h-4 text-purple-400" />
+              <span>Or Paste Team Numbers (Comma or Space separated)</span>
+            </label>
+            <div className="flex flex-col gap-2">
+              <textarea
+                rows={2}
+                value={bulkInput}
+                onChange={(e) => setBulkInput(e.target.value)}
+                placeholder="e.g. 9751, 3322, 1684, 254, 1678..."
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-purple-500"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!bulkInput.trim()) return;
+                  const res = await bulkImportTeams(bulkInput);
+                  alert(res.message);
+                  setBulkInput('');
+                  loadSettings();
+                }}
+                className="py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-mono font-bold text-xs uppercase cursor-pointer"
+              >
+                Bulk Add Teams To Roster
+              </button>
+            </div>
           </div>
         </div>
 

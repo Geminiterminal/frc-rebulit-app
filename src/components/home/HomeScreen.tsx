@@ -59,27 +59,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   return (
     <>
       <div className="max-w-xl mx-auto px-3.5 sm:px-5 py-6 pb-28 flex flex-col gap-6">
-        {/* Cloud Room Status Pill (if connected) */}
-        {syncStatus.roomCode && (
-          <div 
-            onClick={() => setShowSyncModal(true)}
-            className="px-4 py-2.5 rounded-xl bg-emerald-950/40 border border-emerald-800/80 flex items-center justify-between cursor-pointer hover:bg-emerald-900/30 transition-colors shadow-sm"
-          >
-            <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs sm:text-sm font-bold text-emerald-300 font-mono">
-                ROOM: {syncStatus.roomCode}
-              </span>
-              <span className="text-xs text-emerald-400/80 hidden sm:inline">
-                • Live Cloud Auto-Sync Active
-              </span>
-            </div>
-            <span className="text-[11px] text-emerald-400 font-bold uppercase tracking-wider bg-emerald-900/60 px-2.5 py-1 rounded-lg border border-emerald-700/60">
-              Manage
-            </span>
-          </div>
-        )}
-
         {/* Search Bar */}
         <form onSubmit={handleSearchSubmit} className="relative">
           <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-500" />
@@ -112,10 +91,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
               </div>
               <div>
                 <div className="text-base sm:text-lg font-black text-amber-400 tracking-tight font-mono">
-                  TEAM PICKLIST & COMPARE
-                </div>
-                <div className="text-xs text-slate-400">
-                  Decision matrix & side-by-side team comparison
+                  RANKING
                 </div>
               </div>
             </div>

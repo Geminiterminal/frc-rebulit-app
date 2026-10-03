@@ -118,7 +118,10 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
               {pit?.drivetrain || 'No Pit Data'}
             </span>
             <span className="px-2.5 py-1 rounded-md bg-amber-950/80 text-amber-300 border border-amber-800/80 font-mono text-xs font-bold">
-              {team.officialRank ? `Rank ${team.officialRank}` : 'Rank: N/A'}
+              {team.officialRank ? `Event Rank: ${team.officialRank}` : 'Event Rank: N/A'}
+            </span>
+            <span className="px-2.5 py-1 rounded-md bg-blue-950/80 text-blue-300 border border-blue-800/80 font-mono text-xs font-bold">
+              {team.stateRank ? `State Rank: ${team.stateRank}` : 'State Rank: N/A'}
             </span>
           </div>
           <div className="text-sm font-semibold text-slate-400 mt-1">

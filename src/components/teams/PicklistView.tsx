@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TeamProfile, MatchScoutingRecord } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
-import { syncOfficialRankings } from '../../utils/rankingsSync';
+import { importEventRosterAndRankings } from '../../utils/rankingsSync';
 import { 
   Trophy, 
   ArrowUpDown, 
@@ -13,7 +13,8 @@ import {
   Square, 
   Edit3,
   Check,
-  X
+  X,
+  Award
 } from 'lucide-react';
 
 interface PicklistViewProps {
@@ -28,7 +29,8 @@ export type SortOption =
   | 'defense' 
   | 'defenseEffectiveness' 
   | 'matchesScouted' 
-  | 'officialRank';
+  | 'officialRank'
+  | 'stateRank';
 
 export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
   const [teams, setTeams] = useState<TeamProfile[]>([]);
@@ -41,6 +43,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
 
   // Manual rank editing state
   const [editingRankTeamNum, setEditingRankTeamNum] = useState<number | null>(null);
+  const [editingRankType, setEditingRankType] = useState<'official' | 'state' | null>(null);
   const [tempRankValue, setTempRankValue] = useState<string>('');
 
   useEffect(() => {
@@ -56,15 +59,15 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
 
   const handleSyncRankings = async () => {
     setIsSyncingRanks(true);
-    const eventCode = await scoutingDB.getSetting<string>('eventCode', '2026REBUILT');
-    const result = await syncOfficialRankings(eventCode);
+    const eventCode = await scoutingDB.getSetting<string>('eventCode', '2025micmp');
+    const result = await importEventRosterAndRankings(eventCode);
     setIsSyncingRanks(false);
     setSyncToast(result.message);
     await loadData();
     setTimeout(() => setSyncToast(null), 3500);
   };
 
-  const handleSaveManualRank = async (teamNum: number) => {
+  const handleSaveManualRank = async (teamNum: number, rankType: 'official' | 'state') => {
     const targetTeam = teams.find((t) => t.teamNumber === teamNum);
     if (!targetTeam) return;
 
@@ -73,11 +76,12 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
 
     await scoutingDB.saveTeam({
       ...targetTeam,
-      officialRank: newRank,
+      [rankType === 'official' ? 'officialRank' : 'stateRank']: newRank,
       updatedAt: Date.now(),
     });
 
     setEditingRankTeamNum(null);
+    setEditingRankType(null);
     setTempRankValue('');
     await loadData();
   };
@@ -160,6 +164,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
       defenseVal,
       defenseLabel,
       officialRank: team.officialRank,
+      stateRank: team.stateRank,
     };
   });
 
@@ -179,10 +184,16 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
         return b.defenseVal - a.defenseVal;
       case 'matchesScouted':
         return b.matchesCount - a.matchesCount;
-      case 'officialRank':
+      case 'officialRank': {
         const rA = a.officialRank !== undefined ? a.officialRank : 999;
         const rB = b.officialRank !== undefined ? b.officialRank : 999;
         return rA - rB;
+      }
+      case 'stateRank': {
+        const rA = a.stateRank !== undefined ? a.stateRank : 999;
+        const rB = b.stateRank !== undefined ? b.stateRank : 999;
+        return rA - rB;
+      }
       default:
         return b.avgTotalFuel - a.avgTotalFuel;
     }
@@ -205,37 +216,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-3.5 sm:px-5 py-5 pb-32 flex flex-col gap-6">
-      {/* Toast Notification */}
-      {syncToast && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-slate-100 font-mono text-xs px-4 py-2.5 rounded-xl shadow-2xl border border-slate-700 max-w-md text-center animate-fadeIn">
-          {syncToast}
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black font-mono text-white tracking-tight uppercase flex items-center gap-2">
-            <Trophy className="w-6 h-6 text-amber-400" />
-            <span>TEAM PICKLIST</span>
-          </h1>
-          <p className="text-xs text-slate-400">
-            Alliance captain decision matrix with editable official ranks & N/A status
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleSyncRankings}
-          disabled={isSyncingRanks}
-          className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-750 font-mono font-bold text-xs uppercase cursor-pointer disabled:opacity-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 text-amber-400 ${isSyncingRanks ? 'animate-spin' : ''}`} />
-          <span>{isSyncingRanks ? 'Syncing...' : 'Sync Official Ranks'}</span>
-        </button>
-      </div>
-
+    <div className="max-w-5xl mx-auto px-3.5 sm:px-5 py-5 pb-32 flex flex-col gap-6">
       {/* Controls Bar: Sort by & Filter */}
       <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-sm">
         {/* Sort By Dropdown */}
@@ -254,8 +235,9 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
             <option value="autoFuel">Auto Fuel</option>
             <option value="reliability">Reliability Rating</option>
             <option value="defense">Defense Effectiveness</option>
-            <option value="matchesScouted">Matches Scouted</option>
             <option value="officialRank">Official Event Rank</option>
+            <option value="stateRank">State / District Rank</option>
+            <option value="matchesScouted">Matches Scouted</option>
           </select>
         </div>
 
@@ -287,7 +269,8 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
               <th className="p-3 text-center">FUEL</th>
               <th className="p-3 text-center">REL.</th>
               <th className="p-3 text-center">DEF.</th>
-              <th className="p-3 text-center">OFFICIAL</th>
+              <th className="p-3 text-center">EVENT RANK</th>
+              <th className="p-3 text-center">STATE RANK</th>
               <th className="p-3 text-right">ACTION</th>
             </tr>
           </thead>
@@ -295,14 +278,15 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
           <tbody className="divide-y divide-slate-850">
             {filteredTeams.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-8 text-center text-slate-500">
+                <td colSpan={10} className="p-8 text-center text-slate-500">
                   No teams registered. Perform pit or match scouting to populate the picklist.
                 </td>
               </tr>
             ) : (
               filteredTeams.map((item, idx) => {
                 const isSelected = selectedTeamNums.includes(item.teamNumber);
-                const isEditingRank = editingRankTeamNum === item.teamNumber;
+                const isEditingOfficial = editingRankTeamNum === item.teamNumber && editingRankType === 'official';
+                const isEditingState = editingRankTeamNum === item.teamNumber && editingRankType === 'state';
 
                 return (
                   <tr
@@ -386,9 +370,9 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                       </span>
                     </td>
 
-                    {/* Official Rank (With Inline Edit Ability) */}
+                    {/* Official Event Rank */}
                     <td className="p-3 text-center font-mono font-bold">
-                      {isEditingRank ? (
+                      {isEditingOfficial ? (
                         <div className="flex items-center justify-center gap-1">
                           <input
                             type="number"
@@ -398,23 +382,16 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                             autoFocus
                             className="w-14 bg-slate-900 border border-amber-500 rounded px-1 py-0.5 text-center font-mono text-xs text-amber-300 focus:outline-none"
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveManualRank(item.teamNumber);
+                              if (e.key === 'Enter') handleSaveManualRank(item.teamNumber, 'official');
                               if (e.key === 'Escape') setEditingRankTeamNum(null);
                             }}
                           />
                           <button
                             type="button"
-                            onClick={() => handleSaveManualRank(item.teamNumber)}
+                            onClick={() => handleSaveManualRank(item.teamNumber, 'official')}
                             className="p-1 rounded bg-amber-500 text-slate-950 hover:bg-amber-400 cursor-pointer"
                           >
                             <Check className="w-3 h-3" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEditingRankTeamNum(null)}
-                            className="p-1 rounded bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer"
-                          >
-                            <X className="w-3 h-3" />
                           </button>
                         </div>
                       ) : (
@@ -426,10 +403,56 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                             type="button"
                             onClick={() => {
                               setEditingRankTeamNum(item.teamNumber);
+                              setEditingRankType('official');
                               setTempRankValue(item.officialRank ? item.officialRank.toString() : '');
                             }}
                             className="opacity-40 group-hover:opacity-100 p-1 text-slate-400 hover:text-amber-400 transition-opacity cursor-pointer"
-                            title="Edit Official Rank"
+                            title="Edit Event Rank"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* State / District Rank */}
+                    <td className="p-3 text-center font-mono font-bold">
+                      {isEditingState ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <input
+                            type="number"
+                            value={tempRankValue}
+                            onChange={(e) => setTempRankValue(e.target.value)}
+                            placeholder="State #"
+                            autoFocus
+                            className="w-14 bg-slate-900 border border-blue-500 rounded px-1 py-0.5 text-center font-mono text-xs text-blue-300 focus:outline-none"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveManualRank(item.teamNumber, 'state');
+                              if (e.key === 'Escape') setEditingRankTeamNum(null);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveManualRank(item.teamNumber, 'state')}
+                            className="p-1 rounded bg-blue-500 text-slate-950 hover:bg-blue-400 cursor-pointer"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1.5 group">
+                          <span className={item.stateRank ? 'text-blue-300 font-black' : 'text-slate-500 font-bold'}>
+                            {item.stateRank ? `Rank ${item.stateRank}` : 'N/A'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingRankTeamNum(item.teamNumber);
+                              setEditingRankType('state');
+                              setTempRankValue(item.stateRank ? item.stateRank.toString() : '');
+                            }}
+                            className="opacity-40 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-400 transition-opacity cursor-pointer"
+                            title="Edit State Rank"
                           >
                             <Edit3 className="w-3 h-3" />
                           </button>

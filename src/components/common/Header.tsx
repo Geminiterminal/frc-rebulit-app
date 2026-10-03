@@ -117,16 +117,6 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
-            <button
-              type="button"
-              onClick={() => setShowDistributeModal(true)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 transition-colors active:scale-95 cursor-pointer"
-              title="Distribute / Share app with scouts"
-            >
-              <Share2 className="w-3.5 h-3.5 text-blue-400" />
-              <span className="hidden xs:inline">Share</span>
-            </button>
-
             <PWAInstallButton />
 
             {!isOnline && (
