@@ -252,27 +252,6 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
         </form>
       </div>
 
-      {/* QUICK LAUNCH FORMS */}
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          onClick={() => onNavigate('pit-scout')}
-          className="p-4 rounded-2xl bg-[#0F172A] border border-slate-800 hover:border-slate-700 text-left transition-colors cursor-pointer flex items-center justify-between"
-        >
-          <span className="text-xs font-bold text-slate-200">Pit Form</span>
-          <ClipboardList className="w-4 h-4 text-slate-400" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onNavigate('match-scout')}
-          className="p-4 rounded-2xl bg-[#0F172A] border border-slate-800 hover:border-slate-700 text-left transition-colors cursor-pointer flex items-center justify-between"
-        >
-          <span className="text-xs font-bold text-slate-200">Match Form</span>
-          <Gamepad2 className="w-4 h-4 text-slate-400" />
-        </button>
-      </div>
-
       {/* SCAN ASSIGNMENT QR MODAL */}
       <QrScannerModal
         isOpen={isScanAssignmentOpen}
