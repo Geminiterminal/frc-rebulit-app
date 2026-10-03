@@ -123,6 +123,16 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
             <span className="px-2.5 py-1 rounded-md bg-blue-950/80 text-blue-300 border border-blue-800/80 font-mono text-xs font-bold">
               {team.stateRank ? `State Rank: ${team.stateRank}` : 'State Rank: N/A'}
             </span>
+            {team.customPicklistRank && (
+              <span className="px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-xs font-bold">
+                Pref #{team.customPicklistRank}
+              </span>
+            )}
+            {team.isUnavailable && (
+              <span className="px-2.5 py-1 rounded-md bg-rose-950 text-rose-300 border border-rose-800 font-mono text-xs font-bold uppercase">
+                PICKED / UNAVAILABLE
+              </span>
+            )}
           </div>
           <div className="text-sm font-semibold text-slate-400 mt-1">
             {team.teamName}

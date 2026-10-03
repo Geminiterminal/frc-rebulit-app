@@ -156,6 +156,35 @@ class ScoutingDB {
     });
   }
 
+  async saveTeamsBatch(teams: TeamProfile[]): Promise<void> {
+    await this.init();
+    const now = Date.now();
+    teams.forEach((t) => {
+      t.updatedAt = now;
+      if (!t.createdAt) t.createdAt = now;
+      onSaveHook?.('team', t);
+    });
+
+    if (!this.db) {
+      try {
+        teams.forEach((t) => localStorage.setItem(`team_${t.teamNumber}`, JSON.stringify(t)));
+      } catch {}
+      return;
+    }
+
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db!.transaction('teams', 'readwrite');
+        const store = tx.objectStore('teams');
+        teams.forEach((t) => store.put(t));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  }
+
   async deleteTeam(teamNumber: number): Promise<void> {
     await this.init();
     if (!this.db) {
@@ -458,193 +487,54 @@ class ScoutingDB {
   async clearAllData(): Promise<void> {
     await this.init();
 
-    // Clear localStorage fallback keys
+    // 1. Clear all localStorage keys
     if (typeof localStorage !== 'undefined') {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && (k.startsWith('team_') || k.startsWith('match_') || k.startsWith('strat_'))) {
-          keysToRemove.push(k);
-        }
-      }
-      keysToRemove.forEach((k) => localStorage.removeItem(k));
-      localStorage.setItem('frc_has_cleared_data', 'true');
+      localStorage.clear();
     }
 
-    if (!this.db) {
-      return;
-    }
-
-    return new Promise((resolve, reject) => {
+    // 2. Clear all object stores if DB is open
+    if (this.db) {
       try {
-        const tx = this.db!.transaction(['teams', 'matches', 'strategies'], 'readwrite');
+        const tx = this.db.transaction(['teams', 'matches', 'strategies', 'settings'], 'readwrite');
         tx.objectStore('teams').clear();
         tx.objectStore('matches').clear();
         tx.objectStore('strategies').clear();
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      } catch (err) {
-        console.error('Error clearing object stores:', err);
-        resolve();
+        if (this.db.objectStoreNames.contains('settings')) {
+          tx.objectStore('settings').clear();
+        }
+        await new Promise<void>((resolve) => {
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        });
+      } catch (e) {
+        console.warn('Object store clear warning:', e);
       }
-    });
-  }
 
-  // Seed sample data if database is empty - Disabled so app starts with clean slate
-  async seedInitialDataIfEmpty(): Promise<boolean> {
-    return false;
-  }
-
-  // Force seed sample competition data (Team 9751, 254, 1678)
-  async seedSampleData(): Promise<boolean> {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('frc_has_cleared_data');
+      try {
+        this.db.close();
+        this.db = null;
+      } catch (e) {
+        console.warn('DB close warning:', e);
+      }
     }
 
-    // Seed Team 9751 (as requested by user)
-    const team9751: TeamProfile = {
-      teamNumber: 9751,
-      teamName: 'Titan Robotics',
-      organization: 'REBUILT High School',
-      location: 'San Jose, CA',
-      createdAt: Date.now() - 3600000 * 24,
-      updatedAt: Date.now(),
-      pit: {
-        drivetrain: 'SWERVE',
-        shooter: ['TURRET', 'PIVOTING'],
-        hopperCapacity: 20,
-        shootingAccuracy: '85–94%',
-        shootingAreas: [
-          { id: 'zone-1', x: 78, y: 32, label: 'Trench Shot', zoneType: 'trench' },
-          { id: 'zone-2', x: 50, y: 38, label: 'Hub Key', zoneType: 'hub' },
-          { id: 'zone-3', x: 22, y: 30, label: 'Bump Flank', zoneType: 'bump' },
-        ],
-        bumpTrench: 'BOTH',
-        hasAutonomous: 'YES',
-        autoRoutinesCount: '2',
-        autoConsistency: 'VERY CONSISTENT',
-        biggestIssues: ['MECHANICAL'],
-        reliability: 'MOSTLY RELIABLE',
-        notes: 'Very clean wiring. Swerve drive Mk4i with L2 gearing. Quick cycle shooter with beam-break indexer.',
-        autoDrawings: [
-          {
-            id: 'auto-9751-1',
-            name: '3-Ball Trench + Rendezvous',
-            createdAt: Date.now() - 3600000 * 12,
-            startPosition: { x: 78, y: 25, angle: 180, label: 'Trench Start' },
-            paths: [
-              {
-                id: 'p1',
-                color: '#3b82f6',
-                width: 4,
-                type: 'path',
-                points: [
-                  { x: 78, y: 25 },
-                  { x: 78, y: 46 },
-                  { x: 78, y: 52 },
-                ],
-                label: 'Intake 2 balls',
-              },
-              {
-                id: 'p2',
-                color: '#ef4444',
-                width: 4,
-                type: 'shoot',
-                points: [
-                  { x: 78, y: 52 },
-                  { x: 50, y: 30 },
-                ],
-                label: 'Score in Blue Hub',
-              },
-            ],
-            notes: 'Consistent 5 ball auto when alliance partners stay out of trench.',
-          },
-        ],
-        photos: [],
-        lastUpdated: Date.now(),
-      },
-    };
+    // 3. Delete IndexedDB database completely
+    try {
+      const deleteReq = indexedDB.deleteDatabase(DB_NAME);
+      await new Promise<void>((resolve) => {
+        deleteReq.onsuccess = () => resolve();
+        deleteReq.onerror = () => resolve();
+        deleteReq.onblocked = () => resolve();
+      });
+    } catch (e) {
+      console.warn('Database deletion warning:', e);
+    }
 
-    // Also seed a couple realistic alliance partner reference teams
-    const team254: TeamProfile = {
-      teamNumber: 254,
-      teamName: 'The Cheesy Poofs',
-      createdAt: Date.now() - 3600000 * 20,
-      updatedAt: Date.now(),
-      pit: {
-        drivetrain: 'SWERVE',
-        shooter: ['TURRET'],
-        hopperCapacity: 25,
-        shootingAccuracy: '95%+',
-        shootingAreas: [
-          { id: 'z1', x: 50, y: 35, label: 'Hub Key', zoneType: 'hub' },
-          { id: 'z2', x: 80, y: 35, label: 'Trench', zoneType: 'trench' },
-          { id: 'z3', x: 50, y: 50, label: 'Center Field', zoneType: 'open' },
-        ],
-        bumpTrench: 'BOTH',
-        hasAutonomous: 'YES',
-        autoRoutinesCount: '4+',
-        autoConsistency: 'VERY CONSISTENT',
-        biggestIssues: ['NONE'],
-        reliability: 'VERY RELIABLE',
-        notes: 'Top tier vision auto-aiming turret. Rapid climb under 4 seconds.',
-        autoDrawings: [],
-        photos: [],
-        lastUpdated: Date.now(),
-      },
-    };
+    this.isReadyPromise = null;
+  }
 
-    const team1678: TeamProfile = {
-      teamNumber: 1678,
-      teamName: 'Citrus Circuits',
-      createdAt: Date.now() - 3600000 * 18,
-      updatedAt: Date.now(),
-      pit: {
-        drivetrain: 'SWERVE',
-        shooter: ['TURRET', 'PIVOTING'],
-        hopperCapacity: 22,
-        shootingAccuracy: '95%+',
-        shootingAreas: [
-          { id: 'z1', x: 50, y: 32, label: 'Protected Key', zoneType: 'hub' },
-          { id: 'z2', x: 82, y: 40, label: 'Trench Alley', zoneType: 'trench' },
-        ],
-        bumpTrench: 'BOTH',
-        hasAutonomous: 'YES',
-        autoRoutinesCount: '4+',
-        autoConsistency: 'VERY CONSISTENT',
-        biggestIssues: ['NONE'],
-        reliability: 'VERY RELIABLE',
-        notes: 'Triple buddy climb mechanism tested in practice match.',
-        autoDrawings: [],
-        photos: [],
-        lastUpdated: Date.now(),
-      },
-    };
-
-    await this.saveTeam(team9751);
-    await this.saveTeam(team254);
-    await this.saveTeam(team1678);
-
-    // Seed 1 realistic match record for 9751
-    const match1: MatchScoutingRecord = {
-      id: 'match-q1-9751',
-      teamNumber: 9751,
-      matchNumber: 1,
-      timestamp: Date.now() - 3600000 * 4,
-      autoWorked: true,
-      autoFuelScored: 4,
-      teleopFuelScored: 20,
-      fieldRoute: 'TRENCH',
-      playedDefense: false,
-      robotIssues: 'NONE',
-      quickNote: 'Awesome trench running speed. Fast cycles.',
-      autoHighScored: 4,
-      teleopHighScored: 20,
-      notes: 'Awesome trench running speed. Fast cycles.',
-    };
-
-    await this.saveMatch(match1);
-    return true;
+  async seedInitialDataIfEmpty(): Promise<boolean> {
+    return false;
   }
 }
 

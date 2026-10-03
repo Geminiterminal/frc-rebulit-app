@@ -141,6 +141,8 @@ export interface TeamProfile {
   officialRank?: number;
   stateRank?: number;
   customPicklistRank?: number;
+  isUnavailable?: boolean;
+  unavailableReason?: string;
   createdAt: number;
   updatedAt: number;
 }

@@ -22,7 +22,6 @@ export const DataManagement: React.FC<DataManagementProps> = ({ onNavigate }) =>
 
   // In-app Confirmation Modals (NO window.confirm!)
   const [showClearModal, setShowClearModal] = useState<boolean>(false);
-  const [showSeedModal, setShowSeedModal] = useState<boolean>(false);
 
   // Conflict resolution modal
   const [pendingImportData, setPendingImportData] = useState<ScoutingDatabaseExport | null>(null);
@@ -99,22 +98,11 @@ export const DataManagement: React.FC<DataManagementProps> = ({ onNavigate }) =>
     }
   };
 
-  const executeResetSampleData = async () => {
-    try {
-      await scoutingDB.seedSampleData();
-      setShowSeedModal(false);
-      setImportResult('Sample competition data initialized (Teams 9751, 254, 1678).');
-    } catch (err: any) {
-      setErrorMsg(`Failed to seed data: ${err.message}`);
-    }
-  };
-
   const executeClearAll = async () => {
     try {
       await scoutingDB.clearAllData();
       setShowClearModal(false);
-      setImportResult('All local scouting data has been completely erased (0 teams, 0 matches).');
-      setExportStats({ teams: 0, matches: 0 });
+      window.location.reload();
     } catch (err: any) {
       setErrorMsg(`Failed to clear database: ${err.message}`);
     }
@@ -214,28 +202,16 @@ export const DataManagement: React.FC<DataManagementProps> = ({ onNavigate }) =>
       )}
 
       {/* Database Actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-        <button
-          type="button"
-          onClick={() => setShowSeedModal(true)}
-          className="p-3.5 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 text-left transition-colors flex items-center gap-3 cursor-pointer"
-        >
-          <Sparkles className="w-4 h-4 text-slate-400 shrink-0" />
-          <div>
-            <div className="text-xs font-bold text-slate-200">Load Sample Data</div>
-            <div className="text-[11px] text-slate-400">Team 9751 & test records</div>
-          </div>
-        </button>
-
+      <div className="pt-1">
         <button
           type="button"
           onClick={() => setShowClearModal(true)}
-          className="p-3.5 rounded-xl bg-slate-900 hover:bg-rose-950/30 border border-slate-800 hover:border-rose-900/60 text-left transition-colors flex items-center gap-3 cursor-pointer"
+          className="w-full p-4 rounded-xl bg-slate-900 hover:bg-rose-950/30 border border-slate-800 hover:border-rose-900/60 text-left transition-colors flex items-center gap-3 cursor-pointer"
         >
-          <Trash2 className="w-4 h-4 text-rose-400 shrink-0" />
+          <Trash2 className="w-5 h-5 text-rose-400 shrink-0" />
           <div>
-            <div className="text-xs font-bold text-rose-300">Erase All Data</div>
-            <div className="text-[11px] text-slate-400">Clear local database completely</div>
+            <div className="text-sm font-bold text-rose-300">Erase All Data</div>
+            <div className="text-xs text-slate-400 mt-0.5">Completely delete all local scouting records, teams, and drawings on this device.</div>
           </div>
         </button>
       </div>
@@ -267,39 +243,6 @@ export const DataManagement: React.FC<DataManagementProps> = ({ onNavigate }) =>
                 className="flex-1 py-2 rounded-xl bg-rose-950 hover:bg-rose-900 text-rose-200 border border-rose-800 font-bold text-xs uppercase shadow transition-colors cursor-pointer"
               >
                 Yes, Erase
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* IN-APP CONFIRMATION MODAL: SEED DATA */}
-      {showSeedModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
-            <div className="flex items-center gap-2.5 text-amber-400">
-              <Sparkles className="w-6 h-6" />
-              <h3 className="font-black text-lg text-white">Load Sample Data?</h3>
-            </div>
-
-            <p className="text-xs text-slate-300 leading-relaxed">
-              This will populate your database with sample competition data for Team 9751, 254, and 1678 with sample autonomous paths, shooting zones, and match observations.
-            </p>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowSeedModal(false)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={executeResetSampleData}
-                className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs uppercase shadow transition-colors"
-              >
-                Load
               </button>
             </div>
           </div>

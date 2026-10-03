@@ -109,6 +109,8 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
       teamNum,
       officialRank: team?.officialRank ? `Rank ${team.officialRank}` : 'N/A',
       stateRank: team?.stateRank ? `Rank ${team.stateRank}` : 'N/A',
+      prefRank: team?.customPicklistRank ? `#${team.customPicklistRank}` : 'N/A',
+      isUnavailable: !!team?.isUnavailable,
       matchesScouted: count,
       autoSuccessStr,
       avgAutoFuel: avgAutoFuel.toFixed(1),
@@ -212,14 +214,47 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
             </thead>
 
             <tbody className="divide-y divide-slate-850">
+              {/* OUR PREFERENCE RANK */}
+              <tr className="bg-amber-950/20 font-bold">
+                <td className="p-3 font-mono uppercase text-amber-400 flex items-center gap-1.5">
+                  <Trophy className="w-4 h-4 text-amber-400" />
+                  <span>Our Preference Rank</span>
+                </td>
+                {comparedStats.map((s) => (
+                  <td key={s.teamNum} className="p-3 text-center font-mono font-black text-amber-300 text-sm">
+                    {s.prefRank}
+                  </td>
+                ))}
+              </tr>
+
+              {/* ALLIANCE AVAILABILITY */}
+              <tr className="bg-slate-900/60 font-bold">
+                <td className="p-3 font-mono uppercase text-slate-300">
+                  <span>Alliance Availability</span>
+                </td>
+                {comparedStats.map((s) => (
+                  <td key={s.teamNum} className="p-3 text-center font-mono text-xs">
+                    {s.isUnavailable ? (
+                      <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-bold uppercase">
+                        PICKED / UNAVAILABLE
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold uppercase">
+                        AVAILABLE
+                      </span>
+                    )}
+                  </td>
+                ))}
+              </tr>
+
               {/* OFFICIAL EVENT RANK */}
               <tr className="bg-slate-900/50 font-bold">
-                <td className="p-3 font-mono uppercase text-amber-400 flex items-center gap-1.5">
+                <td className="p-3 font-mono uppercase text-slate-400 flex items-center gap-1.5">
                   <Trophy className="w-4 h-4" />
                   <span>Event Rank</span>
                 </td>
                 {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono font-black text-amber-300">
+                  <td key={s.teamNum} className="p-3 text-center font-mono font-black text-slate-300">
                     {s.officialRank}
                   </td>
                 ))}
