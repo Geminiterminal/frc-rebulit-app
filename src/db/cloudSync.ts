@@ -4,6 +4,7 @@ import {
   setDoc, 
   getDoc, 
   getDocs, 
+  deleteDoc,
   onSnapshot, 
   Unsubscribe 
 } from 'firebase/firestore';
@@ -31,6 +32,7 @@ export interface AvailableRoom {
   teamCount?: number;
   matchCount?: number;
   createdBy?: string;
+  creatorName?: string;
 }
 
 export interface SyncStatus {
@@ -43,6 +45,32 @@ export interface SyncStatus {
   syncedMatchesCount: number;
   syncedTeamsCount: number;
   scoutName: string;
+  lastError: string | null;
+}
+
+// Timeout helper to prevent infinite network stalls or backoff hangs
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 6000, errorMsg: string = 'Cloud operation timed out.'): Promise<T> {
+  let timer: any;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(errorMsg));
+    }, timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+}
+
+function parseFirebaseError(err: any): string {
+  const msg = err?.message || String(err);
+  if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('Quota limit exceeded') || err?.code === 'resource-exhausted') {
+    return 'Cloud write quota reached on Google Cloud free tier. Remote sync is temporarily paused, but your data is safely saved locally.';
+  }
+  if (msg.includes('PERMISSION_DENIED') || err?.code === 'permission-denied') {
+    return 'Permission denied by cloud security rules.';
+  }
+  if (msg.includes('timed out')) {
+    return 'Connection timed out. The server may be busy or offline.';
+  }
+  return msg;
 }
 
 class CloudSyncManager {
@@ -53,6 +81,7 @@ class CloudSyncManager {
   private isSyncing: boolean = false;
   private lastSyncedAt: number | null = null;
   private pendingCount: number = 0;
+  private lastError: string | null = null;
 
   constructor() {
     this.initFromStorage();
@@ -70,8 +99,9 @@ class CloudSyncManager {
       if (savedRoom) {
         this.activeRoomCode = savedRoom;
         if (savedEvent) this.activeEventName = savedEvent;
-        // Connect automatically if room was previously set
-        setTimeout(() => this.connectToRoom(savedRoom, this.activeEventName), 1000);
+        setTimeout(() => {
+          this.connectToRoom(savedRoom, this.activeEventName).catch(() => {});
+        }, 1200);
       }
     }
   }
@@ -100,14 +130,15 @@ class CloudSyncManager {
       syncedMatchesCount: 0,
       syncedTeamsCount: 0,
       scoutName: this.getScoutName(),
+      lastError: this.lastError,
     };
   }
 
   public getScoutName(): string {
     if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('frc_scout_name') || 'Scout';
+      return localStorage.getItem('frc_scout_name') || 'Lead Scout';
     }
-    return 'Scout';
+    return 'Lead Scout';
   }
 
   public setScoutName(name: string) {
@@ -117,33 +148,46 @@ class CloudSyncManager {
     this.notify();
   }
 
+  public getDeviceId(): string {
+    if (typeof localStorage !== 'undefined') {
+      let id = localStorage.getItem('frc_device_id');
+      if (!id) {
+        id = `dev-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
+        localStorage.setItem('frc_device_id', id);
+      }
+      return id;
+    }
+    return 'device-offline';
+  }
+
   public async ensureAuth(): Promise<string> {
     if (auth.currentUser) return auth.currentUser.uid;
     try {
       const cred = await signInAnonymously(auth);
       return cred.user.uid;
     } catch {
-      let deviceUid = 'panther-device';
-      try {
-        if (typeof localStorage !== 'undefined') {
-          deviceUid = localStorage.getItem('panther_device_uid') || '';
-          if (!deviceUid) {
-            deviceUid = `dev-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-            localStorage.setItem('panther_device_uid', deviceUid);
-          }
-        }
-      } catch {
-        // quota safety
-      }
-      return deviceUid;
+      return this.getDeviceId();
     }
+  }
+
+  // Check if current scout created this room
+  public isRoomCreator(room: AvailableRoom): boolean {
+    const myUid = this.getDeviceId();
+    const myScout = this.getScoutName().trim().toLowerCase();
+    if (room.createdBy && room.createdBy === myUid) return true;
+    if (room.creatorName && myScout && room.creatorName.trim().toLowerCase() === myScout) return true;
+    return false;
   }
 
   // Fetch all active/available scouting rooms from Firestore
   public async fetchAvailableRooms(): Promise<AvailableRoom[]> {
     try {
       await this.ensureAuth();
-      const snap = await getDocs(collection(db, 'rooms'));
+      const snap = await withTimeout(
+        getDocs(collection(db, 'rooms')),
+        5000,
+        'Failed to load room list (network timed out)'
+      );
       const list: AvailableRoom[] = [];
       snap.forEach((d) => {
         const data = d.data();
@@ -156,51 +200,91 @@ class CloudSyncManager {
             teamCount: data.teamCount || 0,
             matchCount: data.matchCount || 0,
             createdBy: data.createdBy,
+            creatorName: data.creatorName || (data.createdBy ? 'Scout' : undefined),
           });
         }
       });
       return list.sort((a, b) => (b.lastActiveAt || b.createdAt || 0) - (a.lastActiveAt || a.createdAt || 0));
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Could not fetch available rooms:', err);
-      return [];
+      throw new Error(parseFirebaseError(err));
+    }
+  }
+
+  // Delete a room from cloud (only for creator)
+  public async deleteRoom(rawCode: string): Promise<boolean> {
+    const code = rawCode.trim().toUpperCase();
+    try {
+      await withTimeout(
+        deleteDoc(doc(db, 'rooms', code)),
+        5000,
+        'Failed to delete room (request timed out)'
+      );
+      if (this.activeRoomCode === code) {
+        this.disconnect();
+      }
+      return true;
+    } catch (err: any) {
+      throw new Error(parseFirebaseError(err));
     }
   }
 
   // Connect / Join a Team Scouting Room
-  public async connectToRoom(rawCode: string, eventName: string = 'FRC REBUILT Competition'): Promise<boolean> {
+  public async connectToRoom(rawCode: string, eventName?: string): Promise<boolean> {
     const code = rawCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
     if (!code) throw new Error('Invalid room code. Please use alphanumeric characters.');
 
     this.disconnect();
     this.isSyncing = true;
+    this.lastError = null;
     this.notify();
 
     try {
       const uid = await this.ensureAuth();
+      const scoutName = this.getScoutName();
       this.activeRoomCode = code;
 
-      // 1. Create or update room doc
+      // 1. Check or create room doc with timeout
       const roomRef = doc(db, 'rooms', code);
-      const roomSnap = await getDoc(roomRef);
-      const now = Date.now();
+      let roomSnap;
+      try {
+        roomSnap = await withTimeout(
+          getDoc(roomRef),
+          5000,
+          'Connection to room timed out. Please check your internet or Firebase quota.'
+        );
+      } catch (err: any) {
+        throw new Error(parseFirebaseError(err));
+      }
 
+      const now = Date.now();
       if (roomSnap.exists()) {
         const data = roomSnap.data();
         const effectiveEvent = (eventName && eventName !== 'FRC REBUILT Competition') ? eventName : (data?.eventName || 'FRC REBUILT Competition');
         this.activeEventName = effectiveEvent;
-        await setDoc(roomRef, {
+        // Best-effort update of last active
+        setDoc(roomRef, {
           lastActiveAt: now,
           eventName: effectiveEvent,
-        }, { merge: true });
+        }, { merge: true }).catch(() => {});
       } else {
         this.activeEventName = eventName || 'FRC REBUILT Competition';
-        await setDoc(roomRef, {
-          roomCode: code,
-          eventName: this.activeEventName,
-          createdAt: now,
-          createdBy: uid,
-          lastActiveAt: now,
-        });
+        try {
+          await withTimeout(
+            setDoc(roomRef, {
+              roomCode: code,
+              eventName: this.activeEventName,
+              createdAt: now,
+              createdBy: uid,
+              creatorName: scoutName,
+              lastActiveAt: now,
+            }),
+            5000,
+            'Room creation timed out.'
+          );
+        } catch (err: any) {
+          throw new Error(parseFirebaseError(err));
+        }
       }
 
       if (typeof localStorage !== 'undefined') {
@@ -214,12 +298,15 @@ class CloudSyncManager {
 
       this.lastSyncedAt = Date.now();
       this.isSyncing = false;
+      this.lastError = null;
       this.notify();
       return true;
-    } catch (err) {
+    } catch (err: any) {
       this.isSyncing = false;
+      const parsed = parseFirebaseError(err);
+      this.lastError = parsed;
       this.notify();
-      throw err;
+      throw new Error(parsed);
     }
   }
 
@@ -227,6 +314,7 @@ class CloudSyncManager {
     this.unsubs.forEach((unsub) => unsub());
     this.unsubs = [];
     this.activeRoomCode = null;
+    this.lastError = null;
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('frc_sync_room_code');
     }
@@ -252,7 +340,9 @@ class CloudSyncManager {
         this.lastSyncedAt = Date.now();
         this.notify();
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, teamsPath)
+      (err) => {
+        console.warn(`[Firestore Sync Note] LIST at ${teamsPath}:`, err.message);
+      }
     );
     this.unsubs.push(unTeam);
 
@@ -269,7 +359,9 @@ class CloudSyncManager {
         this.lastSyncedAt = Date.now();
         this.notify();
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, matchesPath)
+      (err) => {
+        console.warn(`[Firestore Sync Note] LIST at ${matchesPath}:`, err.message);
+      }
     );
     this.unsubs.push(unMatch);
 
@@ -286,29 +378,26 @@ class CloudSyncManager {
         this.lastSyncedAt = Date.now();
         this.notify();
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, strategiesPath)
+      (err) => {
+        console.warn(`[Firestore Sync Note] LIST at ${strategiesPath}:`, err.message);
+      }
     );
     this.unsubs.push(unStrat);
   }
 
   // --- SMART CONFLICT RESOLUTION MERGE ENGINE ---
-
-  // Merge Match Observation (Append-Only Event Log Strategy)
   private async mergeIncomingMatch(remoteMatch: MatchScoutingRecord) {
     if (!remoteMatch || !remoteMatch.id) return;
     const localMatch = await scoutingDB.getMatch(remoteMatch.id);
     if (!localMatch) {
-      // New match record from another scout: insert directly into local database
       await scoutingDB.saveMatch(remoteMatch);
     } else {
-      // If already exists locally with older timestamp, update
       if ((remoteMatch.timestamp || 0) > (localMatch.timestamp || 0)) {
         await scoutingDB.saveMatch(remoteMatch);
       }
     }
   }
 
-  // Merge Pit Scouting Profile (Field-Level Timestamp / LWW Strategy)
   private async mergeIncomingTeam(remoteTeam: TeamProfile) {
     if (!remoteTeam || !remoteTeam.teamNumber) return;
     const localTeam = await scoutingDB.getTeam(remoteTeam.teamNumber);
@@ -318,7 +407,6 @@ class CloudSyncManager {
       return;
     }
 
-    // Both exist: perform field-level 3-way merge
     let mergedPit: PitData | undefined = undefined;
     if (localTeam.pit || remoteTeam.pit) {
       const basePit = localTeam.pit || remoteTeam.pit!;
@@ -354,7 +442,6 @@ class CloudSyncManager {
     return Array.from(map.values());
   }
 
-  // Deep sanitize objects to remove any `undefined` values before sending to Firestore
   private cleanForFirestore<T>(data: T): T {
     if (data === null || data === undefined) {
       return null as any;
@@ -376,7 +463,7 @@ class CloudSyncManager {
     return data;
   }
 
-  // Push local changes to cloud
+  // Push local changes to cloud safely
   public async pushLocalDataToCloud() {
     if (!this.activeRoomCode) return;
     const roomCode = this.activeRoomCode;
@@ -386,94 +473,110 @@ class CloudSyncManager {
     const matches = await scoutingDB.getAllMatches();
     const strategies = await scoutingDB.getAllStrategies();
 
-    // Push Teams
+    // Push Teams (batched best-effort with timeout)
     for (const team of teams) {
       const cleanTeam = this.cleanForFirestore({
         ...team,
         updatedBy: uid,
       });
-      const teamDocPath = `rooms/${roomCode}/teams/${team.teamNumber}`;
       try {
-        await setDoc(doc(db, 'rooms', roomCode, 'teams', team.teamNumber.toString()), cleanTeam, { merge: true });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, teamDocPath);
+        await withTimeout(
+          setDoc(doc(db, 'rooms', roomCode, 'teams', team.teamNumber.toString()), cleanTeam, { merge: true }),
+          3500
+        );
+      } catch (err: any) {
+        if (err?.message?.includes('RESOURCE_EXHAUSTED') || err?.code === 'resource-exhausted') {
+          console.warn('Firestore write quota exceeded; pausing batch team uploads.');
+          break;
+        }
       }
     }
 
     // Push Matches
     for (const match of matches) {
       const cleanMatch = this.cleanForFirestore(match);
-      const matchDocPath = `rooms/${roomCode}/matches/${match.id}`;
       try {
-        await setDoc(doc(db, 'rooms', roomCode, 'matches', match.id), cleanMatch, { merge: true });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, matchDocPath);
+        await withTimeout(
+          setDoc(doc(db, 'rooms', roomCode, 'matches', match.id), cleanMatch, { merge: true }),
+          3500
+        );
+      } catch (err: any) {
+        if (err?.message?.includes('RESOURCE_EXHAUSTED') || err?.code === 'resource-exhausted') {
+          break;
+        }
       }
     }
 
     // Push Strategies
     for (const strat of strategies) {
       const cleanStrat = this.cleanForFirestore(strat);
-      const stratDocPath = `rooms/${roomCode}/strategies/${strat.id}`;
       try {
-        await setDoc(doc(db, 'rooms', roomCode, 'strategies', strat.id), cleanStrat, { merge: true });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, stratDocPath);
-      }
+        await withTimeout(
+          setDoc(doc(db, 'rooms', roomCode, 'strategies', strat.id), cleanStrat, { merge: true }),
+          3500
+        );
+      } catch {}
     }
 
     // Update room activity and statistics
     try {
-      await setDoc(doc(db, 'rooms', roomCode), {
-        teamCount: teams.length,
-        matchCount: matches.length,
-        lastActiveAt: Date.now(),
-      }, { merge: true });
-    } catch {
-      // safe fallback
-    }
+      await withTimeout(
+        setDoc(doc(db, 'rooms', roomCode), {
+          teamCount: teams.length,
+          matchCount: matches.length,
+          lastActiveAt: Date.now(),
+        }, { merge: true }),
+        3500
+      );
+    } catch {}
   }
 
   // Hook into save operations for immediate cloud broadcast
   public async broadcastTeamSave(team: TeamProfile) {
     if (!this.activeRoomCode) return;
     const roomCode = this.activeRoomCode;
-    const teamDocPath = `rooms/${roomCode}/teams/${team.teamNumber}`;
     try {
       const cleanTeam = this.cleanForFirestore(team);
-      await setDoc(doc(db, 'rooms', roomCode, 'teams', team.teamNumber.toString()), cleanTeam, { merge: true });
+      await withTimeout(
+        setDoc(doc(db, 'rooms', roomCode, 'teams', team.teamNumber.toString()), cleanTeam, { merge: true }),
+        4000
+      );
       this.lastSyncedAt = Date.now();
       this.notify();
     } catch (err) {
-      console.warn('Queued team save offline in Firestore cache:', err);
+      console.warn('Team save queued locally; cloud write note:', err);
     }
   }
 
   public async broadcastMatchSave(match: MatchScoutingRecord) {
     if (!this.activeRoomCode) return;
     const roomCode = this.activeRoomCode;
-    const matchDocPath = `rooms/${roomCode}/matches/${match.id}`;
     try {
       const cleanMatch = this.cleanForFirestore(match);
-      await setDoc(doc(db, 'rooms', roomCode, 'matches', match.id), cleanMatch, { merge: true });
+      await withTimeout(
+        setDoc(doc(db, 'rooms', roomCode, 'matches', match.id), cleanMatch, { merge: true }),
+        4000
+      );
       this.lastSyncedAt = Date.now();
       this.notify();
     } catch (err) {
-      console.warn('Queued match save offline in Firestore cache:', err);
+      console.warn('Match save queued locally; cloud write note:', err);
     }
   }
 
   public async broadcastStrategySave(strategy: StrategyPlan) {
     if (!this.activeRoomCode) return;
     const roomCode = this.activeRoomCode;
-    const stratDocPath = `rooms/${roomCode}/strategies/${strategy.id}`;
     try {
       const cleanStrat = this.cleanForFirestore(strategy);
-      await setDoc(doc(db, 'rooms', roomCode, 'strategies', strategy.id), cleanStrat, { merge: true });
+      await withTimeout(
+        setDoc(doc(db, 'rooms', roomCode, 'strategies', strategy.id), cleanStrat, { merge: true }),
+        4000
+      );
       this.lastSyncedAt = Date.now();
       this.notify();
     } catch (err) {
-      console.warn('Queued strategy save offline in Firestore cache:', err);
+      console.warn('Strategy save queued locally; cloud write note:', err);
     }
   }
 }

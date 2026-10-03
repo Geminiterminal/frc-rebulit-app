@@ -17,10 +17,12 @@ import {
   LogOut,
   Search,
   Sparkles,
-  Layers,
   Clock,
   ArrowRight,
-  Plus
+  Plus,
+  Trash2,
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react';
 
 interface TeamRoomSyncModalProps {
@@ -33,7 +35,11 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [eventNameInput, setEventNameInput] = useState('FRC REBUILT Competition');
   const [scoutNameInput, setScoutNameInput] = useState(cloudSync.getScoutName());
+  
+  // Connection states
   const [isConnecting, setIsConnecting] = useState(false);
+  const [connectingRoomCode, setConnectingRoomCode] = useState<string | null>(null);
+  const [deletingRoomCode, setDeletingRoomCode] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -63,11 +69,12 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
 
   const loadRooms = async () => {
     setIsLoadingRooms(true);
+    setErrorMsg(null);
     try {
       const list = await cloudSync.fetchAvailableRooms();
       setAvailableRooms(list);
-    } catch {
-      // safe fallback
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Could not load available rooms.');
     } finally {
       setIsLoadingRooms(false);
     }
@@ -90,6 +97,8 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
     }
 
     setIsConnecting(true);
+    setConnectingRoomCode(cleanCode);
+
     try {
       await cloudSync.connectToRoom(cleanCode, targetEvent || eventNameInput);
       setSuccessMsg(`Successfully connected to Room: ${cleanCode}`);
@@ -99,12 +108,34 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
       setErrorMsg(err.message || 'Failed to connect to cloud room.');
     } finally {
       setIsConnecting(false);
+      setConnectingRoomCode(null);
     }
   };
 
   const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await handleConnectToCode(roomCodeInput, eventNameInput);
+  };
+
+  const handleDeleteRoom = async (room: AvailableRoom) => {
+    if (!window.confirm(`Are you sure you want to delete room "${room.roomCode}"? This will remove the room from the active list for all scouts.`)) {
+      return;
+    }
+
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setDeletingRoomCode(room.roomCode);
+
+    try {
+      await cloudSync.deleteRoom(room.roomCode);
+      setSuccessMsg(`Deleted room ${room.roomCode}.`);
+      await loadRooms();
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (err: any) {
+      setErrorMsg(`Failed to delete room: ${err.message}`);
+    } finally {
+      setDeletingRoomCode(null);
+    }
   };
 
   const handleManualSync = async () => {
@@ -151,6 +182,8 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
     return `${Math.floor(diffSec / 86400)}d ago`;
   };
 
+  const isQuotaError = (errorMsg || syncStatus.lastError || '').toLowerCase().includes('quota');
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
@@ -190,12 +223,32 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
 
         {/* Content */}
         <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+          {/* Error Notice */}
           {errorMsg && (
-            <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs flex items-center gap-2">
-              <span className="font-bold">Error:</span> {errorMsg}
+            <div className="p-3.5 rounded-xl bg-rose-950/70 border border-rose-800/90 text-rose-200 text-xs flex flex-col gap-1.5 shadow">
+              <div className="flex items-center gap-2 font-bold text-rose-300">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Connection Alert</span>
+              </div>
+              <p className="text-[11px] text-rose-200/90 leading-relaxed">{errorMsg}</p>
+              {isQuotaError && (
+                <div className="pt-1 border-t border-rose-900/60 flex items-center justify-between text-[10px] text-amber-300">
+                  <span>Free Firestore daily write limit reached on project.</span>
+                  <a 
+                    href="https://console.firebase.google.com/project/pi-obsidian/firestore/databases/ai-studio-frcrebuiltscouti-149a6f32-a94f-4b68-8171-8290692d700f/data?openUpgradeDialog=true" 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className="underline font-bold flex items-center gap-1 hover:text-amber-200"
+                  >
+                    <span>Check Quota in Console</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+              )}
             </div>
           )}
 
+          {/* Success Notice */}
           {successMsg && (
             <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 text-xs flex items-center gap-2">
               <Check className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -275,7 +328,7 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
             </div>
           )}
 
-          {/* Scout Name Configuration (Always visible) */}
+          {/* Scout Name Configuration */}
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs font-mono">
               <span className="text-slate-400">Scout Name:</span>
@@ -286,14 +339,14 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
                   setScoutNameInput(e.target.value);
                   cloudSync.setScoutName(e.target.value);
                 }}
-                placeholder="Your Name (e.g. Alex)"
+                placeholder="Your Name (e.g. Alex M.)"
                 className="bg-slate-900 border border-slate-750 rounded-lg px-2.5 py-1 text-slate-200 text-xs focus:outline-none focus:border-amber-400 w-36 sm:w-48 font-mono"
               />
             </div>
-            <span className="text-[10px] text-slate-500 hidden sm:inline font-mono">Attached to scouting records</span>
+            <span className="text-[10px] text-slate-500 hidden sm:inline font-mono">Author tag on created rooms</span>
           </div>
 
-          {/* Navigation Tabs: Browse Available Rooms vs Join/Create by Code */}
+          {/* Tabs: Available Rooms vs Custom Code */}
           <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
             <button
               type="button"
@@ -331,7 +384,7 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
                   <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-500" />
                   <input
                     type="text"
-                    placeholder="Search room code or event name..."
+                    placeholder="Search room code, event, or scout..."
                     value={roomSearchQuery}
                     onChange={(e) => setRoomSearchQuery(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8.5 pr-3 py-2 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-400"
@@ -350,7 +403,7 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
               </div>
 
               {/* Rooms List */}
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                 {isLoadingRooms ? (
                   <div className="p-8 text-center text-slate-400 space-y-2">
                     <RefreshCw className="w-5 h-5 animate-spin mx-auto text-amber-400" />
@@ -374,10 +427,14 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
                 ) : (
                   filteredRooms.map((room) => {
                     const isCurrent = syncStatus.roomCode === room.roomCode;
+                    const isTargetConnecting = connectingRoomCode === room.roomCode;
+                    const isTargetDeleting = deletingRoomCode === room.roomCode;
+                    const canDelete = cloudSync.isRoomCreator(room);
+
                     return (
                       <div
                         key={room.roomCode}
-                        className={`p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                        className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                           isCurrent
                             ? 'bg-emerald-950/30 border-emerald-800/80 shadow-sm'
                             : 'bg-slate-950/80 hover:bg-slate-950 border-slate-800 hover:border-slate-700'
@@ -393,15 +450,24 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
                                 Connected
                               </span>
                             )}
+                            {canDelete && (
+                              <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[9px] font-mono font-bold">
+                                Your Room
+                              </span>
+                            )}
                           </div>
-                          <div className="text-xs text-slate-400 truncate max-w-[200px] sm:max-w-xs">
+
+                          <div className="text-xs text-slate-300 truncate max-w-xs sm:max-w-sm">
                             {room.eventName}
                           </div>
-                          <div className="flex items-center gap-3 text-[10px] text-slate-500 font-mono">
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              <span>{formatRelativeTime(room.lastActiveAt || room.createdAt)}</span>
-                            </span>
+
+                          <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500 font-mono">
+                            {room.creatorName && (
+                              <span className="text-slate-400">
+                                Created by: <strong className="text-slate-300">{room.creatorName}</strong>
+                              </span>
+                            )}
+                            <span>• {formatRelativeTime(room.lastActiveAt || room.createdAt)}</span>
                             {typeof room.teamCount === 'number' && room.teamCount > 0 && (
                               <span>• {room.teamCount} teams</span>
                             )}
@@ -411,7 +477,24 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
                           </div>
                         </div>
 
-                        <div>
+                        {/* Room Action Buttons */}
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                          {canDelete && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRoom(room)}
+                              disabled={isTargetDeleting || isTargetConnecting}
+                              className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950/70 text-slate-400 hover:text-rose-300 border border-slate-850 hover:border-rose-800 transition-colors cursor-pointer disabled:opacity-50"
+                              title="Delete this room"
+                            >
+                              {isTargetDeleting ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin text-rose-400" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          )}
+
                           {isCurrent ? (
                             <span className="px-3 py-1.5 rounded-lg bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 text-xs font-mono font-bold">
                               Active
@@ -421,9 +504,16 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
                               type="button"
                               onClick={() => handleConnectToCode(room.roomCode, room.eventName)}
                               disabled={isConnecting}
-                              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-bold transition-colors cursor-pointer shadow disabled:opacity-50"
+                              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-bold transition-colors cursor-pointer shadow disabled:opacity-50 flex items-center gap-1.5"
                             >
-                              Join
+                              {isTargetConnecting ? (
+                                <>
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Joining...</span>
+                                </>
+                              ) : (
+                                <span>Join</span>
+                              )}
                             </button>
                           )}
                         </div>
@@ -475,8 +565,17 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
                 disabled={isConnecting}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-mono font-black uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 shadow-md"
               >
-                <Zap className="w-3.5 h-3.5 text-slate-950" />
-                <span>{isConnecting ? 'Connecting...' : 'Connect / Create Room'}</span>
+                {isConnecting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-950" />
+                    <span>Connecting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3.5 h-3.5 text-slate-950" />
+                    <span>Connect / Create Room</span>
+                  </>
+                )}
               </button>
             </form>
           )}
@@ -490,7 +589,7 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
             
             <div className="text-[10px] text-slate-400 leading-relaxed space-y-1">
               <p>• <strong>Instant Live Push</strong>: Every match and pit observation is automatically synced to all scouts connected to the same room code.</p>
-              <p>• <strong>Full Offline Buffer</strong>: When arena cellular drops, changes queue locally in IndexedDB and upload immediately when reconnected.</p>
+              <p>• <strong>Offline Resilience</strong>: When arena cellular drops, changes queue locally in IndexedDB and upload immediately when reconnected.</p>
             </div>
           </div>
         </div>
