@@ -61,6 +61,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
   // 6. QUICK OBSERVATION
   const [quickNote, setQuickNote] = useState<string>('');
+  const [impression, setImpression] = useState<number | null>(null);
 
   // UI state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -233,6 +234,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
       // 6. QUICK OBSERVATION
       quickNote: quickNote.trim() || undefined,
+      impression: (impression as 1 | 2 | 3 | 4 | 5) || undefined,
 
       // Legacy field aliases
     };
@@ -677,6 +679,29 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           onChange={(e) => setQuickNote(e.target.value)}
           className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-700 resize-none"
         />
+
+        {/* Impression */}
+        <div className="space-y-2">
+          <span className="block text-xs font-mono font-semibold uppercase text-slate-300">
+            Impression (1-5)
+          </span>
+          <div className="flex gap-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                type="button"
+                onClick={() => setImpression(star)}
+                className={`p-3 rounded-xl transition-all ${
+                  impression && impression >= star
+                    ? 'bg-amber-500 text-slate-950'
+                    : 'bg-slate-950 text-slate-600'
+                }`}
+              >
+                ★
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* BOTTOM SAVE & QR BUTTONS */}

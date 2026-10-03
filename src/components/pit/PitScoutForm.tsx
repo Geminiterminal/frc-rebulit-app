@@ -256,7 +256,12 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
             dataUrl,
             timestamp: Date.now(),
           };
-          setPhotos((prev) => [...prev, newPhoto]);
+          setPhotos((prev) => {
+            const updated = [...prev, newPhoto];
+            // Save to localStorage too
+            localStorage.setItem(`team_photo_${newPhoto.id}`, dataUrl);
+            return updated;
+          });
         }
       };
       reader.readAsDataURL(file);
@@ -628,6 +633,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
         <ShootingAreaMapper
           zones={shootingAreas}
           onChange={setShootingAreas}
+          isHidden={localStorage.getItem('hide_map') === 'true'}
         />
       </div>
 

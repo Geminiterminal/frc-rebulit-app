@@ -81,6 +81,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'event-data', label: 'Matches' },
     { id: 'import-export', label: 'Import / Export' },
     { id: 'settings', label: 'Settings' },
+    { id: 'toggle-map', label: localStorage.getItem('hide_map') === 'true' ? 'Show Map' : 'Hide Map' },
   ];
 
   return (
@@ -182,8 +183,14 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     key={item.id}
                     onClick={() => {
-                      onNavigate(item.id);
-                      setMenuOpen(false);
+                      if (item.id === 'toggle-map') {
+                        const current = localStorage.getItem('hide_map') === 'true';
+                        localStorage.setItem('hide_map', (!current).toString());
+                        window.location.reload();
+                      } else {
+                        onNavigate(item.id);
+                        setMenuOpen(false);
+                      }
                     }}
                     className={`p-2.5 rounded-lg text-xs font-bold text-left transition-colors ${
                       currentView === item.id

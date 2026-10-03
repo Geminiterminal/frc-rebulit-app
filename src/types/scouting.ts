@@ -124,6 +124,7 @@ export interface MatchScoutingRecord {
 
   // 6. QUICK OBSERVATION
   quickNote?: string;
+  impression?: 1 | 2 | 3 | 4 | 5;
 
   // Legacy optional fields for backward compatibility with existing data
   autoHighScored?: number;

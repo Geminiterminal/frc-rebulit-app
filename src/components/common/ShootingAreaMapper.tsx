@@ -7,13 +7,16 @@ interface ShootingAreaMapperProps {
   zones: ShootingZonePoint[];
   onChange: (zones: ShootingZonePoint[]) => void;
   readOnly?: boolean;
+  isHidden?: boolean;
 }
 
 export const ShootingAreaMapper: React.FC<ShootingAreaMapperProps> = ({
   zones,
   onChange,
   readOnly = false,
+  isHidden = false,
 }) => {
+  if (isHidden) return null;
   // Convert pointer coordinates to percentage (0 - 100)
   const handlePointerDown = (e: React.PointerEvent<SVGElement>) => {
     if (readOnly) return;
