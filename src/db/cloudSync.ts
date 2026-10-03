@@ -606,6 +606,136 @@ class CloudSyncManager {
         3500
       );
     } catch {}
+
+    this.lastSyncedAt = Date.now();
+    this.notify();
+
+    return {
+      pushedTeams: teams.length,
+      pushedMatches: matches.length,
+      pushedStrategies: strategies.length,
+    };
+  }
+
+  // Explicitly fetch available remote changes to see what can be pulled
+  public async fetchRemoteUpdates(): Promise<{
+    hasUpdates: boolean;
+    newTeamsCount: number;
+    newMatchesCount: number;
+    newStrategiesCount: number;
+    remoteTeams: TeamProfile[];
+    remoteMatches: MatchScoutingRecord[];
+    remoteStrategies: StrategyPlan[];
+  }> {
+    if (!this.activeRoomCode) {
+      throw new Error('No active Cloud room. Please connect to a room first.');
+    }
+    const roomCode = this.activeRoomCode;
+    await this.ensureAuth();
+
+    const [remoteTeamsSnap, remoteMatchesSnap, remoteStrategiesSnap, localTeams, localMatches, localStrategies] = await Promise.all([
+      getDocs(collection(db, 'rooms', roomCode, 'teams')),
+      getDocs(collection(db, 'rooms', roomCode, 'matches')),
+      getDocs(collection(db, 'rooms', roomCode, 'strategies')),
+      scoutingDB.getAllTeams(),
+      scoutingDB.getAllMatches(),
+      scoutingDB.getAllStrategies(),
+    ]);
+
+    const localTeamMap = new Map(localTeams.map((t) => [t.teamNumber, t]));
+    const localMatchMap = new Map(localMatches.map((m) => [m.id, m]));
+    const localStratMap = new Map(localStrategies.map((s) => [s.id, s]));
+
+    const remoteTeams: TeamProfile[] = [];
+    let newTeamsCount = 0;
+    remoteTeamsSnap.forEach((d) => {
+      const data = d.data() as TeamProfile;
+      if (data && data.teamNumber) {
+        remoteTeams.push(data);
+        const local = localTeamMap.get(data.teamNumber);
+        if (!local || (data.updatedAt && data.updatedAt > (local.updatedAt || 0))) {
+          newTeamsCount++;
+        }
+      }
+    });
+
+    const remoteMatches: MatchScoutingRecord[] = [];
+    let newMatchesCount = 0;
+    remoteMatchesSnap.forEach((d) => {
+      const data = d.data() as MatchScoutingRecord;
+      if (data && data.id) {
+        remoteMatches.push(data);
+        const local = localMatchMap.get(data.id);
+        if (!local || (data.timestamp && data.timestamp > (local.timestamp || 0))) {
+          newMatchesCount++;
+        }
+      }
+    });
+
+    const remoteStrategies: StrategyPlan[] = [];
+    let newStrategiesCount = 0;
+    remoteStrategiesSnap.forEach((d) => {
+      const data = d.data() as StrategyPlan;
+      if (data && data.id) {
+        remoteStrategies.push(data);
+        const local = localStratMap.get(data.id);
+        if (!local || (data.updatedAt && data.updatedAt > (local.updatedAt || 0))) {
+          newStrategiesCount++;
+        }
+      }
+    });
+
+    return {
+      hasUpdates: (newTeamsCount + newMatchesCount + newStrategiesCount) > 0,
+      newTeamsCount,
+      newMatchesCount,
+      newStrategiesCount,
+      remoteTeams,
+      remoteMatches,
+      remoteStrategies,
+    };
+  }
+
+  // Pull fetched remote updates and merge into local IndexedDB
+  public async pullRemoteUpdates(updates?: {
+    remoteTeams?: TeamProfile[];
+    remoteMatches?: MatchScoutingRecord[];
+    remoteStrategies?: StrategyPlan[];
+  }): Promise<{ pulledTeams: number; pulledMatches: number; pulledStrategies: number }> {
+    let teams = updates?.remoteTeams;
+    let matches = updates?.remoteMatches;
+    let strategies = updates?.remoteStrategies;
+
+    if (!teams || !matches || !strategies) {
+      const fetched = await this.fetchRemoteUpdates();
+      teams = fetched.remoteTeams;
+      matches = fetched.remoteMatches;
+      strategies = fetched.remoteStrategies;
+    }
+
+    let pulledTeams = 0;
+    let pulledMatches = 0;
+    let pulledStrategies = 0;
+
+    for (const t of teams) {
+      await this.mergeIncomingTeam(t);
+      pulledTeams++;
+    }
+
+    for (const m of matches) {
+      await this.mergeIncomingMatch(m);
+      pulledMatches++;
+    }
+
+    for (const s of strategies) {
+      await scoutingDB.saveStrategy(s);
+      pulledStrategies++;
+    }
+
+    this.lastSyncedAt = Date.now();
+    this.notify();
+
+    return { pulledTeams, pulledMatches, pulledStrategies };
   }
 
   // Hook into save operations for immediate cloud broadcast

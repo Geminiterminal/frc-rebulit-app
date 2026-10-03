@@ -11,15 +11,31 @@ import {
   Info,
   Smartphone,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Crown,
+  Target,
+  Zap,
+  BarChart3,
+  Wrench,
+  ShieldCheck
 } from 'lucide-react';
+import { 
+  scoutingAssignments, 
+  ScoutPosition, 
+  SCOUT_POSITIONS 
+} from '../../db/scoutingAssignments';
 
 interface SettingsViewProps {
   onNavigate: (view: string) => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
-  const [scoutName, setScoutName] = useState('');
+  const currentProfile = scoutingAssignments.getProfile();
+  const [scoutName, setScoutName] = useState(currentProfile.name || '');
+  const [position, setPosition] = useState<ScoutPosition>(currentProfile.position);
+  const [passcode, setPasscode] = useState('');
+  const [passcodeError, setPasscodeError] = useState<string | null>(null);
+
   const [eventCode, setEventCode] = useState('2025micmp');
   const [tbaApiKey, setTbaApiKey] = useState('');
   const [bulkInput, setBulkInput] = useState('');
@@ -34,10 +50,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
   }, []);
 
   const loadSettings = async () => {
-    const name = await scoutingDB.getSetting<string>('scoutName', '');
+    const prof = scoutingAssignments.getProfile();
+    setScoutName(prof.name);
+    setPosition(prof.position);
     const code = await scoutingDB.getSetting<string>('eventCode', '2026REBUILT');
     const key = await scoutingDB.getSetting<string>('tbaApiKey', '');
-    setScoutName(name);
     setEventCode(code);
     setTbaApiKey(key);
 
@@ -60,7 +77,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    await scoutingDB.setSetting('scoutName', scoutName);
+    setPasscodeError(null);
+
+    // Passcode protection for Lead Scout role
+    if (position === 'LEAD_SCOUT' && currentProfile.position !== 'LEAD_SCOUT' && scoutName.trim().toLowerCase() !== 'kawser') {
+      if (passcode.trim() !== 'team9751') {
+        setPasscodeError('Incorrect admin passcode for Lead Scout role. Enter "team9751".');
+        return;
+      }
+    }
+
+    scoutingAssignments.setProfile({
+      name: scoutName.trim() || 'Scout',
+      position: position,
+      isSetupComplete: true,
+    });
+
+    await scoutingDB.setSetting('scoutName', scoutName.trim());
     await scoutingDB.setSetting('eventCode', eventCode);
     await scoutingDB.setSetting('tbaApiKey', tbaApiKey);
     setSavedToast(true);
@@ -80,22 +113,84 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
       </div>
 
       <form onSubmit={handleSave} className="space-y-4">
-        {/* Scout Name */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-          <label className="text-xs font-mono font-bold uppercase text-slate-300 block flex items-center gap-2">
-            <User className="w-4 h-4 text-blue-400" />
-            <span>Default Scout Name or Initials</span>
-          </label>
-          <input
-            type="text"
-            placeholder="Scout Name or Initials"
-            value={scoutName}
-            onChange={(e) => setScoutName(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
-          />
-          <p className="text-[11px] text-slate-400">
-            Automatically attached to all new pit profiles and match scouting records.
-          </p>
+        {/* Scout Name & Position */}
+        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+          <div className="space-y-2">
+            <label className="text-xs font-mono font-bold uppercase text-slate-300 block flex items-center gap-2">
+              <User className="w-4 h-4 text-cyan-400" />
+              <span>Scout Name / Callsign</span>
+            </label>
+            <input
+              type="text"
+              placeholder="Scout Name (e.g. Kawser, Alex, Maya)"
+              value={scoutName}
+              onChange={(e) => setScoutName(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+              required
+            />
+          </div>
+
+          <div className="space-y-2 pt-2 border-t border-slate-800/80">
+            <label className="text-xs font-mono font-bold uppercase text-slate-300 block flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-amber-400" />
+              <span>Team Position / Hierarchy Role</span>
+            </label>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {SCOUT_POSITIONS.map((pos) => {
+                const isSelected = position === pos.id;
+                return (
+                  <div
+                    key={pos.id}
+                    onClick={() => {
+                      setPosition(pos.id);
+                      setPasscodeError(null);
+                    }}
+                    className={`p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                      isSelected
+                        ? 'bg-slate-800 border-cyan-500 ring-1 ring-cyan-500/50 shadow-md'
+                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-950'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                        {pos.id === 'LEAD_SCOUT' ? <Crown className="w-3.5 h-3.5 text-amber-400" /> :
+                         pos.id === 'PIT_SCOUT' ? <Target className="w-3.5 h-3.5 text-cyan-400" /> :
+                         pos.id === 'MATCH_SCOUT' ? <Zap className="w-3.5 h-3.5 text-emerald-400" /> :
+                         pos.id === 'STRATEGIST' ? <BarChart3 className="w-3.5 h-3.5 text-indigo-400" /> :
+                         <Wrench className="w-3.5 h-3.5 text-orange-400" />}
+                        <span>{pos.label}</span>
+                      </span>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+                      {pos.description}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Passcode field if selecting Lead Scout */}
+            {position === 'LEAD_SCOUT' && currentProfile.position !== 'LEAD_SCOUT' && scoutName.trim().toLowerCase() !== 'kawser' && (
+              <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-800/60 space-y-1.5 mt-2">
+                <span className="text-xs font-semibold text-amber-300 flex items-center gap-1">
+                  <span>Enter Lead Scout Passcode (team9751):</span>
+                </span>
+                <input
+                  type="password"
+                  placeholder="Passcode..."
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value)}
+                  className="w-full bg-slate-950 border border-amber-700/80 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 font-mono"
+                />
+              </div>
+            )}
+
+            {passcodeError && (
+              <p className="text-xs text-rose-400 mt-1">{passcodeError}</p>
+            )}
+          </div>
         </div>
 
         {/* Event Code & TBA Key */}

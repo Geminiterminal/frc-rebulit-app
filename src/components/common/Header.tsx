@@ -2,15 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { DistributeModal } from './DistributeModal';
 import { TeamRoomSyncModal } from '../sync/TeamRoomSyncModal';
+import { ScoutRoleSetupModal } from '../setup/ScoutRoleSetupModal';
+import { scoutingAssignments, ScoutProfile, SCOUT_POSITIONS } from '../../db/scoutingAssignments';
 import { cloudSync, SyncStatus } from '../../db/cloudSync';
 import { p2pSync, P2PStatus } from '../../db/p2pSync';
 import { PantherLogo } from './PantherLogo';
 import { 
   Menu, 
   X, 
-  Search,
-  WifiOff,
-  Cloud
+  Search, 
+  WifiOff, 
+  Cloud,
+  Crown,
+  Target,
+  Zap,
+  BarChart3,
+  Wrench,
+  UserCheck
 } from 'lucide-react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
@@ -28,6 +36,8 @@ export const Header: React.FC<HeaderProps> = ({
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDistributeModal, setShowDistributeModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [profile, setProfile] = useState<ScoutProfile>(scoutingAssignments.getProfile());
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(cloudSync.getStatus());
   const [p2pStatus, setP2pStatus] = useState<P2PStatus>(p2pSync.getStatus());
   const isOnline = useOnlineStatus();
@@ -40,9 +50,13 @@ export const Header: React.FC<HeaderProps> = ({
     const unsubP2P = p2pSync.subscribe((status) => {
       setP2pStatus(status);
     });
+    const interval = setInterval(() => {
+      setProfile(scoutingAssignments.getProfile());
+    }, 2500);
     return () => {
       unsubCloud();
       unsubP2P();
+      clearInterval(interval);
     };
   }, []);
 
@@ -66,48 +80,71 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'settings', label: 'Settings' },
   ];
 
+  const posMeta = SCOUT_POSITIONS.find((p) => p.id === profile.position) || SCOUT_POSITIONS[1];
+
   return (
     <>
       <header className="sticky top-0 z-40 bg-slate-950/95 border-b border-slate-800/80 backdrop-blur-md">
-        <div className="max-w-4xl mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-3">
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-2">
           {/* Brand */}
           <div 
             onClick={() => {
               onNavigate('home');
               setMenuOpen(false);
             }}
-            className="flex items-center gap-2.5 cursor-pointer select-none group"
+            className="flex items-center gap-2 cursor-pointer select-none group shrink-0"
           >
             <PantherLogo size="sm" className="group-hover:scale-105 transition-transform" />
             <div className="flex flex-col">
-              <span className="font-black text-sm sm:text-base tracking-tight text-white font-mono uppercase leading-tight">
+              <span className="font-black text-xs sm:text-sm tracking-tight text-white font-mono uppercase leading-tight">
                 PANTHER SCOUTS
               </span>
-              <span className="text-[10px] text-amber-400 font-mono tracking-wider font-semibold">
+              <span className="text-[9px] text-amber-400 font-mono tracking-wider font-semibold">
                 TEAM 9751
               </span>
             </div>
           </div>
 
           {/* Center Quick Search (Tablet / Desktop) */}
-          <form onSubmit={handleSearchSubmit} className="hidden sm:flex items-center relative max-w-xs w-full">
+          <form onSubmit={handleSearchSubmit} className="hidden md:flex items-center relative max-w-[180px] w-full">
             <Search className="w-3.5 h-3.5 absolute left-2.5 text-slate-500" />
             <input
               type="number"
               placeholder="Team #"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono"
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono"
             />
           </form>
 
           {/* Right Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Position / Role Setup Pill */}
+            <button
+              type="button"
+              onClick={() => setShowRoleModal(true)}
+              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-lg border transition-all active:scale-95 cursor-pointer ${
+                profile.position === 'LEAD_SCOUT'
+                  ? 'bg-amber-950/70 border-amber-700/80 text-amber-300'
+                  : 'bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800'
+              }`}
+              title="Change Scout Role"
+            >
+              {profile.position === 'LEAD_SCOUT' ? (
+                <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              ) : (
+                <Target className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              )}
+              <span className="truncate max-w-[80px] sm:max-w-[120px]">
+                {profile.name}
+              </span>
+            </button>
+
             {/* Cloud Sync Status Button */}
             <button
               type="button"
               onClick={() => setShowSyncModal(true)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors active:scale-95 cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors active:scale-95 cursor-pointer ${
                 syncStatus.roomCode || p2pStatus.roomCode
                   ? 'bg-emerald-950/50 border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/50'
                   : 'bg-slate-900 border-slate-750 text-slate-300 hover:bg-slate-800'
@@ -115,7 +152,7 @@ export const Header: React.FC<HeaderProps> = ({
               title={syncStatus.roomCode || p2pStatus.roomCode ? `Connected to Room ${syncStatus.roomCode || p2pStatus.roomCode}` : 'Team Sync'}
             >
               <Cloud className={`w-3.5 h-3.5 ${syncStatus.roomCode || p2pStatus.roomCode ? 'text-emerald-400' : 'text-blue-400'}`} />
-              <span className="font-mono">
+              <span className="font-mono text-xs">
                 {syncStatus.roomCode || p2pStatus.roomCode || 'Sync'}
               </span>
               {(syncStatus.roomCode || p2pStatus.roomCode) && (
@@ -186,6 +223,16 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
       </header>
+
+      {/* Scout Role Setup Modal */}
+      <ScoutRoleSetupModal
+        isOpen={showRoleModal}
+        onClose={() => {
+          setShowRoleModal(false);
+          setProfile(scoutingAssignments.getProfile());
+        }}
+        onSaved={(newProf) => setProfile(newProf)}
+      />
 
       {/* Distribute & Install Modal */}
       <DistributeModal

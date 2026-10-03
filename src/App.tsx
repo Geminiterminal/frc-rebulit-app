@@ -17,6 +17,8 @@ import { TeamCompareView } from './components/teams/TeamCompareView';
 import { EventDataView } from './components/data/EventDataView';
 import { DataManagement } from './components/data/DataManagement';
 import { SettingsView } from './components/settings/SettingsView';
+import { ScoutRoleSetupModal } from './components/setup/ScoutRoleSetupModal';
+import { scoutingAssignments } from './db/scoutingAssignments';
 import { scoutingDB } from './db/indexedDB';
 import { 
   Home, 
@@ -32,8 +34,15 @@ export default function App() {
   const [selectedMatchNumber, setSelectedMatchNumber] = useState<number | undefined>(undefined);
   const [compareTeamNums, setCompareTeamNums] = useState<number[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
+  const [showInitialSetup, setShowInitialSetup] = useState<boolean>(false);
 
   useEffect(() => {
+    // Check if user has completed initial profile & role setup
+    const prof = scoutingAssignments.getProfile();
+    if (!prof.isSetupComplete && typeof localStorage !== 'undefined' && !localStorage.getItem('frc_scout_name')) {
+      setShowInitialSetup(true);
+    }
+
     // Initialize local database on app start without seeding default mock data
     scoutingDB.init().finally(() => {
       setIsDbLoaded(true);
@@ -188,6 +197,12 @@ export default function App() {
           <span className="text-[10px]">Teams</span>
         </button>
       </nav>
+      {/* Initial Welcome & Role Setup Modal */}
+      <ScoutRoleSetupModal
+        isOpen={showInitialSetup}
+        onClose={() => setShowInitialSetup(false)}
+        isInitialSetup={true}
+      />
     </div>
   );
 }

@@ -52,6 +52,12 @@ service cloud.firestore {
              data.updatedAt is number;
     }
 
+    // --- P2P ACTIVE ROOMS REGISTRY ---
+    match /p2p_rooms/{roomCode} {
+      allow get, list: if true;
+      allow create, update, delete: if isValidId(roomCode);
+    }
+
     // --- SCOUTING ROOMS ---
     match /rooms/{roomCode} {
       allow get: if isValidId(roomCode);

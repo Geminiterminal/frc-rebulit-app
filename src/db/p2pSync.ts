@@ -61,6 +61,7 @@ class P2PSyncEngine {
   private isConnected: boolean = false;
   private lastSyncedAt: number | null = null;
   private errorMsg: string | null = null;
+  private heartbeatTimer: any = null;
 
   constructor() {
     this.initFromStorage();
@@ -174,7 +175,17 @@ class P2PSyncEngine {
 
     return new Promise((resolve, reject) => {
       try {
-        const hostPeer = new Peer(hostId, { debug: 0 });
+        const hostPeer = new Peer(hostId, {
+          debug: 0,
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' },
+              { urls: 'stun:stun2.l.google.com:19302' },
+              { urls: 'stun:global.stun.twilio.com:3478' },
+            ],
+          },
+        });
 
         hostPeer.on('open', () => {
           this.peer = hostPeer;
@@ -193,16 +204,30 @@ class P2PSyncEngine {
             this.syncAllLocalDataToConn(conn);
           });
 
-          // Register active P2P room so other scouts can scan and discover it
-          try {
-            const roomRef = doc(db, 'p2p_rooms', code);
-            setDoc(roomRef, {
-              roomCode: code,
-              creatorName: this.getScoutName(),
-              createdAt: Date.now(),
-              lastActiveAt: Date.now(),
-            }, { merge: true }).catch(() => {});
-          } catch {}
+          // Register active P2P room in Firestore so other scouts can scan and discover it
+          const registerRoom = async () => {
+            try {
+              const roomRef = doc(db, 'p2p_rooms', code);
+              await setDoc(roomRef, {
+                roomCode: code,
+                creatorName: this.getScoutName(),
+                createdAt: Date.now(),
+                lastActiveAt: Date.now(),
+              }, { merge: true });
+            } catch (err) {
+              console.warn('Could not register P2P room in Firestore:', err);
+            }
+          };
+
+          registerRoom();
+
+          if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+          this.heartbeatTimer = setInterval(() => {
+            if (this.isHost && this.roomCode) {
+              const roomRef = doc(db, 'p2p_rooms', this.roomCode);
+              setDoc(roomRef, { lastActiveAt: Date.now() }, { merge: true }).catch(() => {});
+            }
+          }, 15000);
 
           this.saveKnownP2PRoom(code, this.getScoutName());
           resolve(true);
@@ -250,14 +275,24 @@ class P2PSyncEngine {
           isSettled = true;
           this.isConnecting = false;
           this.isConnected = false;
-          this.errorMsg = `Room "${code}" host not found. Ask lead scout to create/host the room with password team9751.`;
+          this.errorMsg = `Room "${code}" host not found. Make sure host created the room and is on the network.`;
           this.notify();
           reject(new Error(this.errorMsg));
         }
-      }, 7000);
+      }, 12000);
 
       try {
-        const clientPeer = new Peer(this.getUniquePeerId(code), { debug: 0 });
+        const clientPeer = new Peer(this.getUniquePeerId(code), {
+          debug: 0,
+          config: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' },
+              { urls: 'stun:stun1.l.google.com:19302' },
+              { urls: 'stun:stun2.l.google.com:19302' },
+              { urls: 'stun:global.stun.twilio.com:3478' },
+            ],
+          },
+        });
 
         clientPeer.on('open', () => {
           const conn = clientPeer.connect(hostId, {
@@ -330,11 +365,11 @@ class P2PSyncEngine {
     } catch {}
   }
 
-  // Scan for available active P2P rooms
+  // Scan for available active P2P rooms (strictly P2P rooms only)
   public async fetchAvailableRooms(): Promise<P2PAvailableRoom[]> {
     const map = new Map<string, P2PAvailableRoom>();
 
-    // 1. Try Firestore p2p_rooms collection
+    // 1. Try Firestore p2p_rooms collection (strictly P2P)
     try {
       const snap = await getDocs(collection(db, 'p2p_rooms'));
       snap.forEach((d) => {
@@ -347,7 +382,9 @@ class P2PSyncEngine {
           });
         }
       });
-    } catch {}
+    } catch (e) {
+      console.warn('Error fetching p2p_rooms:', e);
+    }
 
     // 2. Include locally known P2P rooms
     try {
@@ -541,9 +578,15 @@ class P2PSyncEngine {
 
   // 1-Click Sync All Data across active scouts
   public async autoSyncOneClick(): Promise<{ matchCount: number; teamCount: number; peerCount: number }> {
-    const defaultRoom = this.roomCode || 'FRC-REBUILT-2026';
+    return this.pushLocalData();
+  }
+
+  // Explicitly push local scouted data to all connected peers
+  public async pushLocalData(): Promise<{ matchCount: number; teamCount: number; peerCount: number }> {
     if (!this.isConnected) {
-      await this.connectToRoom(defaultRoom);
+      const code = this.roomCode || (typeof localStorage !== 'undefined' ? localStorage.getItem('frc_p2p_room') : null);
+      if (code) await this.joinRoom(code);
+      else throw new Error('Not connected to a P2P room. Please join or create a room first.');
     }
 
     const teams = await scoutingDB.getAllTeams();
@@ -553,6 +596,28 @@ class P2PSyncEngine {
     this.broadcastToAll('ROOM_STATE', { teams, matches, strategies });
     this.lastSyncedAt = Date.now();
     this.notify();
+
+    return {
+      matchCount: matches.length,
+      teamCount: teams.length,
+      peerCount: this.getStatus().peerCount,
+    };
+  }
+
+  // Explicitly pull / request latest data from connected room peers
+  public async pullRemoteData(): Promise<{ matchCount: number; teamCount: number; peerCount: number }> {
+    if (!this.isConnected) {
+      const code = this.roomCode || (typeof localStorage !== 'undefined' ? localStorage.getItem('frc_p2p_room') : null);
+      if (code) await this.joinRoom(code);
+      else throw new Error('Not connected to a P2P room. Please join or create a room first.');
+    }
+
+    this.broadcastToAll('JOIN_ROOM');
+    this.lastSyncedAt = Date.now();
+    this.notify();
+
+    const teams = await scoutingDB.getAllTeams();
+    const matches = await scoutingDB.getAllMatches();
 
     return {
       matchCount: matches.length,
@@ -583,6 +648,11 @@ class P2PSyncEngine {
   }
 
   public disconnect() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+
     this.connections.forEach((conn) => conn.close());
     this.connections.clear();
 

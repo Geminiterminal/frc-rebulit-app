@@ -16,6 +16,7 @@ import {
 import { scoutingDB } from '../../db/indexedDB';
 import { ShootingAreaMapper } from '../common/ShootingAreaMapper';
 import { AutonomousDrawer } from '../common/AutonomousDrawer';
+import { ScoutingAssignmentsCard } from '../scouting/ScoutingAssignmentsCard';
 import { 
   Check, 
   Save, 
@@ -310,15 +311,26 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
   // STEP 1: Direct team number prompt with Event Roster Selector
   if (!teamConfirmed) {
     return (
-      <div className="max-w-sm mx-auto px-4 py-10 space-y-6">
-        <button
-          type="button"
-          onClick={() => onNavigate('home')}
-          className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 font-semibold cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </button>
+      <div className="max-w-xl mx-auto px-4 py-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => onNavigate('home')}
+            className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 font-semibold cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+        </div>
+
+        {/* My Pit Duty & Assignments Card */}
+        <ScoutingAssignmentsCard
+          onSelectTeam={(num) => {
+            setTeamNumberInput(String(num));
+            setTeamConfirmed(true);
+          }}
+          onNavigate={onNavigate}
+        />
 
         {rosterTeams.length > 0 && (
           <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">

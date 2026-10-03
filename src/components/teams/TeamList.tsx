@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TeamProfile, MatchScoutingRecord } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
+import { scoutingAssignments } from '../../db/scoutingAssignments';
 import { 
   Search, 
   Plus, 
@@ -29,6 +30,9 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
   const [newTeamNumber, setNewTeamNumber] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
+  const [filterAssignedOnly, setFilterAssignedOnly] = useState<boolean>(false);
+  const [assignedTeams, setAssignedTeams] = useState<number[]>([]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -38,6 +42,7 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
     const allMatches = await scoutingDB.getAllMatches();
     setTeams(allTeams);
     setMatches(allMatches);
+    setAssignedTeams(scoutingAssignments.getMyTargetTeams());
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -83,6 +88,10 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
         (t.teamName && t.teamName.toLowerCase().includes(searchQuery.toLowerCase()));
 
       if (!matchSearch) return false;
+
+      if (filterAssignedOnly) {
+        if (!assignedTeams.includes(t.teamNumber)) return false;
+      }
 
       if (filterDrivetrain !== 'ALL') {
         if (t.pit?.drivetrain !== filterDrivetrain) return false;
@@ -164,6 +173,20 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-slate-400 font-medium">Filter:</span>
+          {assignedTeams.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilterAssignedOnly(!filterAssignedOnly)}
+              className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1 ${
+                filterAssignedOnly
+                  ? 'bg-cyan-950 text-cyan-300 border border-cyan-600 shadow-sm'
+                  : 'bg-slate-950 text-slate-400 hover:bg-slate-900 border border-slate-850'
+              }`}
+            >
+              <Target className="w-3.5 h-3.5 text-cyan-400" />
+              <span>My Assigned ({assignedTeams.length})</span>
+            </button>
+          )}
           {['ALL', 'SWERVE', 'TANK / WEST COAST'].map((dt) => (
             <button
               key={dt}

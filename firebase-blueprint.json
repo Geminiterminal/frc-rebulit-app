@@ -158,9 +158,40 @@
         }
       },
       "required": ["id", "updatedAt"]
+    },
+    "P2PRoom": {
+      "title": "P2PRoom",
+      "description": "Active WebRTC Peer-to-Peer scouting room host registry.",
+      "type": "object",
+      "properties": {
+        "roomCode": {
+          "type": "string",
+          "description": "Room code for P2P connection",
+          "maxLength": 64
+        },
+        "creatorName": {
+          "type": "string",
+          "description": "Host scout name"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp"
+        },
+        "lastActiveAt": {
+          "type": "number",
+          "description": "Last heartbeat timestamp"
+        }
+      },
+      "required": ["roomCode", "createdAt"]
     }
   },
   "firestore": {
+    "/p2p_rooms/{roomCode}": {
+      "schema": {
+        "$ref": "P2PRoom"
+      },
+      "description": "Registry of currently active P2P room hosts."
+    },
     "/rooms/{roomCode}": {
       "schema": {
         "$ref": "TeamRoom"

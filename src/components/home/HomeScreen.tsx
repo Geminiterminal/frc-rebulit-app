@@ -16,6 +16,7 @@ import { scoutingDB } from '../../db/indexedDB';
 import { TeamProfile } from '../../types/scouting';
 import { DistributeModal } from '../common/DistributeModal';
 import { PantherLogo } from '../common/PantherLogo';
+import { ScoutingAssignmentsCard } from '../scouting/ScoutingAssignmentsCard';
 
 interface HomeScreenProps {
   onNavigate: (view: string, teamNumber?: number) => void;
@@ -63,6 +64,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
             Open
           </button>
         </form>
+
+        {/* Scout Assignments & Push / Fetch / Pull */}
+        <ScoutingAssignmentsCard onNavigate={onNavigate} />
 
         {/* PRIMARY FUNCTIONS */}
         <div className="grid grid-cols-1 gap-3.5">
