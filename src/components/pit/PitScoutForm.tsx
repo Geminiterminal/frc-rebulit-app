@@ -302,7 +302,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
     setTimeout(() => {
       setSaveToast(null);
-      onNavigate('team-profile', num);
+      onNavigate('home');
     }, 1000);
   };
 

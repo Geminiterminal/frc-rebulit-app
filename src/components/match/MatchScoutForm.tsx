@@ -78,6 +78,37 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
     }
   }, [initialMatchNumber]);
 
+  // Load existing match scout record if present in IndexedDB
+  useEffect(() => {
+    const teamNum = parseInt(teamNumber, 10);
+    if (!isNaN(teamNum) && teamNum > 0 && matchNumber > 0) {
+      scoutingDB.getMatchesForTeam(teamNum).then((records) => {
+        const existing = records.find((r) => r.matchNumber === matchNumber);
+        if (existing) {
+          setAutoWorked(existing.autoWorked);
+          setAutoFuelScored(existing.autoFuelScored || existing.autoHighScored || 0);
+          setTeleopFuelScored(existing.teleopFuelScored || existing.teleopHighScored || 0);
+          setFieldRoute(existing.fieldRoute || null);
+          setPlayedDefense(existing.playedDefense);
+          setDefenseEffectiveness(existing.defenseEffectiveness || null);
+          setRobotIssues(existing.robotIssues || null);
+          setWhatHappenedNote(existing.whatHappenedNote || '');
+          setQuickNote(existing.quickNote || existing.notes || '');
+        } else {
+          setAutoWorked(null);
+          setAutoFuelScored(0);
+          setTeleopFuelScored(0);
+          setFieldRoute(null);
+          setPlayedDefense(null);
+          setDefenseEffectiveness(null);
+          setRobotIssues(null);
+          setWhatHappenedNote('');
+          setQuickNote('');
+        }
+      });
+    }
+  }, [teamNumber, matchNumber]);
+
   // Quick increment/decrement helper ensuring values never go below 0
   const adjustValue = (current: number, delta: number) => {
     return Math.max(0, current + delta);
@@ -161,6 +192,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       setWhatHappenedNote('');
       setQuickNote('');
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      onNavigate('home');
     }, 1200);
   };
 

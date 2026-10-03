@@ -35,11 +35,12 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
   const [isScanAssignmentOpen, setIsScanAssignmentOpen] = useState<boolean>(false);
   const [scanAssignmentMsg, setScanAssignmentMsg] = useState<string | null>(null);
 
-  // Push Data QR Modal State
   const [isPushDataOpen, setIsPushDataOpen] = useState<boolean>(false);
-  const [qrChunks, setQrChunks] = useState<string[]>([]);
-  const [currentChunkIdx, setCurrentChunkIdx] = useState<number>(0);
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+
+  // Individual task QR sync panel states
+  const [completedTasks, setCompletedTasks] = useState<any[]>([]);
+  const [activeTaskQrUrl, setActiveTaskQrUrl] = useState<string | null>(null);
+  const [activeTaskTitle, setActiveTaskTitle] = useState<string | null>(null);
 
   useEffect(() => {
     loadScoutData();
@@ -69,36 +70,53 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
     setTimeout(() => setScanAssignmentMsg(null), 4000);
   };
 
-  const handlePushData = async () => {
-    const chunks = await qrTransferEngine.generateScoutDataQrChunks(scoutProfile.name || 'SCOUT');
-    setQrChunks(chunks);
-    setCurrentChunkIdx(0);
+  const handleOpenTasksDone = async () => {
+    const list: any[] = [];
+
+    // 1. Fetch completed pit scouting profiles
+    const allTeams = await scoutingDB.getAllTeams();
+    for (const team of allTeams) {
+      if (team.pit && Object.keys(team.pit).length > 0) {
+        list.push({
+          teamNumber: team.teamNumber,
+          type: 'PIT',
+          data: team.pit,
+        });
+      }
+    }
+
+    // 2. Fetch completed match scouting records
+    const allMatches = await scoutingDB.getAllMatches();
+    for (const match of allMatches) {
+      list.push({
+        teamNumber: match.teamNumber,
+        type: 'MATCH',
+        matchNumber: match.matchNumber,
+        data: match,
+      });
+    }
+
+    // Sort by type then team number
+    setCompletedTasks(list.sort((a, b) => a.teamNumber - b.teamNumber));
     setIsPushDataOpen(true);
-    renderChunkQr(chunks[0]);
   };
 
-  const renderChunkQr = async (chunkPayloadStr: string) => {
+  const handleGenerateTaskQr = async (task: any) => {
+    const scoutName = scoutProfile.name || 'Scout';
+    let payloadStr = '';
+
+    if (task.type === 'PIT') {
+      payloadStr = qrTransferEngine.generateSinglePitQr(scoutName, task.teamNumber, task.data);
+    } else {
+      payloadStr = qrTransferEngine.generateSingleMatchQr(scoutName, task.data);
+    }
+
     try {
-      const url = await QRCode.toDataURL(chunkPayloadStr, { errorCorrectionLevel: 'L', margin: 1, width: 280 });
-      setQrDataUrl(url);
-    } catch {
-      setQrDataUrl(null);
-    }
-  };
-
-  const handleNextChunk = () => {
-    if (currentChunkIdx < qrChunks.length - 1) {
-      const nextIdx = currentChunkIdx + 1;
-      setCurrentChunkIdx(nextIdx);
-      renderChunkQr(qrChunks[nextIdx]);
-    }
-  };
-
-  const handlePrevChunk = () => {
-    if (currentChunkIdx > 0) {
-      const prevIdx = currentChunkIdx - 1;
-      setCurrentChunkIdx(prevIdx);
-      renderChunkQr(qrChunks[prevIdx]);
+      const url = await QRCode.toDataURL(payloadStr, { errorCorrectionLevel: 'L', margin: 1, width: 280 });
+      setActiveTaskQrUrl(url);
+      setActiveTaskTitle(`Team ${task.teamNumber} (${task.type === 'PIT' ? 'Pit Scout' : `Match ${task.matchNumber}`})`);
+    } catch (e) {
+      console.error(e);
     }
   };
 
@@ -117,23 +135,14 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
   return (
     <div className="max-w-md mx-auto px-2 sm:px-3 py-2 pb-24 flex flex-col gap-3 font-mono">
       {/* Top Main Action Bar */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="w-full">
         <button
           type="button"
           onClick={() => setIsScanAssignmentOpen(true)}
-          className="py-3 px-3 rounded-xl bg-slate-800/40 hover:bg-slate-700 text-slate-200 border border-slate-700/80 font-bold text-xs uppercase cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
+          className="w-full py-3 px-3 rounded-xl bg-slate-800/40 hover:bg-slate-700 text-slate-200 border border-slate-700/80 font-bold text-xs uppercase cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
         >
           <Camera className="w-4 h-4 text-slate-300" />
           <span>Scan Assign QR</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={handlePushData}
-          className="py-3 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold border border-slate-700 text-xs uppercase cursor-pointer transition-all active:scale-98 shadow flex items-center justify-center gap-1.5"
-        >
-          <QrCode className="w-4 h-4 text-slate-300" />
-          <span>PUSH DATA QR</span>
         </button>
       </div>
 
@@ -162,14 +171,16 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
               return (
                 <div
                   key={teamNum}
-                  onClick={() => onNavigate(isPitMode ? 'pit-scout' : 'match-scout', teamNum)}
                   className={`p-3.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-colors ${
                     isDone
                       ? 'bg-[#0B132B] border-emerald-600/60 text-emerald-200'
                       : 'bg-[#0B132B] border-slate-800 text-slate-200 hover:border-slate-700'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5 font-bold text-sm">
+                  <div
+                    onClick={() => onNavigate(isPitMode ? 'pit-scout' : 'match-scout', teamNum)}
+                    className="flex items-center gap-2.5 font-bold text-sm flex-1"
+                  >
                     {isDone ? (
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                     ) : (
@@ -178,11 +189,39 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
                     <span>Team #{teamNum}</span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-xs">
-                    <span className={isDone ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
-                      {isDone ? 'Done ✓' : 'Tap to Scout'}
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-slate-500" />
+                  <div className="flex items-center gap-3">
+                    <div
+                      onClick={() => onNavigate(isPitMode ? 'pit-scout' : 'match-scout', teamNum)}
+                      className="flex items-center gap-1.5 text-xs"
+                    >
+                      <span className={isDone ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
+                        {isDone ? 'Done ✓' : 'Tap to Scout'}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-slate-500" />
+                    </div>
+
+                    {isDone && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (isPitMode) {
+                            const teamData = await scoutingDB.getTeam(teamNum);
+                            if (teamData?.pit) {
+                              handleGenerateTaskQr({ type: 'PIT', teamNumber: teamNum, data: teamData.pit });
+                            }
+                          } else {
+                            const matchData = await scoutingDB.getMatchesForTeam(teamNum);
+                            if (matchData && matchData.length > 0) {
+                              // Generate QR for the most recent match for now
+                              handleGenerateTaskQr({ type: 'MATCH', teamNumber: teamNum, data: matchData[0], matchNumber: matchData[0].matchNumber });
+                            }
+                          }
+                        }}
+                        className="py-1 px-2 rounded-lg bg-emerald-950/40 hover:bg-emerald-800/50 border border-emerald-800 text-emerald-300 text-[10px] font-bold cursor-pointer"
+                      >
+                        QR
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -245,61 +284,112 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
       {/* PUSH DATA QR GENERATOR MODAL */}
       {isPushDataOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
+          <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <span className="text-xs font-black text-emerald-400 font-mono uppercase">
-                SHOW QR TO CAPTAIN ({currentChunkIdx + 1} / {qrChunks.length})
+              <span className="text-xs font-black text-slate-200 font-mono uppercase tracking-wider">
+                COMPLETED TASKS ({completedTasks.length})
               </span>
               <button
                 type="button"
-                onClick={() => setIsPushDataOpen(false)}
-                className="text-slate-400 hover:text-white p-1"
+                onClick={() => {
+                  setIsPushDataOpen(false);
+                  setActiveTaskQrUrl(null);
+                  setActiveTaskTitle(null);
+                }}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-400 text-left font-mono">
+              Select a completed team below to generate its single-record QR. Have Captain scan with "Scan Scout Data QR":
+            </p>
+
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto text-left pr-1 scrollbar-thin">
+              {completedTasks.length > 0 ? (
+                completedTasks.map((task, idx) => (
+                  <div
+                    key={`${task.type}-${task.teamNumber}-${task.matchNumber || idx}`}
+                    className="p-3 rounded-xl bg-slate-950 border border-slate-850 flex items-center justify-between text-xs font-mono"
+                  >
+                    <div>
+                      <div className="font-bold text-slate-100 flex items-center gap-1.5 flex-wrap">
+                        <span>Team #{task.teamNumber}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase ${
+                          task.type === 'PIT'
+                            ? 'bg-slate-800 text-slate-300 border border-slate-750'
+                            : 'bg-slate-800/60 text-slate-400 border border-slate-750/50'
+                        }`}>
+                          {task.type === 'PIT' ? 'Pit' : `Match ${task.matchNumber}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleGenerateTaskQr(task)}
+                      className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-[10px] font-bold cursor-pointer transition-colors active:scale-95"
+                    >
+                      GENERATE QR
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-slate-500 text-center py-4">No completed scout data found. Start scouting first!</p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsPushDataOpen(false);
+                setActiveTaskQrUrl(null);
+                setActiveTaskTitle(null);
+              }}
+              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs font-mono cursor-pointer transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* INDIVIDUAL TASK QR OVERLAY MODAL */}
+      {activeTaskQrUrl && activeTaskTitle && (
+        <div className="fixed inset-0 z-55 bg-black/90 flex items-center justify-center p-4 backdrop-blur-md">
+          <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="text-xs font-black text-slate-200 font-mono uppercase tracking-wider">
+                Sync QR: {activeTaskTitle}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTaskQrUrl(null);
+                  setActiveTaskTitle(null);
+                }}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <p className="text-xs text-slate-300 font-mono">
-              Have <strong>Captain</strong> scan this QR code with "Scan Data" camera:
+              Have <strong>Captain</strong> scan this low-density QR code to import:
             </p>
 
-            {qrDataUrl && (
-              <div className="p-3 bg-white rounded-xl inline-block mx-auto shadow-lg">
-                <img src={qrDataUrl} alt="Scout Data QR" className="w-52 h-52 mx-auto" />
-              </div>
-            )}
-
-            {/* Chunking Pagination */}
-            {qrChunks.length > 1 && (
-              <div className="flex items-center justify-between gap-2 pt-1 font-mono">
-                <button
-                  type="button"
-                  onClick={handlePrevChunk}
-                  disabled={currentChunkIdx === 0}
-                  className="py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold disabled:opacity-40 cursor-pointer flex items-center gap-1"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                  <span>Prev</span>
-                </button>
-                <span className="text-xs text-slate-300 font-bold">
-                  {currentChunkIdx + 1} of {qrChunks.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleNextChunk}
-                  disabled={currentChunkIdx === qrChunks.length - 1}
-                  className="py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold disabled:opacity-40 cursor-pointer flex items-center gap-1"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
+            <div className="p-3 bg-white rounded-2xl inline-block mx-auto shadow-lg">
+              <img src={activeTaskQrUrl} alt="Task QR" className="w-52 h-52 mx-auto" />
+            </div>
 
             <button
               type="button"
-              onClick={() => setIsPushDataOpen(false)}
-              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs font-mono cursor-pointer"
+              onClick={() => {
+                setActiveTaskQrUrl(null);
+                setActiveTaskTitle(null);
+              }}
+              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs cursor-pointer"
             >
               Done
             </button>
