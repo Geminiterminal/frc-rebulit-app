@@ -1,28 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  cloudSync, 
-  SyncStatus,
-  AvailableRoom
-} from '../../db/cloudSync';
+import { cloudSync, SyncStatus, AvailableRoom } from '../../db/cloudSync';
+import { p2pSync, P2PStatus, P2PAvailableRoom } from '../../db/p2pSync';
 import { 
   Cloud, 
+  Radio, 
+  X, 
   RefreshCw, 
   Check, 
-  Copy, 
+  AlertCircle, 
   Users, 
-  ShieldCheck, 
-  Zap, 
-  X, 
-  Radio, 
-  LogOut,
-  Search,
-  Sparkles,
-  Clock,
+  Search, 
+  Trash2, 
+  LogOut, 
   ArrowRight,
-  Plus,
-  Trash2,
-  AlertCircle,
-  ExternalLink
+  KeyRound,
+  Eye,
+  EyeOff,
+  Radar
 } from 'lucide-react';
 
 interface TeamRoomSyncModalProps {
@@ -31,579 +25,1000 @@ interface TeamRoomSyncModalProps {
 }
 
 export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, onClose }) => {
+  const [syncType, setSyncType] = useState<'p2p' | 'cloud'>('p2p');
+  const [p2pMode, setP2pMode] = useState<'join' | 'create'>('join');
+  const [cloudMode, setCloudMode] = useState<'join' | 'create'>('join');
+
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(cloudSync.getStatus());
-  const [roomCodeInput, setRoomCodeInput] = useState('');
-  const [eventNameInput, setEventNameInput] = useState('FRC REBUILT Competition');
-  const [scoutNameInput, setScoutNameInput] = useState(cloudSync.getScoutName());
+  const [p2pStatus, setP2pStatus] = useState<P2PStatus>(p2pSync.getStatus());
+
+  const [inputP2PRoomCode, setInputP2PRoomCode] = useState('');
+  const [p2pPassword, setP2pPassword] = useState('');
+  const [showP2pPassword, setShowP2pPassword] = useState(false);
+
+  const [inputCloudRoomCode, setInputCloudRoomCode] = useState('');
+  const [cloudPassword, setCloudPassword] = useState('');
+  const [showCloudPassword, setShowCloudPassword] = useState(false);
+
+  const [scoutName, setScoutName] = useState(p2pSync.getScoutName());
   
-  // Connection states
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [connectingRoomCode, setConnectingRoomCode] = useState<string | null>(null);
+  const [availableP2PRooms, setAvailableP2PRooms] = useState<P2PAvailableRoom[]>([]);
+  const [isLoadingP2PRooms, setIsLoadingP2PRooms] = useState(false);
+  const [connectingP2PCode, setConnectingP2PCode] = useState<string | null>(null);
+  const [deletingP2PCode, setDeletingP2PCode] = useState<string | null>(null);
+
+  const [availableCloudRooms, setAvailableCloudRooms] = useState<AvailableRoom[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [p2pSearchQuery, setP2pSearchQuery] = useState('');
+  const [isLoadingRooms, setIsLoadingRooms] = useState(false);
+  
+  const [isSyncingP2P, setIsSyncingP2P] = useState(false);
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const [connectingCloudCode, setConnectingCloudCode] = useState<string | null>(null);
   const [deletingRoomCode, setDeletingRoomCode] = useState<string | null>(null);
+
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const errorTimeoutRef = React.useRef<any>(null);
+  const successTimeoutRef = React.useRef<any>(null);
 
-  // Available Rooms Discovery & Search State
-  const [availableRooms, setAvailableRooms] = useState<AvailableRoom[]>([]);
-  const [isLoadingRooms, setIsLoadingRooms] = useState(false);
-  const [roomSearchQuery, setRoomSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'browse' | 'custom'>('browse');
+  const showErrorMsg = (msg: string) => {
+    if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current);
+    setErrorMsg(msg);
+    errorTimeoutRef.current = setTimeout(() => setErrorMsg(null), 3000);
+  };
+
+  const showSuccessMsg = (msg: string) => {
+    if (successTimeoutRef.current) clearTimeout(successTimeoutRef.current);
+    setSuccessMsg(msg);
+    successTimeoutRef.current = setTimeout(() => setSuccessMsg(null), 3000);
+  };
+
+  // User can create rooms ONLY if their scout name is Kawser
+  const isKawser = scoutName.trim().toLowerCase() === 'kawser';
 
   useEffect(() => {
-    const unsub = cloudSync.subscribe((status) => {
-      setSyncStatus(status);
-      if (status.roomCode) {
-        setRoomCodeInput(status.roomCode);
-        setEventNameInput(status.eventName);
-      }
-    });
-    return () => unsub();
+    const unsubCloud = cloudSync.subscribe(setSyncStatus);
+    const unsubP2P = p2pSync.subscribe(setP2pStatus);
+    return () => {
+      unsubCloud();
+      unsubP2P();
+    };
   }, []);
 
   useEffect(() => {
     if (isOpen) {
-      loadRooms();
+      if (syncType === 'cloud') {
+        loadCloudRooms();
+      } else {
+        scanP2PRooms();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, syncType]);
 
-  const loadRooms = async () => {
+  const loadCloudRooms = async () => {
     setIsLoadingRooms(true);
-    setErrorMsg(null);
     try {
       const list = await cloudSync.fetchAvailableRooms();
-      setAvailableRooms(list);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Could not load available rooms.');
-    } finally {
-      setIsLoadingRooms(false);
-    }
+      setAvailableCloudRooms(list);
+    } catch {}
+    setIsLoadingRooms(false);
+  };
+
+  const scanP2PRooms = async () => {
+    setIsLoadingP2PRooms(true);
+    try {
+      const list = await p2pSync.fetchAvailableRooms();
+      setAvailableP2PRooms(list);
+    } catch {}
+    setIsLoadingP2PRooms(false);
   };
 
   if (!isOpen) return null;
 
-  const handleConnectToCode = async (targetCode: string, targetEvent?: string) => {
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    const cleanCode = targetCode.trim().toUpperCase();
-    if (!cleanCode) {
-      setErrorMsg('Please enter a team room code (e.g. 9751-SVR)');
+  // --- P2P SYNC TRIGGER ---
+  const handleP2PSync = async () => {
+    if (!p2pStatus.roomCode || !p2pStatus.isConnected) {
+      showErrorMsg('No active P2P room. Please join or create a room first.');
       return;
     }
 
-    if (scoutNameInput.trim()) {
-      cloudSync.setScoutName(scoutNameInput.trim());
-    }
-
-    setIsConnecting(true);
-    setConnectingRoomCode(cleanCode);
+    setIsSyncingP2P(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
 
     try {
-      await cloudSync.connectToRoom(cleanCode, targetEvent || eventNameInput);
-      setSuccessMsg(`Successfully connected to Room: ${cleanCode}`);
-      await loadRooms();
-      setTimeout(() => setSuccessMsg(null), 3500);
+      const res = await p2pSync.autoSyncOneClick();
+      showSuccessMsg(`Synced ${res.matchCount} matches & ${res.teamCount} teams (${res.peerCount} peers)`);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to connect to cloud room.');
+      showErrorMsg(err.message || 'P2P sync failed.');
     } finally {
-      setIsConnecting(false);
-      setConnectingRoomCode(null);
+      setIsSyncingP2P(false);
     }
   };
 
-  const handleManualSubmit = async (e: React.FormEvent) => {
+  // Create P2P Room (only Kawser + password team9751)
+  const handleCreateP2PRoom = async (e: React.FormEvent) => {
     e.preventDefault();
-    await handleConnectToCode(roomCodeInput, eventNameInput);
-  };
+    if (!isKawser) {
+      showErrorMsg('Only Kawser is authorized to create rooms.');
+      return;
+    }
 
-  const handleDeleteRoom = async (room: AvailableRoom) => {
-    if (!window.confirm(`Are you sure you want to delete room "${room.roomCode}"? This will remove the room from the active list for all scouts.`)) {
+    const code = inputP2PRoomCode.trim().toUpperCase();
+    if (!code) return;
+
+    if (p2pPassword.trim().toLowerCase() !== 'team9751') {
+      showErrorMsg('Incorrect admin password.');
       return;
     }
 
     setErrorMsg(null);
     setSuccessMsg(null);
-    setDeletingRoomCode(room.roomCode);
+    setIsSyncingP2P(true);
 
     try {
-      await cloudSync.deleteRoom(room.roomCode);
-      setSuccessMsg(`Deleted room ${room.roomCode}.`);
-      await loadRooms();
-      setTimeout(() => setSuccessMsg(null), 3000);
+      await p2pSync.createRoom(code, p2pPassword.trim());
+      showSuccessMsg(`Created & hosting P2P Room ${code}!`);
+      setInputP2PRoomCode('');
+      setP2pPassword('');
+      await scanP2PRooms();
     } catch (err: any) {
-      setErrorMsg(`Failed to delete room: ${err.message}`);
+      showErrorMsg(err.message || 'Failed to create P2P room.');
+    } finally {
+      setIsSyncingP2P(false);
+    }
+  };
+
+  // Join P2P Room (no password required)
+  const handleJoinP2PRoom = async (targetCode?: string) => {
+    const code = (targetCode || inputP2PRoomCode).trim().toUpperCase();
+    if (!code) return;
+
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setConnectingP2PCode(code);
+    setIsSyncingP2P(true);
+
+    try {
+      await p2pSync.joinRoom(code);
+      showSuccessMsg(`Connected to P2P Room ${code}!`);
+      setInputP2PRoomCode('');
+      await scanP2PRooms();
+    } catch (err: any) {
+      showErrorMsg(err.message || 'Failed to connect. Check room code or ask host.');
+    } finally {
+      setIsSyncingP2P(false);
+      setConnectingP2PCode(null);
+    }
+  };
+
+  const handleLeaveP2PRoom = () => {
+    p2pSync.disconnect();
+    showSuccessMsg('Disconnected from P2P');
+  };
+
+  const handleDeleteP2PRoom = async (r: P2PAvailableRoom) => {
+    if (!window.confirm(`Delete P2P room "${r.roomCode}"?`)) return;
+    setDeletingP2PCode(r.roomCode);
+    try {
+      await p2pSync.deleteRoom(r.roomCode);
+      showSuccessMsg('P2P room removed from list');
+      await scanP2PRooms();
+    } catch (err: any) {
+      showErrorMsg(err.message || 'Failed to delete room.');
+    } finally {
+      setDeletingP2PCode(null);
+    }
+  };
+
+  // --- CLOUD SYNC TRIGGER ---
+  const handleCloudSync = async () => {
+    if (!syncStatus.roomCode) {
+      showErrorMsg('No active Cloud room. Please join or create a room first.');
+      return;
+    }
+
+    setIsSyncingCloud(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      await cloudSync.pushLocalDataToCloud();
+      showSuccessMsg('Cloud Synced to Firebase');
+      await loadCloudRooms();
+    } catch (err: any) {
+      showErrorMsg(err.message || 'Cloud sync failed.');
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
+
+  // Create Cloud Room (only Kawser + password team9751)
+  const handleCreateCloudRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isKawser) {
+      showErrorMsg('Only Kawser is authorized to create rooms.');
+      return;
+    }
+
+    const code = inputCloudRoomCode.trim().toUpperCase();
+    if (!code) return;
+
+    if (cloudPassword.trim().toLowerCase() !== 'team9751') {
+      showErrorMsg('Incorrect admin password.');
+      return;
+    }
+
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setIsSyncingCloud(true);
+
+    try {
+      await cloudSync.createRoom(code, cloudPassword.trim());
+      showSuccessMsg(`Created Cloud Room ${code}!`);
+      setInputCloudRoomCode('');
+      setCloudPassword('');
+      await loadCloudRooms();
+    } catch (err: any) {
+      showErrorMsg(err.message || 'Failed to create Cloud room.');
+    } finally {
+      setIsSyncingCloud(false);
+    }
+  };
+
+  // Join Cloud Room (no password required)
+  const handleJoinCloudRoom = async (targetCode: string) => {
+    const code = targetCode.trim().toUpperCase();
+    if (!code) return;
+
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setConnectingCloudCode(code);
+    setIsSyncingCloud(true);
+
+    try {
+      await cloudSync.joinRoom(code);
+      showSuccessMsg(`Joined Cloud Room ${code}!`);
+      setInputCloudRoomCode('');
+      await loadCloudRooms();
+    } catch (err: any) {
+      showErrorMsg(err.message || 'Room not found. Check code or ask Kawser to create it.');
+    } finally {
+      setIsSyncingCloud(false);
+      setConnectingCloudCode(null);
+    }
+  };
+
+  const handleLeaveCloudRoom = () => {
+    cloudSync.disconnect();
+    showSuccessMsg('Disconnected from Cloud');
+  };
+
+  const handleDeleteCloudRoom = async (r: AvailableRoom) => {
+    if (!window.confirm(`Delete room "${r.roomCode}"?`)) return;
+    setDeletingRoomCode(r.roomCode);
+    try {
+      await cloudSync.deleteRoom(r.roomCode);
+      showSuccessMsg('Room deleted');
+      await loadCloudRooms();
+    } catch (err: any) {
+      showErrorMsg(err.message || 'Failed to delete room.');
     } finally {
       setDeletingRoomCode(null);
     }
   };
 
-  const handleManualSync = async () => {
-    setErrorMsg(null);
-    setIsConnecting(true);
-    try {
-      await cloudSync.pushLocalDataToCloud();
-      setSuccessMsg('Pushed local data and fetched latest cloud updates.');
-      await loadRooms();
-      setTimeout(() => setSuccessMsg(null), 3000);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Sync failed.');
-    } finally {
-      setIsConnecting(false);
-    }
-  };
+  // Compile active scouts in current Cloud room
+  const currentCloudRoom = availableCloudRooms.find((r) => r.roomCode === syncStatus.roomCode);
+  const cloudRoomScouts = currentCloudRoom?.connectedScouts || (currentCloudRoom?.creatorName ? [currentCloudRoom.creatorName] : []);
 
-  const handleDisconnect = () => {
-    cloudSync.disconnect();
-    setRoomCodeInput('');
-    setSuccessMsg('Disconnected from room.');
-    setTimeout(() => setSuccessMsg(null), 2500);
-  };
-
-  const handleCopyInvite = () => {
-    if (!syncStatus.roomCode) return;
-    navigator.clipboard.writeText(syncStatus.roomCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const filteredRooms = availableRooms.filter((r) => {
-    if (!roomSearchQuery.trim()) return true;
-    const q = roomSearchQuery.toLowerCase();
-    return r.roomCode.toLowerCase().includes(q) || r.eventName.toLowerCase().includes(q);
+  // Filter Cloud rooms
+  const filteredCloudRooms = availableCloudRooms.filter((r) => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      r.roomCode.toLowerCase().includes(query) ||
+      r.eventName.toLowerCase().includes(query) ||
+      r.connectedScouts?.some((s) => s.toLowerCase().includes(query))
+    );
   });
 
-  const formatRelativeTime = (timestamp?: number) => {
-    if (!timestamp) return 'Recently';
-    const diffSec = Math.floor((Date.now() - timestamp) / 1000);
-    if (diffSec < 60) return 'Just now';
-    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-    return `${Math.floor(diffSec / 86400)}d ago`;
-  };
-
-  const isQuotaError = (errorMsg || syncStatus.lastError || '').toLowerCase().includes('quota');
+  // Filter P2P rooms
+  const filteredP2PRooms = availableP2PRooms.filter((r) => {
+    if (!p2pSearchQuery.trim()) return true;
+    const query = p2pSearchQuery.toLowerCase();
+    return (
+      r.roomCode.toLowerCase().includes(query) ||
+      r.creatorName.toLowerCase().includes(query)
+    );
+  });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-950">
-          <div className="flex items-center gap-2.5">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${
-              syncStatus.roomCode 
-                ? 'bg-emerald-950/60 border-emerald-800 text-emerald-400' 
-                : 'bg-blue-950/60 border-blue-800 text-blue-400'
-            }`}>
-              <Cloud className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-bold text-white font-mono tracking-tight flex items-center gap-2">
-                Team Cloud Auto-Sync
-                {syncStatus.roomCode && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-emerald-950 border border-emerald-800/80 text-emerald-300 font-sans font-medium">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    LIVE
-                  </span>
-                )}
-              </h2>
-              <p className="text-[11px] text-slate-400">
-                Sync scouts remotely in real-time across the competition arena
-              </p>
-            </div>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-950">
+          <div className="flex items-center gap-2">
+            {syncType === 'p2p' ? (
+              <Radio className={`w-4 h-4 ${p2pStatus.isConnected ? 'text-emerald-400' : 'text-slate-400'}`} />
+            ) : (
+              <Cloud className={`w-4 h-4 ${syncStatus.roomCode ? 'text-blue-400' : 'text-slate-400'}`} />
+            )}
+            <h2 className="text-xs font-bold text-white font-mono uppercase tracking-wide">
+              Sync
+            </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
-          {/* Error Notice */}
-          {errorMsg && (
-            <div className="p-3.5 rounded-xl bg-rose-950/70 border border-rose-800/90 text-rose-200 text-xs flex flex-col gap-1.5 shadow">
-              <div className="flex items-center gap-2 font-bold text-rose-300">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>Connection Alert</span>
-              </div>
-              <p className="text-[11px] text-rose-200/90 leading-relaxed">{errorMsg}</p>
-              {isQuotaError && (
-                <div className="pt-1 border-t border-rose-900/60 flex items-center justify-between text-[10px] text-amber-300">
-                  <span>Free Firestore daily write limit reached on project.</span>
-                  <a 
-                    href="https://console.firebase.google.com/project/pi-obsidian/firestore/databases/ai-studio-frcrebuiltscouti-149a6f32-a94f-4b68-8171-8290692d700f/data?openUpgradeDialog=true" 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="underline font-bold flex items-center gap-1 hover:text-amber-200"
-                  >
-                    <span>Check Quota in Console</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
+        {/* Modal Content */}
+        <div className="p-4 overflow-y-auto space-y-3.5 text-xs font-mono">
+          {/* Top Two Mode Buttons: P2P and Cloud */}
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setSyncType('p2p')}
+              className={`py-2 px-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                syncType === 'p2p'
+                  ? 'bg-emerald-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <Radio className="w-3.5 h-3.5" />
+              <span>P2P</span>
+              {p2pStatus.isConnected && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
               )}
-            </div>
-          )}
-
-          {/* Success Notice */}
-          {successMsg && (
-            <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 text-xs flex items-center gap-2">
-              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>{successMsg}</span>
-            </div>
-          )}
-
-          {/* ACTIVE ROOM STATUS (if already connected) */}
-          {syncStatus.roomCode && (
-            <div className="p-4 rounded-xl bg-slate-950 border border-emerald-900/60 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] uppercase font-mono tracking-wider text-emerald-400 font-bold flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>CONNECTED TO ROOM</span>
-                  </div>
-                  <div className="text-xl font-black text-emerald-300 font-mono tracking-wider mt-0.5">
-                    {syncStatus.roomCode}
-                  </div>
-                  <div className="text-xs text-slate-300">{syncStatus.eventName}</div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleCopyInvite}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400">Copied</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy Code</span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-xs font-mono">
-                <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-                  <div className="text-slate-400 text-[10px]">Scout Name</div>
-                  <div className="font-bold text-slate-200 truncate">{syncStatus.scoutName}</div>
-                </div>
-                <div className="bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-                  <div className="text-slate-400 text-[10px]">Last Sync</div>
-                  <div className="font-bold text-slate-200">
-                    {syncStatus.lastSyncedAt 
-                      ? new Date(syncStatus.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                      : 'Just now'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={handleManualSync}
-                  disabled={isConnecting}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isConnecting ? 'animate-spin' : ''}`} />
-                  <span>Sync Now</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDisconnect}
-                  className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 border border-slate-800 hover:border-rose-800 text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Disconnect</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Scout Name Configuration */}
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs font-mono">
-              <span className="text-slate-400">Scout Name:</span>
-              <input
-                type="text"
-                value={scoutNameInput}
-                onChange={(e) => {
-                  setScoutNameInput(e.target.value);
-                  cloudSync.setScoutName(e.target.value);
-                }}
-                placeholder="Your Name (e.g. Alex M.)"
-                className="bg-slate-900 border border-slate-750 rounded-lg px-2.5 py-1 text-slate-200 text-xs focus:outline-none focus:border-amber-400 w-36 sm:w-48 font-mono"
-              />
-            </div>
-            <span className="text-[10px] text-slate-500 hidden sm:inline font-mono">Author tag on created rooms</span>
-          </div>
-
-          {/* Tabs: Available Rooms vs Custom Code */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
-            <button
-              type="button"
-              onClick={() => setActiveTab('browse')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                activeTab === 'browse'
-                  ? 'bg-slate-800 text-amber-300 shadow'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Search className="w-3.5 h-3.5" />
-              <span>Available Rooms ({availableRooms.length})</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setActiveTab('custom')}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
-                activeTab === 'custom'
-                  ? 'bg-slate-800 text-amber-300 shadow'
-                  : 'text-slate-400 hover:text-slate-200'
+              onClick={() => setSyncType('cloud')}
+              className={`py-2 px-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                syncType === 'cloud'
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Join or Create by Code</span>
+              <Cloud className="w-3.5 h-3.5" />
+              <span>Cloud</span>
+              {syncStatus.roomCode && (
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse" />
+              )}
             </button>
           </div>
 
-          {/* TAB 1: BROWSE & SEARCH AVAILABLE ROOMS */}
-          {activeTab === 'browse' && (
-            <div className="space-y-3">
-              {/* Search Bar & Refresh */}
+          {/* Feedback Alerts */}
+          {errorMsg && (
+            <div className="p-2.5 rounded-xl bg-rose-950/70 border border-rose-800/80 text-rose-200 flex items-center justify-between gap-2 animate-in fade-in duration-150">
               <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-500" />
-                  <input
-                    type="text"
-                    placeholder="Search room code, event, or scout..."
-                    value={roomSearchQuery}
-                    onChange={(e) => setRoomSearchQuery(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8.5 pr-3 py-2 text-xs font-mono text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-400"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={loadRooms}
-                  disabled={isLoadingRooms}
-                  className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-850 text-slate-300 border border-slate-800 text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  title="Refresh room list"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isLoadingRooms ? 'animate-spin' : ''}`} />
-                  <span className="hidden sm:inline">Refresh</span>
-                </button>
+                <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                <span>{errorMsg}</span>
               </div>
+              <button
+                type="button"
+                onClick={() => setErrorMsg(null)}
+                className="p-1 text-rose-400 hover:text-white rounded cursor-pointer shrink-0"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
-              {/* Rooms List */}
-              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {isLoadingRooms ? (
-                  <div className="p-8 text-center text-slate-400 space-y-2">
-                    <RefreshCw className="w-5 h-5 animate-spin mx-auto text-amber-400" />
-                    <p className="text-xs font-mono">Discovering active scouting rooms...</p>
+          {successMsg && (
+            <div className="p-2.5 rounded-xl bg-emerald-950/70 border border-emerald-800/80 text-emerald-300 flex items-center justify-between gap-2 animate-in fade-in duration-150">
+              <div className="flex items-center gap-2">
+                <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>{successMsg}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSuccessMsg(null)}
+                className="p-1 text-emerald-400 hover:text-white rounded cursor-pointer shrink-0"
+                title="Dismiss"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* ================= P2P TAB ================= */}
+          {syncType === 'p2p' && (
+            <div className="space-y-3">
+              {/* Active Room Card */}
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${p2pStatus.isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+                      <span>{p2pStatus.isConnected ? (p2pStatus.isHost ? 'Host' : 'Connected') : 'Disconnected'}</span>
+                    </div>
+                    <div className="text-base font-black text-amber-300 mt-0.5">
+                      {p2pStatus.roomCode || 'No Room'}
+                    </div>
                   </div>
-                ) : filteredRooms.length === 0 ? (
-                  <div className="p-6 rounded-xl bg-slate-950/60 border border-slate-800 text-center space-y-2">
-                    <Radio className="w-6 h-6 text-slate-600 mx-auto" />
-                    <p className="text-xs text-slate-400 font-mono">
-                      {roomSearchQuery ? 'No rooms match your search query.' : 'No active cloud rooms detected yet.'}
-                    </p>
+
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setActiveTab('custom')}
-                      className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-amber-400 hover:underline cursor-pointer"
+                      onClick={handleP2PSync}
+                      disabled={isSyncingP2P}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                     >
-                      <span>Create the first room</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      <RefreshCw className={`w-3 h-3 ${isSyncingP2P ? 'animate-spin' : ''}`} />
+                      <span>Sync</span>
+                    </button>
+
+                    {p2pStatus.isConnected && (
+                      <button
+                        type="button"
+                        onClick={handleLeaveP2PRoom}
+                        className="p-1.5 rounded-lg bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border border-rose-800/80 cursor-pointer"
+                        title="Leave"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Connected Scouts */}
+                <div className="pt-2 border-t border-slate-900 space-y-1">
+                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                    <Users className="w-3 h-3 text-emerald-400" />
+                    <span>Scouts ({p2pStatus.peers.length + (p2pStatus.isConnected ? 1 : 0)}):</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {p2pStatus.isConnected && (
+                      <span className="px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-800/80 text-[10px] text-emerald-300 font-semibold flex items-center gap-1">
+                        <span>{scoutName || 'You'} (You)</span>
+                        {p2pStatus.isHost && <span className="text-[9px] bg-emerald-800 px-1 rounded text-white">Host</span>}
+                      </span>
+                    )}
+                    {p2pStatus.peers.map((peer, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-amber-300"
+                      >
+                        {peer.scoutName || `Scout #${idx + 1}`}
+                      </span>
+                    ))}
+                    {!p2pStatus.isConnected && (
+                      <span className="text-slate-500 text-[10px] italic">Not connected</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Mode Selector: Create Room only shows for Kawser */}
+              {isKawser ? (
+                <div className="flex items-center gap-3 pt-1 border-t border-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setP2pMode('join');
+                      setErrorMsg(null);
+                    }}
+                    className={`pb-1 text-xs font-bold transition-colors cursor-pointer border-b-2 ${
+                      p2pMode === 'join'
+                        ? 'border-emerald-500 text-emerald-400'
+                        : 'border-transparent text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    Join Room
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setP2pMode('create');
+                      setErrorMsg(null);
+                    }}
+                    className={`pb-1 text-xs font-bold transition-colors cursor-pointer border-b-2 ${
+                      p2pMode === 'create'
+                        ? 'border-emerald-500 text-emerald-400'
+                        : 'border-transparent text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    Create Room
+                  </button>
+                </div>
+              ) : (
+                <div className="pt-1 border-t border-slate-900 text-[11px] font-bold text-slate-300">
+                  Join Room
+                </div>
+              )}
+
+              {/* Join P2P Form */}
+              {(!isKawser || p2pMode === 'join') && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleJoinP2PRoom();
+                  }}
+                  className="flex gap-1.5"
+                >
+                  <input
+                    type="text"
+                    placeholder="Room Code"
+                    value={inputP2PRoomCode}
+                    onChange={(e) => setInputP2PRoomCode(e.target.value.toUpperCase())}
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white placeholder-slate-500 uppercase focus:outline-none focus:border-emerald-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!inputP2PRoomCode.trim() || isSyncingP2P}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Join
+                  </button>
+                </form>
+              )}
+
+              {/* Create P2P Form (Only for Kawser + Requires Password team9751) */}
+              {isKawser && p2pMode === 'create' && (
+                <form onSubmit={handleCreateP2PRoom} className="space-y-1.5">
+                  <input
+                    type="text"
+                    placeholder="Room Code"
+                    value={inputP2PRoomCode}
+                    onChange={(e) => setInputP2PRoomCode(e.target.value.toUpperCase())}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white placeholder-slate-500 uppercase focus:outline-none focus:border-emerald-500"
+                  />
+                  <div className="flex gap-1.5">
+                    <div className="relative flex-1">
+                      <KeyRound className="w-3 h-3 absolute left-2.5 top-2.5 text-slate-500" />
+                      <input
+                        type={showP2pPassword ? "text" : "password"}
+                        placeholder="Password"
+                        value={p2pPassword}
+                        onChange={(e) => setP2pPassword(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-7 pr-7 py-1.5 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowP2pPassword(!showP2pPassword)}
+                        className="absolute right-2 top-2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                        title={showP2pPassword ? "Hide password" : "Show password"}
+                      >
+                        {showP2pPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={!inputP2PRoomCode.trim() || !p2pPassword.trim() || isSyncingP2P}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      Create
                     </button>
                   </div>
-                ) : (
-                  filteredRooms.map((room) => {
-                    const isCurrent = syncStatus.roomCode === room.roomCode;
-                    const isTargetConnecting = connectingRoomCode === room.roomCode;
-                    const isTargetDeleting = deletingRoomCode === room.roomCode;
-                    const canDelete = cloudSync.isRoomCreator(room);
+                </form>
+              )}
 
-                    return (
-                      <div
-                        key={room.roomCode}
-                        className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                          isCurrent
-                            ? 'bg-emerald-950/30 border-emerald-800/80 shadow-sm'
-                            : 'bg-slate-950/80 hover:bg-slate-950 border-slate-800 hover:border-slate-700'
-                        }`}
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-black text-sm text-slate-100 tracking-tight">
-                              {room.roomCode}
-                            </span>
-                            {isCurrent && (
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-800 text-[10px] text-emerald-300 font-mono font-bold">
-                                Connected
-                              </span>
-                            )}
+              {/* Scan for Rooms / Available P2P Rooms List */}
+              <div className="space-y-1.5 pt-1 border-t border-slate-900">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[10px] font-bold flex items-center gap-1">
+                    <Radar className="w-3 h-3 text-emerald-400" />
+                    <span>Scan for Rooms:</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={scanP2PRooms}
+                    disabled={isLoadingP2PRooms}
+                    className="text-emerald-400 hover:underline text-[10px] flex items-center gap-1 cursor-pointer font-bold"
+                  >
+                    <RefreshCw className={`w-2.5 h-2.5 ${isLoadingP2PRooms ? 'animate-spin' : ''}`} />
+                    <span>Scan</span>
+                  </button>
+                </div>
+
+                {availableP2PRooms.length > 2 && (
+                  <div className="relative">
+                    <Search className="w-3 h-3 absolute left-2 top-2 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Filter..."
+                      value={p2pSearchQuery}
+                      onChange={(e) => setP2pSearchQuery(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-7 pr-2 py-1 text-[11px] text-slate-300 placeholder-slate-500 focus:outline-none focus:border-slate-700"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
+                  {filteredP2PRooms.length === 0 ? (
+                    <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-center text-slate-500 text-[11px]">
+                      {isLoadingP2PRooms ? 'Scanning...' : 'No active P2P rooms found.'}
+                    </div>
+                  ) : (
+                    filteredP2PRooms.map((r) => {
+                      const isCurrent = p2pStatus.roomCode === r.roomCode;
+                      const isTargetConnecting = connectingP2PCode === r.roomCode;
+                      const isTargetDeleting = deletingP2PCode === r.roomCode;
+                      const canDelete = isKawser;
+
+                      return (
+                        <div
+                          key={r.roomCode}
+                          className={`p-2 rounded-lg border flex items-center justify-between gap-2 ${
+                            isCurrent
+                              ? 'bg-emerald-950/30 border-emerald-800/80'
+                              : 'bg-slate-950 border-slate-800'
+                          }`}
+                        >
+                          <div className="truncate">
+                            <div className="font-bold text-white text-[11px] flex items-center gap-1.5">
+                              <span>{r.roomCode}</span>
+                              {isCurrent && (
+                                <span className="text-[9px] text-emerald-400 px-1 rounded bg-emerald-950 border border-emerald-800">
+                                  Active
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-400 truncate">
+                              Host: {r.creatorName}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
                             {canDelete && (
-                              <span className="px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 text-[9px] font-mono font-bold">
-                                Your Room
-                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteP2PRoom(r)}
+                                disabled={isTargetDeleting}
+                                className="p-1 text-slate-500 hover:text-rose-400 cursor-pointer"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
                             )}
-                          </div>
 
-                          <div className="text-xs text-slate-300 truncate max-w-xs sm:max-w-sm">
-                            {room.eventName}
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500 font-mono">
-                            {room.creatorName && (
-                              <span className="text-slate-400">
-                                Created by: <strong className="text-slate-300">{room.creatorName}</strong>
-                              </span>
-                            )}
-                            <span>• {formatRelativeTime(room.lastActiveAt || room.createdAt)}</span>
-                            {typeof room.teamCount === 'number' && room.teamCount > 0 && (
-                              <span>• {room.teamCount} teams</span>
-                            )}
-                            {typeof room.matchCount === 'number' && room.matchCount > 0 && (
-                              <span>• {room.matchCount} matches</span>
+                            {!isCurrent && (
+                              <button
+                                type="button"
+                                onClick={() => handleJoinP2PRoom(r.roomCode)}
+                                disabled={isSyncingP2P}
+                                className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50 flex items-center gap-0.5"
+                              >
+                                <span>{isTargetConnecting ? '...' : 'Join'}</span>
+                                <ArrowRight className="w-2.5 h-2.5" />
+                              </button>
                             )}
                           </div>
                         </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
 
-                        {/* Room Action Buttons */}
-                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
-                          {canDelete && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteRoom(room)}
-                              disabled={isTargetDeleting || isTargetConnecting}
-                              className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950/70 text-slate-400 hover:text-rose-300 border border-slate-850 hover:border-rose-800 transition-colors cursor-pointer disabled:opacity-50"
-                              title="Delete this room"
-                            >
-                              {isTargetDeleting ? (
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin text-rose-400" />
-                              ) : (
-                                <Trash2 className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          )}
-
-                          {isCurrent ? (
-                            <span className="px-3 py-1.5 rounded-lg bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 text-xs font-mono font-bold">
-                              Active
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleConnectToCode(room.roomCode, room.eventName)}
-                              disabled={isConnecting}
-                              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-bold transition-colors cursor-pointer shadow disabled:opacity-50 flex items-center gap-1.5"
-                            >
-                              {isTargetConnecting ? (
-                                <>
-                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                                  <span>Joining...</span>
-                                </>
-                              ) : (
-                                <span>Join</span>
-                              )}
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
+              {/* Scout Name */}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-900">
+                <span className="text-slate-400">Scout Name:</span>
+                <input
+                  type="text"
+                  value={scoutName}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setScoutName(val);
+                    p2pSync.setScoutName(val);
+                    cloudSync.setScoutName(val);
+                    if (val.trim().toLowerCase() !== 'kawser') {
+                      setP2pMode('join');
+                      setCloudMode('join');
+                    }
+                  }}
+                  placeholder="Your Name"
+                  className="w-36 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200 text-right focus:outline-none focus:border-emerald-500"
+                />
               </div>
             </div>
           )}
 
-          {/* TAB 2: JOIN OR CREATE CUSTOM ROOM CODE */}
-          {activeTab === 'custom' && (
-            <form onSubmit={handleManualSubmit} className="space-y-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
-              <div className="text-xs font-bold text-slate-200 flex items-center gap-2">
-                <Radio className="w-4 h-4 text-amber-400" />
-                <span>Enter Room Code to Join or Create</span>
-              </div>
+          {/* ================= CLOUD TAB ================= */}
+          {syncType === 'cloud' && (
+            <div className="space-y-3">
+              {/* Active Room Card */}
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${syncStatus.roomCode ? 'bg-blue-400 animate-pulse' : 'bg-slate-600'}`} />
+                      <span>{syncStatus.roomCode ? 'Connected' : 'Disconnected'}</span>
+                    </div>
+                    <div className="text-base font-black text-amber-300 mt-0.5">
+                      {syncStatus.roomCode || 'No Room'}
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1 font-mono">
-                  Team Room Code (e.g. 9751-SVR, 254-CMP, TEAM-ROOM)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 9751-SVR"
-                  value={roomCodeInput}
-                  onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 uppercase"
-                  required
-                />
-              </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleCloudSync}
+                      disabled={isSyncingCloud}
+                      className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isSyncingCloud ? 'animate-spin' : ''}`} />
+                      <span>Sync</span>
+                    </button>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1 font-mono">
-                  Event / Competition Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Silicon Valley Regional"
-                  value={eventNameInput}
-                  onChange={(e) => setEventNameInput(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
-                />
-              </div>
+                    {syncStatus.roomCode && (
+                      <button
+                        type="button"
+                        onClick={handleLeaveCloudRoom}
+                        className="p-1.5 rounded-lg bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border border-rose-800/80 cursor-pointer"
+                        title="Leave"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
 
-              <button
-                type="submit"
-                disabled={isConnecting}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-mono font-black uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 shadow-md"
-              >
-                {isConnecting ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-950" />
-                    <span>Connecting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-3.5 h-3.5 text-slate-950" />
-                    <span>Connect / Create Room</span>
-                  </>
+                {/* Connected Scouts */}
+                {syncStatus.roomCode && (
+                  <div className="pt-2 border-t border-slate-900 space-y-1">
+                    <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Users className="w-3 h-3 text-blue-400" />
+                      <span>Scouts ({cloudRoomScouts.length || 1}):</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {cloudRoomScouts.length === 0 ? (
+                        <span className="px-2 py-0.5 rounded bg-blue-950/80 border border-blue-800 text-[10px] text-blue-300">
+                          {scoutName || 'You'} (You)
+                        </span>
+                      ) : (
+                        cloudRoomScouts.map((scout, idx) => (
+                          <span
+                            key={idx}
+                            className={`px-2 py-0.5 rounded border text-[10px] ${
+                              scout === scoutName
+                                ? 'bg-blue-950/80 border-blue-800 text-blue-300'
+                                : 'bg-slate-900 border-slate-800 text-slate-300'
+                            }`}
+                          >
+                            {scout}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 )}
-              </button>
-            </form>
+              </div>
+
+              {/* Mode Selector: Create Room only shows for Kawser */}
+              {isKawser ? (
+                <div className="flex items-center gap-3 pt-1 border-t border-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCloudMode('join');
+                      setErrorMsg(null);
+                    }}
+                    className={`pb-1 text-xs font-bold transition-colors cursor-pointer border-b-2 ${
+                      cloudMode === 'join'
+                        ? 'border-blue-500 text-blue-400'
+                        : 'border-transparent text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    Join Room
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCloudMode('create');
+                      setErrorMsg(null);
+                    }}
+                    className={`pb-1 text-xs font-bold transition-colors cursor-pointer border-b-2 ${
+                      cloudMode === 'create'
+                        ? 'border-blue-500 text-blue-400'
+                        : 'border-transparent text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    Create Room
+                  </button>
+                </div>
+              ) : (
+                <div className="pt-1 border-t border-slate-900 text-[11px] font-bold text-slate-300">
+                  Join Room
+                </div>
+              )}
+
+              {/* Join Cloud Room Form */}
+              {(!isKawser || cloudMode === 'join') && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleJoinCloudRoom(inputCloudRoomCode);
+                  }}
+                  className="flex gap-1.5"
+                >
+                  <input
+                    type="text"
+                    placeholder="Room Code"
+                    value={inputCloudRoomCode}
+                    onChange={(e) => setInputCloudRoomCode(e.target.value.toUpperCase())}
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white placeholder-slate-500 uppercase focus:outline-none focus:border-blue-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!inputCloudRoomCode.trim() || isSyncingCloud}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Join
+                  </button>
+                </form>
+              )}
+
+              {/* Create Cloud Room Form (Only for Kawser + Requires Password team9751) */}
+              {isKawser && cloudMode === 'create' && (
+                <form onSubmit={handleCreateCloudRoom} className="space-y-1.5">
+                  <input
+                    type="text"
+                    placeholder="Room Code"
+                    value={inputCloudRoomCode}
+                    onChange={(e) => setInputCloudRoomCode(e.target.value.toUpperCase())}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-white placeholder-slate-500 uppercase focus:outline-none focus:border-blue-500"
+                  />
+                  <div className="flex gap-1.5">
+                    <div className="relative flex-1">
+                      <KeyRound className="w-3 h-3 absolute left-2.5 top-2.5 text-slate-500" />
+                      <input
+                        type={showCloudPassword ? "text" : "password"}
+                        placeholder="Password"
+                        value={cloudPassword}
+                        onChange={(e) => setCloudPassword(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-7 pr-7 py-1.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCloudPassword(!showCloudPassword)}
+                        className="absolute right-2 top-2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                        title={showCloudPassword ? "Hide password" : "Show password"}
+                      >
+                        {showCloudPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={!inputCloudRoomCode.trim() || !cloudPassword.trim() || isSyncingCloud}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+                    >
+                      Create
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Scan for Rooms / Available Rooms List */}
+              <div className="space-y-1.5 pt-1 border-t border-slate-900">
+                <div className="flex items-center justify-between text-slate-400">
+                  <span className="text-[10px] font-bold flex items-center gap-1">
+                    <Radar className="w-3 h-3 text-blue-400" />
+                    <span>Scan for Rooms:</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={loadCloudRooms}
+                    disabled={isLoadingRooms}
+                    className="text-blue-400 hover:underline text-[10px] flex items-center gap-1 cursor-pointer font-bold"
+                  >
+                    <RefreshCw className={`w-2.5 h-2.5 ${isLoadingRooms ? 'animate-spin' : ''}`} />
+                    <span>Scan</span>
+                  </button>
+                </div>
+
+                {availableCloudRooms.length > 2 && (
+                  <div className="relative">
+                    <Search className="w-3 h-3 absolute left-2 top-2 text-slate-500" />
+                    <input
+                      type="text"
+                      placeholder="Filter..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-7 pr-2 py-1 text-[11px] text-slate-300 placeholder-slate-500 focus:outline-none focus:border-slate-700"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
+                  {filteredCloudRooms.length === 0 ? (
+                    <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-center text-slate-500 text-[11px]">
+                      {isLoadingRooms ? 'Scanning...' : 'No rooms found.'}
+                    </div>
+                  ) : (
+                    filteredCloudRooms.map((r) => {
+                      const isCurrent = syncStatus.roomCode === r.roomCode;
+                      const isTargetConnecting = connectingCloudCode === r.roomCode;
+                      const isTargetDeleting = deletingRoomCode === r.roomCode;
+                      const canDelete = isKawser || cloudSync.isRoomCreator(r);
+                      const scoutsList = r.connectedScouts || (r.creatorName ? [r.creatorName] : []);
+
+                      return (
+                        <div
+                          key={r.roomCode}
+                          className={`p-2 rounded-lg border flex items-center justify-between gap-2 ${
+                            isCurrent
+                              ? 'bg-blue-950/30 border-blue-800/80'
+                              : 'bg-slate-950 border-slate-800'
+                          }`}
+                        >
+                          <div className="truncate">
+                            <div className="font-bold text-white text-[11px] flex items-center gap-1.5">
+                              <span>{r.roomCode}</span>
+                              {isCurrent && (
+                                <span className="text-[9px] text-blue-400 px-1 rounded bg-blue-950 border border-blue-800">
+                                  Active
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-slate-400 truncate">
+                              {scoutsList.length > 0 ? scoutsList.join(', ') : 'No scouts'}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {canDelete && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteCloudRoom(r)}
+                                disabled={isTargetDeleting}
+                                className="p-1 text-slate-500 hover:text-rose-400 cursor-pointer"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+
+                            {!isCurrent && (
+                              <button
+                                type="button"
+                                onClick={() => handleJoinCloudRoom(r.roomCode)}
+                                disabled={isSyncingCloud}
+                                className="px-2 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[10px] font-bold cursor-pointer disabled:opacity-50 flex items-center gap-0.5"
+                              >
+                                <span>{isTargetConnecting ? '...' : 'Join'}</span>
+                                <ArrowRight className="w-2.5 h-2.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Scout Name */}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-900">
+                <span className="text-slate-400">Scout Name:</span>
+                <input
+                  type="text"
+                  value={scoutName}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setScoutName(val);
+                    p2pSync.setScoutName(val);
+                    cloudSync.setScoutName(val);
+                    if (val.trim().toLowerCase() !== 'kawser') {
+                      setP2pMode('join');
+                      setCloudMode('join');
+                    }
+                  }}
+                  placeholder="Your Name"
+                  className="w-36 bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-slate-200 text-right focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
           )}
-
-          {/* HOW CONFLICT RESOLUTION WORKS */}
-          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5 text-xs font-mono">
-            <div className="font-bold text-slate-300 flex items-center gap-1.5 text-[11px]">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Real-Time Cloud Synchronization Features</span>
-            </div>
-            
-            <div className="text-[10px] text-slate-400 leading-relaxed space-y-1">
-              <p>• <strong>Instant Live Push</strong>: Every match and pit observation is automatically synced to all scouts connected to the same room code.</p>
-              <p>• <strong>Offline Resilience</strong>: When arena cellular drops, changes queue locally in IndexedDB and upload immediately when reconnected.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-5 py-3 border-t border-slate-800 bg-slate-950 flex items-center justify-between text-xs">
-          <span className="text-slate-500 text-[11px] font-mono">FRC Real-Time Firestore Sync</span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold transition-colors cursor-pointer"
-          >
-            Done
-          </button>
         </div>
       </div>
     </div>

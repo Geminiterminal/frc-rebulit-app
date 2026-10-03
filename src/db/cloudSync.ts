@@ -33,6 +33,7 @@ export interface AvailableRoom {
   matchCount?: number;
   createdBy?: string;
   creatorName?: string;
+  connectedScouts?: string[];
 }
 
 export interface SyncStatus {
@@ -48,12 +49,30 @@ export interface SyncStatus {
   lastError: string | null;
 }
 
+let isKnownQuotaExhausted = false;
+
+// Intercept Firestore SDK internal gRPC quota errors
+if (typeof window !== 'undefined') {
+  const origError = console.error;
+  console.error = (...args: any[]) => {
+    const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    if (text.includes('RESOURCE_EXHAUSTED') || text.includes('Free daily write units per project')) {
+      isKnownQuotaExhausted = true;
+    }
+    origError.apply(console, args);
+  };
+}
+
 // Timeout helper to prevent infinite network stalls or backoff hangs
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 6000, errorMsg: string = 'Cloud operation timed out.'): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 5000, errorMsg: string = 'Cloud operation timed out.'): Promise<T> {
   let timer: any;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      reject(new Error(errorMsg));
+      if (isKnownQuotaExhausted) {
+        reject(new Error('Firebase free-tier daily write quota reached (resets daily at midnight PST). Data is saved safely on your device.'));
+      } else {
+        reject(new Error(errorMsg));
+      }
     }, timeoutMs);
   });
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
@@ -61,14 +80,18 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 6000, errorMsg:
 
 function parseFirebaseError(err: any): string {
   const msg = err?.message || String(err);
-  if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('Quota limit exceeded') || err?.code === 'resource-exhausted') {
-    return 'Cloud write quota reached on Google Cloud free tier. Remote sync is temporarily paused, but your data is safely saved locally.';
+  if (isKnownQuotaExhausted || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('Quota limit exceeded') || err?.code === 'resource-exhausted') {
+    isKnownQuotaExhausted = true;
+    return 'Google Cloud free-tier daily write quota is reached for this project (resets at midnight PST). Remote cloud writes are paused, but your data is 100% safely saved on your device.';
   }
   if (msg.includes('PERMISSION_DENIED') || err?.code === 'permission-denied') {
     return 'Permission denied by cloud security rules.';
   }
   if (msg.includes('timed out')) {
-    return 'Connection timed out. The server may be busy or offline.';
+    if (isKnownQuotaExhausted) {
+      return 'Google Cloud free-tier daily write quota is reached (resets at midnight PST). Your scouting records remain safe locally.';
+    }
+    return 'Connection timed out. The server may be busy or quota-limited.';
   }
   return msg;
 }
@@ -97,10 +120,15 @@ class CloudSyncManager {
       const savedRoom = localStorage.getItem('frc_sync_room_code');
       const savedEvent = localStorage.getItem('frc_sync_event_name');
       if (savedRoom) {
-        this.activeRoomCode = savedRoom;
         if (savedEvent) this.activeEventName = savedEvent;
         setTimeout(() => {
-          this.connectToRoom(savedRoom, this.activeEventName).catch(() => {});
+          this.joinRoom(savedRoom).catch(() => {
+            this.activeRoomCode = null;
+            if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem('frc_sync_room_code');
+            }
+            this.notify();
+          });
         }, 1200);
       }
     }
@@ -201,6 +229,9 @@ class CloudSyncManager {
             matchCount: data.matchCount || 0,
             createdBy: data.createdBy,
             creatorName: data.creatorName || (data.createdBy ? 'Scout' : undefined),
+            connectedScouts: Array.isArray(data.connectedScouts)
+              ? data.connectedScouts
+              : (data.creatorName ? [data.creatorName] : []),
           });
         }
       });
@@ -229,8 +260,16 @@ class CloudSyncManager {
     }
   }
 
-  // Connect / Join a Team Scouting Room
-  public async connectToRoom(rawCode: string, eventName?: string): Promise<boolean> {
+  // Create a new Team Scouting Room (requires password team9751 and scout name Kawser)
+  public async createRoom(rawCode: string, password: string, eventName?: string): Promise<boolean> {
+    if (this.getScoutName().trim().toLowerCase() !== 'kawser') {
+      throw new Error('Only Kawser is authorized to create rooms.');
+    }
+
+    if (password.trim().toLowerCase() !== 'team9751') {
+      throw new Error('Incorrect password. To create a room, enter password: team9751');
+    }
+
     const code = rawCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
     if (!code) throw new Error('Invalid room code. Please use alphanumeric characters.');
 
@@ -243,56 +282,30 @@ class CloudSyncManager {
       const uid = await this.ensureAuth();
       const scoutName = this.getScoutName();
       this.activeRoomCode = code;
+      this.activeEventName = eventName || 'FRC REBUILT Competition';
 
-      // 1. Check or create room doc with timeout
       const roomRef = doc(db, 'rooms', code);
-      let roomSnap;
-      try {
-        roomSnap = await withTimeout(
-          getDoc(roomRef),
-          5000,
-          'Connection to room timed out. Please check your internet or Firebase quota.'
-        );
-      } catch (err: any) {
-        throw new Error(parseFirebaseError(err));
-      }
-
       const now = Date.now();
-      if (roomSnap.exists()) {
-        const data = roomSnap.data();
-        const effectiveEvent = (eventName && eventName !== 'FRC REBUILT Competition') ? eventName : (data?.eventName || 'FRC REBUILT Competition');
-        this.activeEventName = effectiveEvent;
-        // Best-effort update of last active
+
+      await withTimeout(
         setDoc(roomRef, {
+          roomCode: code,
+          eventName: this.activeEventName,
+          createdAt: now,
+          createdBy: uid,
+          creatorName: scoutName,
+          connectedScouts: [scoutName],
           lastActiveAt: now,
-          eventName: effectiveEvent,
-        }, { merge: true }).catch(() => {});
-      } else {
-        this.activeEventName = eventName || 'FRC REBUILT Competition';
-        try {
-          await withTimeout(
-            setDoc(roomRef, {
-              roomCode: code,
-              eventName: this.activeEventName,
-              createdAt: now,
-              createdBy: uid,
-              creatorName: scoutName,
-              lastActiveAt: now,
-            }),
-            5000,
-            'Room creation timed out.'
-          );
-        } catch (err: any) {
-          throw new Error(parseFirebaseError(err));
-        }
-      }
+        }, { merge: true }),
+        5000,
+        'Room creation timed out.'
+      );
 
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('frc_sync_room_code', code);
         localStorage.setItem('frc_sync_event_name', this.activeEventName);
       }
 
-      // 2. Initial bidirectional push & pull
       await this.pushLocalDataToCloud();
       this.attachRealtimeListeners(code);
 
@@ -308,6 +321,70 @@ class CloudSyncManager {
       this.notify();
       throw new Error(parsed);
     }
+  }
+
+  // Join an existing Team Scouting Room (no password required, but room must exist)
+  public async joinRoom(rawCode: string): Promise<boolean> {
+    const code = rawCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    if (!code) throw new Error('Invalid room code. Please use alphanumeric characters.');
+
+    this.disconnect();
+    this.isSyncing = true;
+    this.lastError = null;
+    this.notify();
+
+    try {
+      await this.ensureAuth();
+      const scoutName = this.getScoutName();
+      const roomRef = doc(db, 'rooms', code);
+
+      const roomSnap = await withTimeout(
+        getDoc(roomRef),
+        5000,
+        'Connection to room timed out.'
+      );
+
+      if (!roomSnap.exists()) {
+        throw new Error(`Room "${code}" not found. To create it, switch to Create Room and enter password team9751.`);
+      }
+
+      const data = roomSnap.data();
+      this.activeRoomCode = code;
+      this.activeEventName = data?.eventName || 'FRC REBUILT Competition';
+
+      const existingScouts: string[] = Array.isArray(data?.connectedScouts) ? data.connectedScouts : (data?.creatorName ? [data.creatorName] : []);
+      const updatedScouts = Array.from(new Set([...existingScouts, scoutName])).slice(-8);
+
+      setDoc(roomRef, {
+        lastActiveAt: Date.now(),
+        connectedScouts: updatedScouts,
+      }, { merge: true }).catch(() => {});
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('frc_sync_room_code', code);
+        localStorage.setItem('frc_sync_event_name', this.activeEventName);
+      }
+
+      await this.pushLocalDataToCloud();
+      this.attachRealtimeListeners(code);
+
+      this.lastSyncedAt = Date.now();
+      this.isSyncing = false;
+      this.lastError = null;
+      this.notify();
+      return true;
+    } catch (err: any) {
+      this.isSyncing = false;
+      const parsed = parseFirebaseError(err);
+      this.lastError = parsed;
+      this.notify();
+      throw new Error(parsed);
+    }
+  }
+
+  // Connect / Join a Team Scouting Room
+  public async connectToRoom(rawCode: string, _eventName?: string): Promise<boolean> {
+    return this.joinRoom(rawCode);
   }
 
   public disconnect() {
@@ -533,7 +610,7 @@ class CloudSyncManager {
 
   // Hook into save operations for immediate cloud broadcast
   public async broadcastTeamSave(team: TeamProfile) {
-    if (!this.activeRoomCode) return;
+    if (!this.activeRoomCode || isKnownQuotaExhausted) return;
     const roomCode = this.activeRoomCode;
     try {
       const cleanTeam = this.cleanForFirestore(team);
@@ -549,7 +626,7 @@ class CloudSyncManager {
   }
 
   public async broadcastMatchSave(match: MatchScoutingRecord) {
-    if (!this.activeRoomCode) return;
+    if (!this.activeRoomCode || isKnownQuotaExhausted) return;
     const roomCode = this.activeRoomCode;
     try {
       const cleanMatch = this.cleanForFirestore(match);
@@ -565,7 +642,7 @@ class CloudSyncManager {
   }
 
   public async broadcastStrategySave(strategy: StrategyPlan) {
-    if (!this.activeRoomCode) return;
+    if (!this.activeRoomCode || isKnownQuotaExhausted) return;
     const roomCode = this.activeRoomCode;
     try {
       const cleanStrat = this.cleanForFirestore(strategy);

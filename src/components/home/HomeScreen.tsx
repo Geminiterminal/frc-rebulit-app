@@ -10,18 +10,11 @@ import {
   Sliders, 
   ChevronRight,
   Share2,
-  QrCode,
-  Cloud,
-  Radio,
-  Zap,
-  Target,
   Trophy
 } from 'lucide-react';
 import { scoutingDB } from '../../db/indexedDB';
 import { TeamProfile } from '../../types/scouting';
 import { DistributeModal } from '../common/DistributeModal';
-import { TeamRoomSyncModal } from '../sync/TeamRoomSyncModal';
-import { cloudSync, SyncStatus } from '../../db/cloudSync';
 import { PantherLogo } from '../common/PantherLogo';
 
 interface HomeScreenProps {
@@ -32,15 +25,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
   const [teamSearch, setTeamSearch] = useState('');
   const [teams, setTeams] = useState<TeamProfile[]>([]);
   const [showDistribute, setShowDistribute] = useState(false);
-  const [showSyncModal, setShowSyncModal] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(cloudSync.getStatus());
 
   useEffect(() => {
     loadSummary();
-    const unsub = cloudSync.subscribe((status) => {
-      setSyncStatus(status);
-    });
-    return () => unsub();
   }, []);
 
   const loadSummary = async () => {
@@ -64,7 +51,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-500" />
           <input
             type="number"
-            placeholder="Search Team # (e.g. 9751, 254, 1678)..."
+            placeholder="Search Team #..."
             value={teamSearch}
             onChange={(e) => setTeamSearch(e.target.value)}
             className="w-full bg-slate-900/90 border border-slate-800 rounded-xl pl-10 pr-20 py-3 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono shadow-sm"
@@ -221,11 +208,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
       <DistributeModal
         isOpen={showDistribute}
         onClose={() => setShowDistribute(false)}
-      />
-
-      <TeamRoomSyncModal
-        isOpen={showSyncModal}
-        onClose={() => setShowSyncModal(false)}
       />
     </>
   );

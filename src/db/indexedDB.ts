@@ -156,13 +156,15 @@ class ScoutingDB {
     });
   }
 
-  async saveTeamsBatch(teams: TeamProfile[]): Promise<void> {
+  async saveTeamsBatch(teams: TeamProfile[], notifyHook: boolean = false): Promise<void> {
     await this.init();
     const now = Date.now();
     teams.forEach((t) => {
       t.updatedAt = now;
       if (!t.createdAt) t.createdAt = now;
-      onSaveHook?.('team', t);
+      if (notifyHook) {
+        onSaveHook?.('team', t);
+      }
     });
 
     if (!this.db) {

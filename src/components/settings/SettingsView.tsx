@@ -9,8 +9,9 @@ import {
   Database, 
   Check, 
   Info,
-  ShieldCheck,
-  Smartphone
+  Smartphone,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -25,6 +26,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
   const [teamCount, setTeamCount] = useState(0);
   const [matchCount, setMatchCount] = useState(0);
   const [savedToast, setSavedToast] = useState(false);
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -42,6 +45,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
     const matches = await scoutingDB.getAllMatches();
     setTeamCount(teams.length);
     setMatchCount(matches.length);
+  };
+
+  const handleClearAll = async () => {
+    setIsClearing(true);
+    try {
+      await scoutingDB.clearAllData();
+      setShowClearModal(false);
+      window.location.reload();
+    } catch {
+      setIsClearing(false);
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -74,7 +88,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
           </label>
           <input
             type="text"
-            placeholder="e.g. Alex M. or Lead Scout"
+            placeholder="Scout Name or Initials"
             value={scoutName}
             onChange={(e) => setScoutName(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500"
@@ -89,7 +103,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
           <div className="space-y-2">
             <label className="text-xs font-mono font-bold uppercase text-slate-300 block flex items-center gap-2">
               <Calendar className="w-4 h-4 text-emerald-400" />
-              <span>Event Code (e.g. 2026cmp or 2026micmp)</span>
+              <span>Event Code (2026cmp or 2026micmp)</span>
             </label>
             <div className="flex gap-2">
               <input
@@ -136,14 +150,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
           <div className="space-y-2 pt-3 border-t border-slate-800">
             <label className="text-xs font-mono font-bold uppercase text-slate-300 block flex items-center gap-2">
               <Database className="w-4 h-4 text-purple-400" />
-              <span>Or Paste Team Numbers (Comma or Space separated)</span>
+              <span>Paste Team Numbers (Comma or Space separated)</span>
             </label>
             <div className="flex flex-col gap-2">
               <textarea
                 rows={2}
                 value={bulkInput}
                 onChange={(e) => setBulkInput(e.target.value)}
-                placeholder="e.g. 9751, 3322, 1684, 254, 1678..."
+                placeholder="9751, 3322, 1684, 254, 1678..."
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white font-mono focus:outline-none focus:border-purple-500"
               />
               <button
@@ -200,6 +214,62 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
           </span>
         </div>
       </div>
+
+      {/* Danger Zone: Erase All Data */}
+      <div className="p-5 rounded-2xl bg-rose-950/20 border border-rose-900/40 space-y-3">
+        <div className="flex items-center gap-2 text-rose-400">
+          <Trash2 className="w-4 h-4" />
+          <h3 className="text-xs font-mono font-bold uppercase tracking-wider">
+            Reset & Erase Database
+          </h3>
+        </div>
+        <p className="text-xs text-slate-400 leading-relaxed">
+          Permanently deletes all teams, match observations, pit notes, and drawings on this device.
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowClearModal(true)}
+          className="w-full py-2.5 px-4 rounded-xl bg-rose-900/40 hover:bg-rose-900/60 border border-rose-800/60 text-rose-300 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-2"
+        >
+          <Trash2 className="w-4 h-4" />
+          <span>Erase All Data</span>
+        </button>
+      </div>
+
+      {/* Confirmation Modal */}
+      {showClearModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 text-rose-400">
+              <AlertTriangle className="w-5 h-5" />
+              <h3 className="font-bold text-base text-slate-100">Erase All Data?</h3>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              This will permanently delete all teams, matches, photos, and drawings stored on this device.
+            </p>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowClearModal(false)}
+                disabled={isClearing}
+                className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleClearAll}
+                disabled={isClearing}
+                className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs cursor-pointer shadow disabled:opacity-50"
+              >
+                {isClearing ? 'Erasing...' : 'Yes, Erase All'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -7,8 +7,6 @@ import {
 } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
 import { 
-  Plus, 
-  Minus, 
   Save, 
   ArrowLeft, 
   Check, 
@@ -38,22 +36,22 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
     initialTeamNumber ? initialTeamNumber.toString() : ''
   );
 
-  // 1. AUTONOMOUS
-  const [autoWorked, setAutoWorked] = useState<boolean>(true);
+  // 1. AUTONOMOUS (Starts unselected / blank)
+  const [autoWorked, setAutoWorked] = useState<boolean | null>(null);
   const [autoFuelScored, setAutoFuelScored] = useState<number>(0);
 
   // 2. SCORING
   const [teleopFuelScored, setTeleopFuelScored] = useState<number>(0);
 
-  // 3. FIELD ROUTE
-  const [fieldRoute, setFieldRoute] = useState<FieldRouteType>('NEITHER');
+  // 3. FIELD ROUTE (Starts unselected / blank)
+  const [fieldRoute, setFieldRoute] = useState<FieldRouteType | null>(null);
 
-  // 4. DEFENSE
-  const [playedDefense, setPlayedDefense] = useState<boolean>(false);
-  const [defenseEffectiveness, setDefenseEffectiveness] = useState<DefenseEffectivenessType>('MEDIUM');
+  // 4. DEFENSE (Starts unselected / blank)
+  const [playedDefense, setPlayedDefense] = useState<boolean | null>(null);
+  const [defenseEffectiveness, setDefenseEffectiveness] = useState<DefenseEffectivenessType | null>(null);
 
-  // 5. ROBOT RELIABILITY
-  const [robotIssues, setRobotIssues] = useState<RobotIssuesType>('NONE');
+  // 5. ROBOT RELIABILITY (Starts unselected / blank)
+  const [robotIssues, setRobotIssues] = useState<RobotIssuesType | null>(null);
   const [whatHappenedNote, setWhatHappenedNote] = useState<string>('');
 
   // 6. QUICK OBSERVATION
@@ -94,22 +92,22 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       timestamp: Date.now(),
 
       // 1. AUTONOMOUS
-      autoWorked,
+      autoWorked: autoWorked !== null ? autoWorked : false,
       autoFuelScored,
 
       // 2. SCORING
       teleopFuelScored,
 
       // 3. FIELD ROUTE
-      fieldRoute,
+      fieldRoute: fieldRoute || 'NEITHER',
 
       // 4. DEFENSE
-      playedDefense,
-      defenseEffectiveness: playedDefense ? defenseEffectiveness : undefined,
+      playedDefense: playedDefense === true,
+      defenseEffectiveness: playedDefense === true ? (defenseEffectiveness || 'MEDIUM') : undefined,
 
       // 5. ROBOT RELIABILITY
-      robotIssues,
-      whatHappenedNote: robotIssues !== 'NONE' ? whatHappenedNote : undefined,
+      robotIssues: robotIssues || 'NONE',
+      whatHappenedNote: (robotIssues && robotIssues !== 'NONE') ? whatHappenedNote : undefined,
 
       // 6. QUICK OBSERVATION
       quickNote: quickNote.trim() || undefined,
@@ -141,18 +139,18 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
     setToastMessage(`Match ${matchNumber} saved for Team ${teamNum}`);
 
-    // Reset form for next match
+    // Reset form for next fresh match (nothing pre-selected)
     setTimeout(() => {
       setToastMessage(null);
       setMatchNumber((prev) => prev + 1);
       setTeamNumber('');
-      setAutoWorked(true);
+      setAutoWorked(null);
       setAutoFuelScored(0);
       setTeleopFuelScored(0);
-      setFieldRoute('NEITHER');
-      setPlayedDefense(false);
-      setDefenseEffectiveness('MEDIUM');
-      setRobotIssues('NONE');
+      setFieldRoute(null);
+      setPlayedDefense(null);
+      setDefenseEffectiveness(null);
+      setRobotIssues(null);
       setWhatHappenedNote('');
       setQuickNote('');
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -241,7 +239,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
             <input
               type="number"
               required
-              placeholder="e.g. 9751"
+              placeholder="Team #"
               value={teamNumber}
               onChange={(e) => setTeamNumber(e.target.value)}
               className="w-full bg-slate-900 border border-slate-750 rounded-lg py-2 px-3 text-lg font-mono font-black text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/80"
@@ -267,12 +265,12 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
               type="button"
               onClick={() => setAutoWorked(true)}
               className={`py-3 rounded-xl font-mono font-bold text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                autoWorked
+                autoWorked === true
                   ? 'bg-blue-600 text-white shadow-md border border-blue-400'
                   : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
               }`}
             >
-              {autoWorked && <Check className="w-4 h-4" />}
+              {autoWorked === true && <Check className="w-4 h-4" />}
               <span>YES</span>
             </button>
 
@@ -280,12 +278,12 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
               type="button"
               onClick={() => setAutoWorked(false)}
               className={`py-3 rounded-xl font-mono font-bold text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                !autoWorked
+                autoWorked === false
                   ? 'bg-rose-600 text-white shadow-md border border-rose-400'
                   : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
               }`}
             >
-              {!autoWorked && <Check className="w-4 h-4" />}
+              {autoWorked === false && <Check className="w-4 h-4" />}
               <span>NO</span>
             </button>
           </div>
@@ -470,32 +468,35 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
               type="button"
               onClick={() => setPlayedDefense(true)}
               className={`py-3 rounded-xl font-mono font-bold text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                playedDefense
+                playedDefense === true
                   ? 'bg-amber-500 text-slate-950 shadow-md border border-amber-300'
                   : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
               }`}
             >
-              {playedDefense && <Check className="w-4 h-4" />}
+              {playedDefense === true && <Check className="w-4 h-4" />}
               <span>YES</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setPlayedDefense(false)}
+              onClick={() => {
+                setPlayedDefense(false);
+                setDefenseEffectiveness(null);
+              }}
               className={`py-3 rounded-xl font-mono font-bold text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                !playedDefense
+                playedDefense === false
                   ? 'bg-slate-800 text-slate-200 shadow-md border border-slate-700'
                   : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
               }`}
             >
-              {!playedDefense && <Check className="w-4 h-4" />}
+              {playedDefense === false && <Check className="w-4 h-4" />}
               <span>NO</span>
             </button>
           </div>
         </div>
 
         {/* Reveal Defense Effectiveness only if YES */}
-        {playedDefense && (
+        {playedDefense === true && (
           <div className="pt-2 border-t border-slate-800/80 animate-fadeIn space-y-2">
             <span className="block text-xs font-mono font-semibold uppercase text-amber-300">
               Defense Effectiveness
@@ -551,14 +552,14 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         </div>
 
         {/* Reveal note if anything other than NONE */}
-        {robotIssues !== 'NONE' && (
+        {robotIssues && robotIssues !== 'NONE' && (
           <div className="pt-2 border-t border-slate-800/80 animate-fadeIn space-y-2">
             <span className="block text-xs font-mono font-semibold uppercase text-rose-300">
               What happened?
             </span>
             <input
               type="text"
-              placeholder="Short optional note regarding the issue..."
+              placeholder="Short note regarding the issue..."
               value={whatHappenedNote}
               onChange={(e) => setWhatHappenedNote(e.target.value)}
               className="w-full bg-slate-950 border border-rose-900/60 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-rose-500"
@@ -580,7 +581,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
         <textarea
           rows={3}
-          placeholder="Anything important about this robot..."
+          placeholder="Important observations about this robot..."
           value={quickNote}
           onChange={(e) => setQuickNote(e.target.value)}
           className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-700 resize-none"

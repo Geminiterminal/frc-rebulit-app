@@ -3,15 +3,14 @@ import { PWAInstallButton } from './PWAInstallButton';
 import { DistributeModal } from './DistributeModal';
 import { TeamRoomSyncModal } from '../sync/TeamRoomSyncModal';
 import { cloudSync, SyncStatus } from '../../db/cloudSync';
+import { p2pSync, P2PStatus } from '../../db/p2pSync';
 import { PantherLogo } from './PantherLogo';
 import { 
   Menu, 
   X, 
   Search,
   WifiOff,
-  Share2,
-  Cloud,
-  Radio
+  Cloud
 } from 'lucide-react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
@@ -30,14 +29,21 @@ export const Header: React.FC<HeaderProps> = ({
   const [showDistributeModal, setShowDistributeModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(cloudSync.getStatus());
+  const [p2pStatus, setP2pStatus] = useState<P2PStatus>(p2pSync.getStatus());
   const isOnline = useOnlineStatus();
   const [searchInput, setSearchInput] = useState('');
 
   useEffect(() => {
-    const unsub = cloudSync.subscribe((status) => {
+    const unsubCloud = cloudSync.subscribe((status) => {
       setSyncStatus(status);
     });
-    return () => unsub();
+    const unsubP2P = p2pSync.subscribe((status) => {
+      setP2pStatus(status);
+    });
+    return () => {
+      unsubCloud();
+      unsubP2P();
+    };
   }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -102,18 +108,18 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={() => setShowSyncModal(true)}
               className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors active:scale-95 cursor-pointer ${
-                syncStatus.roomCode
+                syncStatus.roomCode || p2pStatus.roomCode
                   ? 'bg-emerald-950/50 border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/50'
                   : 'bg-slate-900 border-slate-750 text-slate-300 hover:bg-slate-800'
               }`}
-              title={syncStatus.roomCode ? `Connected to Room ${syncStatus.roomCode}` : 'Join Team Cloud Sync Room'}
+              title={syncStatus.roomCode || p2pStatus.roomCode ? `Connected to Room ${syncStatus.roomCode || p2pStatus.roomCode}` : 'Team Sync'}
             >
-              <Cloud className={`w-3.5 h-3.5 ${syncStatus.roomCode ? 'text-emerald-400' : 'text-blue-400'}`} />
-              <span className="hidden sm:inline font-mono">
-                {syncStatus.roomCode ? syncStatus.roomCode : 'Sync'}
+              <Cloud className={`w-3.5 h-3.5 ${syncStatus.roomCode || p2pStatus.roomCode ? 'text-emerald-400' : 'text-blue-400'}`} />
+              <span className="font-mono">
+                {syncStatus.roomCode || p2pStatus.roomCode || 'Sync'}
               </span>
-              {syncStatus.roomCode && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse hidden sm:inline" />
+              {(syncStatus.roomCode || p2pStatus.roomCode) && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               )}
             </button>
 
