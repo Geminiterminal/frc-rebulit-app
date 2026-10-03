@@ -14,7 +14,8 @@ import {
   Cloud,
   Radio,
   Zap,
-  Target
+  Target,
+  Trophy
 } from 'lucide-react';
 import { scoutingDB } from '../../db/indexedDB';
 import { TeamProfile } from '../../types/scouting';
@@ -97,9 +98,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           </button>
         </form>
 
-        {/* THREE LARGE PRIMARY FUNCTIONS */}
+        {/* PRIMARY FUNCTIONS */}
         <div className="grid grid-cols-1 gap-3.5">
-          {/* 1. PIT SCOUT */}
+          {/* 1. PICKLIST & COMPARISON */}
+          <button
+            type="button"
+            onClick={() => onNavigate('picklist')}
+            className="group text-left p-5 sm:p-5.5 rounded-2xl bg-slate-900/90 hover:bg-slate-850 border border-amber-500/30 hover:border-amber-500/60 transition-all duration-150 active:scale-[0.99] cursor-pointer flex items-center justify-between shadow-md"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors">
+                <Trophy className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-base sm:text-lg font-black text-amber-400 tracking-tight font-mono">
+                  TEAM PICKLIST & COMPARE
+                </div>
+                <div className="text-xs text-slate-400">
+                  Decision matrix & side-by-side team comparison
+                </div>
+              </div>
+            </div>
+            <ChevronRight className="w-5 h-5 text-amber-500 group-hover:translate-x-1 transition-all" />
+          </button>
+
+          {/* 2. PIT SCOUT */}
           <button
             type="button"
             onClick={() => onNavigate('pit-scout')}
@@ -110,30 +133,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                 <ClipboardList className="w-5 h-5" />
               </div>
               <div className="text-base sm:text-lg font-black text-slate-100 tracking-tight font-mono">
-                1. PIT SCOUTING
+                PIT SCOUTING
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-slate-300 group-hover:translate-x-1 transition-all" />
           </button>
 
-          {/* 2. MATCH SCOUT */}
+          {/* 3. MATCH SCOUT */}
           <button
             type="button"
             onClick={() => onNavigate('match-scout')}
             className="group text-left p-5 sm:p-5.5 rounded-2xl bg-slate-900/80 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 transition-all duration-150 active:scale-[0.99] cursor-pointer flex items-center justify-between shadow-sm"
           >
             <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-xl bg-slate-800 border border-slate-750 text-slate-200 flex items-center justify-center group-hover:bg-amber-950/60 group-hover:border-amber-700/60 group-hover:text-amber-300 transition-colors">
+              <div className="w-11 h-11 rounded-xl bg-slate-800 border border-slate-750 text-slate-200 flex items-center justify-center group-hover:bg-emerald-950/60 group-hover:border-emerald-700/60 group-hover:text-emerald-300 transition-colors">
                 <Gamepad2 className="w-5 h-5" />
               </div>
               <div className="text-base sm:text-lg font-black text-slate-100 tracking-tight font-mono">
-                2. MATCH SCOUTING
+                MATCH SCOUTING
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-slate-300 group-hover:translate-x-1 transition-all" />
           </button>
 
-          {/* 3. STRATEGY FIELD */}
+          {/* 4. STRATEGY FIELD */}
           <button
             type="button"
             onClick={() => onNavigate('strategy-field')}
@@ -144,7 +167,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                 <Map className="w-5 h-5" />
               </div>
               <div className="text-base sm:text-lg font-black text-slate-100 tracking-tight font-mono">
-                3. STRATEGY & WHITEBOARD
+                STRATEGY & WHITEBOARD
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-slate-600 group-hover:text-slate-300 group-hover:translate-x-1 transition-all" />

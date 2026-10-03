@@ -12,6 +12,8 @@ import { MatchScoutForm } from './components/match/MatchScoutForm';
 import { StrategyField } from './components/strategy/StrategyField';
 import { TeamList } from './components/teams/TeamList';
 import { TeamProfileView } from './components/teams/TeamProfileView';
+import { PicklistView } from './components/teams/PicklistView';
+import { TeamCompareView } from './components/teams/TeamCompareView';
 import { EventDataView } from './components/data/EventDataView';
 import { DataManagement } from './components/data/DataManagement';
 import { SettingsView } from './components/settings/SettingsView';
@@ -20,7 +22,7 @@ import {
   Home, 
   ClipboardList, 
   Gamepad2, 
-  Map, 
+  Trophy, 
   Users 
 } from 'lucide-react';
 
@@ -28,6 +30,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<string>('home');
   const [selectedTeamNumber, setSelectedTeamNumber] = useState<number | undefined>(undefined);
   const [selectedMatchNumber, setSelectedMatchNumber] = useState<number | undefined>(undefined);
+  const [compareTeamNums, setCompareTeamNums] = useState<number[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
 
   useEffect(() => {
@@ -37,9 +40,14 @@ export default function App() {
     });
   }, []);
 
-  const handleNavigate = (view: string, teamNumber?: number, matchNumber?: number) => {
+  const handleNavigate = (view: string, teamNumber?: number, extraParam?: any) => {
     if (teamNumber) setSelectedTeamNumber(teamNumber);
-    if (matchNumber) setSelectedMatchNumber(matchNumber);
+    if (typeof teamNumber === 'number' && typeof extraParam === 'number') {
+      setSelectedMatchNumber(extraParam);
+    }
+    if (view === 'compare' && Array.isArray(extraParam)) {
+      setCompareTeamNums(extraParam);
+    }
     setCurrentView(view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -90,6 +98,17 @@ export default function App() {
               <TeamList onNavigate={handleNavigate} />
             )}
 
+            {currentView === 'picklist' && (
+              <PicklistView onNavigate={handleNavigate} />
+            )}
+
+            {currentView === 'compare' && (
+              <TeamCompareView
+                initialSelectedTeams={compareTeamNums}
+                onNavigate={handleNavigate}
+              />
+            )}
+
             {currentView === 'team-profile' && selectedTeamNumber && (
               <TeamProfileView
                 teamNumber={selectedTeamNumber}
@@ -112,7 +131,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Mobile Bottom Navigation Bar (Persistent quick access on phones) */}
+      {/* Mobile Bottom Navigation Bar */}
       <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-md px-2 py-1.5 flex items-center justify-around">
         <button
           type="button"
@@ -123,6 +142,17 @@ export default function App() {
         >
           <Home className="w-4 h-4" />
           <span className="text-[10px]">Home</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleNavigate('picklist')}
+          className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors cursor-pointer ${
+            currentView === 'picklist' || currentView === 'compare' ? 'text-amber-400 font-bold bg-slate-900' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Trophy className="w-4 h-4" />
+          <span className="text-[10px]">Picklist</span>
         </button>
 
         <button
@@ -149,31 +179,15 @@ export default function App() {
 
         <button
           type="button"
-          onClick={() => handleNavigate('strategy-field')}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'strategy-field' ? 'text-slate-100 font-bold bg-slate-900' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Map className="w-4 h-4" />
-          <span className="text-[10px]">Field</span>
-        </button>
-
-        <button
-          type="button"
           onClick={() => handleNavigate('teams')}
           className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'teams' || currentView === 'team-profile'
-              ? 'text-slate-100 font-bold bg-slate-900'
-              : 'text-slate-400 hover:text-slate-200'
+            currentView === 'teams' ? 'text-slate-100 font-bold bg-slate-900' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <Users className="w-4 h-4" />
           <span className="text-[10px]">Teams</span>
         </button>
       </nav>
-
-      {/* Global Offline Mode Indicator */}
-      <OfflineIndicator />
     </div>
   );
 }

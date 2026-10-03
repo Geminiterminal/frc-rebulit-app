@@ -52,6 +52,8 @@ export const Header: React.FC<HeaderProps> = ({
 
   const navItems = [
     { id: 'home', label: 'Home' },
+    { id: 'picklist', label: 'Picklist' },
+    { id: 'compare', label: 'Compare' },
     { id: 'teams', label: 'Teams' },
     { id: 'event-data', label: 'Matches' },
     { id: 'import-export', label: 'Import / Export' },

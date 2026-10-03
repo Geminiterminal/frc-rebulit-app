@@ -138,6 +138,8 @@ export interface TeamProfile {
   organization?: string;
   location?: string;
   pit?: PitData;
+  officialRank?: number;
+  customPicklistRank?: number;
   createdAt: number;
   updatedAt: number;
 }
