@@ -269,7 +269,14 @@ export const qrTransferEngine = {
    * Generate a standard single-record SCOUT_DATA QR payload for MATCH scouting
    */
   generateSingleMatchQr(scoutId: string, matchRecord: MatchScoutingRecord): string {
-    const cleanedMatch = cleanEmptyFields(matchRecord);
+    // Ensure id exists
+    const record = {
+      ...matchRecord,
+      id: matchRecord.id || `match-${matchRecord.matchNumber}-${matchRecord.teamNumber}`
+    };
+    // Forcefully remove legacy fields from the record before cleaning
+    const { autoHighScored, teleopHighScored, notes, hangStatus, ...sanitizedRecord } = record as any;
+    const cleanedMatch = cleanEmptyFields(sanitizedRecord);
     const payload: ScoutDataChunkPayload = {
       type: 'SCOUT_DATA',
       scoutId,
@@ -277,9 +284,9 @@ export const qrTransferEngine = {
       totalChunks: 1,
       records: [{
         type: 'MATCH',
-        id: matchRecord.id || `match-${matchRecord.matchNumber}-${matchRecord.teamNumber}`,
-        teamNumber: matchRecord.teamNumber,
-        matchNumber: matchRecord.matchNumber,
+        id: sanitizedRecord.id,
+        teamNumber: sanitizedRecord.teamNumber,
+        matchNumber: sanitizedRecord.matchNumber,
         data: cleanedMatch || {},
       }],
       timestamp: Date.now(),

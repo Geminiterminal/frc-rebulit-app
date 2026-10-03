@@ -235,9 +235,6 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       quickNote: quickNote.trim() || undefined,
 
       // Legacy field aliases
-      autoHighScored: autoFuelScored,
-      teleopHighScored: teleopFuelScored,
-      notes: quickNote,
     };
 
     const payloadStr = qrTransferEngine.generateSingleMatchQr(scoutName, record);
