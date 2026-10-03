@@ -112,9 +112,20 @@ class CloudSyncManager {
     try {
       const cred = await signInAnonymously(auth);
       return cred.user.uid;
-    } catch (err) {
-      console.warn('Anonymous login fallback:', err);
-      return 'anon-user';
+    } catch {
+      let deviceUid = 'panther-device';
+      try {
+        if (typeof localStorage !== 'undefined') {
+          deviceUid = localStorage.getItem('panther_device_uid') || '';
+          if (!deviceUid) {
+            deviceUid = `dev-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+            localStorage.setItem('panther_device_uid', deviceUid);
+          }
+        }
+      } catch {
+        // quota safety
+      }
+      return deviceUid;
     }
   }
 

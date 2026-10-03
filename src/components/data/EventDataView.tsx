@@ -42,44 +42,36 @@ export const EventDataView: React.FC<EventDataViewProps> = ({ onNavigate }) => {
     const headers = [
       'Match',
       'Team',
-      'Alliance',
-      'Scout',
-      'AutoMobility',
-      'AutoHigh',
-      'AutoLow',
-      'TeleopHigh',
-      'TeleopLow',
-      'Trench',
-      'Bump',
-      'Climb',
-      'Broke',
-      'Rating',
-      'Notes',
+      'AutoWorked',
+      'AutoFuelScored',
+      'TeleopFuelScored',
+      'FieldRoute',
+      'PlayedDefense',
+      'DefenseEffectiveness',
+      'RobotIssues',
+      'WhatHappened',
+      'QuickNote',
     ];
 
     const rows = matches.map((m) => [
       m.matchNumber,
       m.teamNumber,
-      m.alliance,
-      `"${m.scoutName}"`,
-      m.autoMobility ? 1 : 0,
-      m.autoHighScored,
-      m.autoLowScored,
-      m.teleopHighScored,
-      m.teleopLowScored,
-      m.usedTrench ? 1 : 0,
-      m.usedBump ? 1 : 0,
-      `"${m.hangStatus}"`,
-      m.robotBroke ? 1 : 0,
-      m.overallRating,
-      `"${(m.notes || '').replace(/"/g, '""')}"`,
+      m.autoWorked !== false ? 'YES' : 'NO',
+      m.autoFuelScored ?? m.autoHighScored ?? 0,
+      m.teleopFuelScored ?? m.teleopHighScored ?? 0,
+      `"${m.fieldRoute || 'NEITHER'}"`,
+      m.playedDefense ? 'YES' : 'NO',
+      `"${m.defenseEffectiveness || ''}"`,
+      `"${m.robotIssues || 'NONE'}"`,
+      `"${(m.whatHappenedNote || '').replace(/"/g, '""')}"`,
+      `"${(m.quickNote || m.notes || '').replace(/"/g, '""')}"`,
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `frc_rebuilt_matches_${Date.now()}.csv`);
+    link.setAttribute('download', `panther_match_observations_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -87,7 +79,6 @@ export const EventDataView: React.FC<EventDataViewProps> = ({ onNavigate }) => {
 
   const filtered = matches.filter((m) => {
     if (filterTeam && !m.teamNumber.toString().includes(filterTeam)) return false;
-    if (filterAlliance !== 'ALL' && m.alliance !== filterAlliance) return false;
     return true;
   });
 
@@ -180,50 +171,46 @@ export const EventDataView: React.FC<EventDataViewProps> = ({ onNavigate }) => {
                   <span className="font-mono font-black text-base text-white">
                     Match {m.matchNumber}
                   </span>
-                  <span
-                    className={`px-2 py-0.5 rounded font-mono font-bold text-xs ${
-                      m.alliance === 'BLUE'
-                        ? 'bg-blue-950 text-blue-300 border border-blue-800'
-                        : 'bg-rose-950 text-rose-300 border border-rose-800'
-                    }`}
-                  >
-                    Team {m.teamNumber} ({m.alliance})
+                  <span className="px-2 py-0.5 rounded bg-slate-800 text-amber-300 font-mono font-bold text-xs border border-slate-700">
+                    Team {m.teamNumber}
                   </span>
-                  <span className="text-xs text-slate-400">Scout: {m.scoutName}</span>
+                  <span className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] ${
+                    m.autoWorked !== false ? 'bg-blue-950 text-blue-300 border border-blue-800' : 'bg-rose-950 text-rose-300 border border-rose-800'
+                  }`}>
+                    {m.autoWorked !== false ? 'Auto Worked' : 'Auto Failed'}
+                  </span>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300 pt-1">
                   <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono">
-                    Auto High: <strong className="text-blue-400">{m.autoHighScored}</strong>
+                    Auto Fuel: <strong className="text-blue-400">{m.autoFuelScored ?? m.autoHighScored ?? 0}</strong>
                   </span>
                   <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono">
-                    Teleop High: <strong className="text-emerald-400">{m.teleopHighScored}</strong>
+                    Teleop Fuel: <strong className="text-emerald-400">{m.teleopFuelScored ?? m.teleopHighScored ?? 0}</strong>
                   </span>
-                  <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono">
-                    Climb: <strong className="text-amber-400">{m.hangStatus}</strong>
-                  </span>
-                  {m.robotBroke && (
-                    <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 font-bold">
-                      Broke
+                  {m.fieldRoute && (
+                    <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono text-purple-300">
+                      Route: {m.fieldRoute}
+                    </span>
+                  )}
+                  {m.playedDefense && (
+                    <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 font-mono">
+                      Defense: {m.defenseEffectiveness || 'YES'}
+                    </span>
+                  )}
+                  {m.robotIssues && m.robotIssues !== 'NONE' && (
+                    <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 font-bold font-mono">
+                      Issues: {m.robotIssues}
                     </span>
                   )}
                 </div>
 
-                {m.notes && <p className="text-xs text-slate-400 italic pt-1">"{m.notes}"</p>}
+                {(m.quickNote || m.notes) && (
+                  <p className="text-xs text-slate-400 italic pt-1">"{m.quickNote || m.notes}"</p>
+                )}
               </div>
 
               <div className="flex items-center gap-3 self-end sm:self-center">
-                <div className="flex items-center gap-0.5">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Star
-                      key={s}
-                      className={`w-3.5 h-3.5 ${
-                        s <= m.overallRating ? 'text-amber-400 fill-amber-400' : 'text-slate-800'
-                      }`}
-                    />
-                  ))}
-                </div>
-
                 <button
                   type="button"
                   onClick={(e) => handleDeleteMatch(m.id, e)}

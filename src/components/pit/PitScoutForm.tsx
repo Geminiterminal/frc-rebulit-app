@@ -118,6 +118,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
   const [hasAutonomous, setHasAutonomous] = useState<'YES' | 'NO' | 'STILL DEVELOPING' | null>(null);
   const [autoRoutinesCount, setAutoRoutinesCount] = useState<'1' | '2' | '3' | '4+' | null>(null);
   const [autoDrawings, setAutoDrawings] = useState<AutonomousDrawing[]>([]);
+  const [activeRoutineIndex, setActiveRoutineIndex] = useState<number>(0);
 
   const [autoConsistency, setAutoConsistency] = useState<AutoConsistency | null>(null);
 
@@ -148,6 +149,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
     setHasAutonomous(null);
     setAutoRoutinesCount(null);
     setAutoDrawings([]);
+    setActiveRoutineIndex(0);
     setAutoConsistency(null);
     setBiggestIssues([]);
     setBiggestIssueOther('');
@@ -343,9 +345,9 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
   // QUESTIONNAIRE: Calm dark-mode pills and inputs
   return (
-    <div className="max-w-xl mx-auto px-3 sm:px-4 py-3 pb-24 flex flex-col gap-3">
+    <div className="max-w-xl mx-auto px-3.5 sm:px-5 py-5 pb-32 flex flex-col gap-7 sm:gap-8">
       {/* Sticky Bar */}
-      <div className="sticky top-13 z-30 bg-slate-950/95 backdrop-blur-md -mx-3 px-3 py-2 border-b border-slate-800 flex items-center justify-between">
+      <div className="sticky top-13 z-30 bg-slate-950/95 backdrop-blur-md -mx-3 px-3 py-2.5 border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -354,7 +356,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <span className="text-sm font-bold font-mono text-slate-200">
+          <span className="text-sm sm:text-base font-bold font-mono text-slate-200">
             TEAM {teamNumberInput}
           </span>
         </div>
@@ -362,9 +364,9 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
         <button
           type="button"
           onClick={handleSaveTeam}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs uppercase shadow transition-colors active:scale-95 cursor-pointer"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs sm:text-sm uppercase shadow transition-colors active:scale-95 cursor-pointer"
         >
-          <Save className="w-3.5 h-3.5" />
+          <Save className="w-4 h-4" />
           <span>Save</span>
         </button>
       </div>
@@ -375,15 +377,15 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
         value={teamName}
         onChange={(e) => setTeamName(e.target.value)}
         placeholder="Team Name (Optional)"
-        className="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600"
+        className="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600"
       />
 
       {/* QUESTION 1: Drivetrain */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <label className="text-xs font-semibold text-slate-200 block">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
           1. What is your drivetrain?
         </label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {DRIVETRAIN_OPTIONS.map((opt) => {
             const isSelected = drivetrain === opt;
             return (
@@ -391,7 +393,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
                  key={opt}
                  type="button"
                  onClick={() => setDrivetrain(drivetrain === opt ? null : opt)}
-                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
+                 className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
                    isSelected
                      ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
                      : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900 hover:text-slate-300'
@@ -409,17 +411,17 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
             value={drivetrainOther}
             onChange={(e) => setDrivetrainOther(e.target.value)}
             placeholder="Specify drivetrain..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
           />
         )}
       </div>
 
       {/* QUESTION 2: Shooter */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <label className="text-xs font-semibold text-slate-200 block">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
           2. Which is true about your shooter?
         </label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {SHOOTER_OPTIONS.map((opt) => {
             const isSelected = shooter.includes(opt);
             return (
@@ -427,13 +429,13 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
                 key={opt}
                 type="button"
                 onClick={() => toggleMultiSelect(shooter, opt, setShooter)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer flex items-center gap-1 ${
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold uppercase transition-colors active:scale-95 cursor-pointer flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
                     : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900 hover:text-slate-300'
                 }`}
               >
-                {isSelected && <Check className="w-3 h-3 text-slate-300" />}
+                {isSelected && <Check className="w-3.5 h-3.5 text-slate-300" />}
                 <span>{opt}</span>
               </button>
             );
@@ -446,30 +448,30 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
             value={shooterOther}
             onChange={(e) => setShooterOther(e.target.value)}
             placeholder="Specify shooter..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
           />
         )}
       </div>
 
       {/* QUESTION 3: Hopper Capacity */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <label className="text-xs font-semibold text-slate-200 block">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
           3. What is your hopper capacity?
         </label>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setHopperCapacity(Math.max(0, (typeof hopperCapacity === 'number' ? hopperCapacity : 0) - 5))}
-            className="px-2 py-1 rounded-md bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-mono font-semibold"
+            className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs sm:text-sm font-mono font-semibold"
           >
             -5
           </button>
           <button
             type="button"
             onClick={() => setHopperCapacity(Math.max(0, (typeof hopperCapacity === 'number' ? hopperCapacity : 0) - 1))}
-            className="p-1 rounded-md bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200"
+            className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200"
           >
-            <Minus className="w-3.5 h-3.5" />
+            <Minus className="w-4 h-4" />
           </button>
 
           <input
@@ -482,20 +484,20 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
               const val = e.target.value;
               setHopperCapacity(val === '' ? '' : Math.max(0, parseInt(val, 10) || 0));
             }}
-            className="w-16 text-center text-base font-mono font-bold bg-slate-950 border border-slate-750 rounded-lg py-0.5 px-1 text-slate-100 focus:outline-none placeholder-slate-600"
+            className="w-20 text-center text-lg font-mono font-bold bg-slate-950 border border-slate-750 rounded-xl py-1.5 px-2 text-slate-100 focus:outline-none placeholder-slate-600"
           />
 
           <button
             type="button"
             onClick={() => setHopperCapacity((typeof hopperCapacity === 'number' ? hopperCapacity : 0) + 1)}
-            className="p-1 rounded-md bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200"
+            className="p-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
           </button>
           <button
             type="button"
             onClick={() => setHopperCapacity((typeof hopperCapacity === 'number' ? hopperCapacity : 0) + 5)}
-            className="px-2 py-1 rounded-md bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-mono font-semibold"
+            className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs sm:text-sm font-mono font-semibold"
           >
             +5
           </button>
@@ -503,11 +505,11 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       </div>
 
       {/* QUESTION 4: Shooting Accuracy */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <label className="text-xs font-semibold text-slate-200 block">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
           4. What is your shooting accuracy?
         </label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {ACCURACY_OPTIONS.map((opt) => {
             const isSelected = shootingAccuracy === opt;
             return (
@@ -515,7 +517,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
                 key={opt}
                 type="button"
                 onClick={() => setShootingAccuracy(shootingAccuracy === opt ? null : opt)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
                   isSelected
                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
                     : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900 hover:text-slate-300'
@@ -529,8 +531,8 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       </div>
 
       {/* QUESTION 5: Shooting Area */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <label className="text-xs font-semibold text-slate-200 block">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
           5. What is your shooting area?
         </label>
         <ShootingAreaMapper
@@ -540,11 +542,11 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       </div>
 
       {/* QUESTION 6: Bump and Trench */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <label className="text-xs font-semibold text-slate-200 block">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
           6. Can you use both Bump and Trench?
         </label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {BUMP_TRENCH_OPTIONS.map((opt) => {
             const isSelected = bumpTrench === opt;
             return (
@@ -552,7 +554,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
                 key={opt}
                 type="button"
                 onClick={() => setBumpTrench(bumpTrench === opt ? null : opt)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
                   isSelected
                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
                     : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900 hover:text-slate-300'
@@ -566,11 +568,11 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       </div>
 
       {/* QUESTION 7: Autonomous */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <label className="text-xs font-semibold text-slate-200 block">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
           7. Do you have autonomous?
         </label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {(['YES', 'NO', 'STILL DEVELOPING'] as const).map((opt) => {
             const isSelected = hasAutonomous === opt;
             return (
@@ -578,7 +580,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
                 key={opt}
                 type="button"
                 onClick={() => setHasAutonomous(hasAutonomous === opt ? null : opt)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
                   isSelected
                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
                     : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900 hover:text-slate-300'
@@ -591,17 +593,17 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
         </div>
 
         {hasAutonomous === 'YES' && (
-          <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
-            <span className="text-[11px] text-slate-400 block font-medium">
+          <div className="pt-2.5 border-t border-slate-800/80 space-y-2">
+            <span className="text-xs text-slate-400 block font-medium">
               Routines count:
             </span>
-            <div className="flex gap-1.5">
+            <div className="flex gap-2">
               {(['1', '2', '3', '4+'] as const).map((opt) => (
                 <button
                   key={opt}
                   type="button"
                   onClick={() => setAutoRoutinesCount(autoRoutinesCount === opt ? null : opt)}
-                  className={`px-3 py-1 rounded-md font-semibold text-xs transition-colors ${
+                  className={`px-3.5 py-1.5 rounded-xl font-semibold text-xs sm:text-sm transition-colors ${
                     autoRoutinesCount === opt
                       ? 'bg-slate-800 text-slate-100 border border-slate-600'
                       : 'bg-slate-950 text-slate-400 border border-slate-850'
@@ -615,27 +617,171 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
         )}
       </div>
 
-      {/* QUESTION 8: Autonomous Drawing */}
+      {/* QUESTION 8: Autonomous Drawing (Multi-Routine Support) */}
       {hasAutonomous !== 'NO' && (
-        <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-          <label className="text-xs font-semibold text-slate-200 block">
-            8. Please draw your autonomous.
-          </label>
-          <AutonomousDrawer
-            drawing={autoDrawings[0]}
-            onSave={(newDrawing) => {
-              setAutoDrawings([newDrawing]);
-            }}
-          />
+        <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3.5">
+          <div className="flex items-center justify-between">
+            <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
+              8. Autonomous Routines & Paths
+            </label>
+            <span className="text-xs font-mono text-purple-400 font-bold">
+              {autoDrawings.length} Routine{autoDrawings.length === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          {/* Routine Tabs & Add Button */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {autoDrawings.map((routine, idx) => {
+              const isSelected = activeRoutineIndex === idx;
+              return (
+                <button
+                  key={routine.id || idx}
+                  type="button"
+                  onClick={() => setActiveRoutineIndex(idx)}
+                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-purple-950/80 text-purple-200 border border-purple-700/80 shadow-sm'
+                      : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900 hover:text-slate-300'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-purple-400" />
+                  <span>{routine.name || `Routine ${idx + 1}`}</span>
+                  {routine.paths && routine.paths.length > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400 font-mono">
+                      {routine.paths.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => {
+                const nextNum = autoDrawings.length + 1;
+                const newRoutine: AutonomousDrawing = {
+                  id: `auto-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                  name: `Routine ${nextNum}`,
+                  createdAt: Date.now(),
+                  paths: [],
+                  startPosition: { x: 50, y: 15, angle: 180, label: 'Start' },
+                };
+                const updated = [...autoDrawings, newRoutine];
+                setAutoDrawings(updated);
+                setActiveRoutineIndex(updated.length - 1);
+              }}
+              className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-900 text-slate-300 border border-dashed border-slate-700 text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4 text-purple-400" />
+              <span>Add Routine</span>
+            </button>
+          </div>
+
+          {/* Current Active Routine Details */}
+          {(() => {
+            // Ensure at least one routine exists if user starts drawing
+            const currentRoutine: AutonomousDrawing = autoDrawings[activeRoutineIndex] || {
+              id: `auto-default-${Date.now()}`,
+              name: `Routine 1`,
+              createdAt: Date.now(),
+              paths: [],
+              startPosition: { x: 50, y: 15, angle: 180, label: 'Start' },
+            };
+
+            const handleSaveCurrentRoutine = (updated: AutonomousDrawing) => {
+              if (autoDrawings.length === 0) {
+                setAutoDrawings([updated]);
+                setActiveRoutineIndex(0);
+                return;
+              }
+              const next = [...autoDrawings];
+              next[activeRoutineIndex] = updated;
+              setAutoDrawings(next);
+            };
+
+            const handleRoutineNameChange = (newName: string) => {
+              const updated = { ...currentRoutine, name: newName };
+              handleSaveCurrentRoutine(updated);
+            };
+
+            const handleRoutineNotesChange = (newNotes: string) => {
+              const updated = { ...currentRoutine, notes: newNotes };
+              handleSaveCurrentRoutine(updated);
+            };
+
+            const handleDeleteCurrentRoutine = () => {
+              if (autoDrawings.length <= 1) {
+                const resetRoutine: AutonomousDrawing = {
+                  id: `auto-${Date.now()}`,
+                  name: 'Routine 1',
+                  createdAt: Date.now(),
+                  paths: [],
+                  startPosition: { x: 50, y: 15, angle: 180, label: 'Start' },
+                };
+                setAutoDrawings([resetRoutine]);
+                setActiveRoutineIndex(0);
+                return;
+              }
+              const next = autoDrawings.filter((_, i) => i !== activeRoutineIndex);
+              setAutoDrawings(next);
+              setActiveRoutineIndex(Math.max(0, activeRoutineIndex - 1));
+            };
+
+            return (
+              <div className="space-y-3 pt-1">
+                {/* Routine Name & Delete bar */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={currentRoutine.name || ''}
+                      onChange={(e) => handleRoutineNameChange(e.target.value)}
+                      placeholder={`Routine ${activeRoutineIndex + 1} Name (e.g. 5-Ball Trench, Center Steal)`}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-600 font-medium"
+                    />
+                  </div>
+
+                  {autoDrawings.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteCurrentRoutine}
+                      className="p-2 rounded-xl bg-slate-950 hover:bg-red-950/60 border border-slate-800 hover:border-red-800 text-slate-400 hover:text-red-300 text-xs transition-colors"
+                      title="Delete this routine"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {/* Routine Field Canvas */}
+                <AutonomousDrawer
+                  key={currentRoutine.id || activeRoutineIndex}
+                  drawing={currentRoutine}
+                  onSave={handleSaveCurrentRoutine}
+                />
+
+                {/* Routine Specific Notes */}
+                <div>
+                  <input
+                    type="text"
+                    value={currentRoutine.notes || ''}
+                    onChange={(e) => handleRoutineNotesChange(e.target.value)}
+                    placeholder="Routine notes (e.g. Starts facing trench, takes 2 balls, shoots from protected zone)..."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-300 placeholder-slate-500 focus:outline-none focus:border-slate-600"
+                  />
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
       {/* QUESTION 9: Autonomous Consistency */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <label className="text-xs font-semibold text-slate-200 block">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
           9. How consistent is your autonomous?
         </label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {AUTO_CONSISTENCY_OPTIONS.map((opt) => {
             const isSelected = autoConsistency === opt;
             return (
@@ -643,7 +789,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
                 key={opt}
                 type="button"
                 onClick={() => setAutoConsistency(autoConsistency === opt ? null : opt)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
                   isSelected
                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
                     : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900 hover:text-slate-300'
@@ -657,11 +803,11 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       </div>
 
       {/* QUESTION 10: Biggest Issue */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <label className="text-xs font-semibold text-slate-200 block">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
           10. What has been your biggest issue?
         </label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {BIGGEST_ISSUES_OPTIONS.map((opt) => {
             const isSelected = biggestIssues.includes(opt);
             return (
@@ -669,13 +815,13 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
                 key={opt}
                 type="button"
                 onClick={() => toggleIssue(opt)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer flex items-center gap-1 ${
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold uppercase transition-colors active:scale-95 cursor-pointer flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
                     : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900 hover:text-slate-300'
                 }`}
               >
-                {isSelected && <Check className="w-3 h-3 text-slate-300" />}
+                {isSelected && <Check className="w-3.5 h-3.5 text-slate-300" />}
                 <span>{opt}</span>
               </button>
             );
@@ -688,17 +834,17 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
             value={biggestIssueOther}
             onChange={(e) => setBiggestIssueOther(e.target.value)}
             placeholder="Specify issue..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none"
           />
         )}
       </div>
 
       {/* QUESTION 11: Reliability */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <label className="text-xs font-semibold text-slate-200 block">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
           11. How reliable is the robot now?
         </label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {RELIABILITY_OPTIONS.map((opt) => {
             const isSelected = reliability === opt;
             return (
@@ -706,7 +852,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
                 key={opt}
                 type="button"
                 onClick={() => setReliability(reliability === opt ? null : opt)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
                   isSelected
                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
                     : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900 hover:text-slate-300'
@@ -720,9 +866,9 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       </div>
 
       {/* PHOTOS */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-semibold text-slate-200 block">
+          <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
             Photos
           </label>
           {photos.length > 0 && (
@@ -747,29 +893,29 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
           className="hidden"
         />
 
-        <div className="flex gap-2">
+        <div className="flex gap-2.5">
           <button
             type="button"
             onClick={() => cameraInputRef.current?.click()}
-            className="flex-1 py-2 px-3 rounded-lg bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-300 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            className="flex-1 py-2.5 px-3.5 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
-            <Camera className="w-3.5 h-3.5 text-slate-400" />
+            <Camera className="w-4 h-4 text-slate-400" />
             <span>Take Photo</span>
           </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex-1 py-2 px-3 rounded-lg bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-300 font-medium text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            className="flex-1 py-2.5 px-3.5 rounded-xl bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-200 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
-            <Upload className="w-3.5 h-3.5 text-slate-400" />
+            <Upload className="w-4 h-4 text-slate-400" />
             <span>Add Photo</span>
           </button>
         </div>
 
         {photos.length > 0 && (
-          <div className="grid grid-cols-4 gap-1.5 pt-1">
+          <div className="grid grid-cols-4 gap-2 pt-1">
             {photos.map((p, idx) => (
-              <div key={p.id} className="relative group rounded-lg overflow-hidden border border-slate-800 aspect-square bg-slate-950">
+              <div key={p.id} className="relative group rounded-xl overflow-hidden border border-slate-800 aspect-square bg-slate-950">
                 <img
                   src={p.dataUrl}
                   alt={`Robot ${idx + 1}`}
@@ -779,9 +925,9 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
                 <button
                   type="button"
                   onClick={() => setPhotos(photos.filter((item) => item.id !== p.id))}
-                  className="absolute top-1 right-1 p-1 rounded bg-black/80 text-white hover:bg-rose-600"
+                  className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/80 text-white hover:bg-rose-600"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             ))}
@@ -790,16 +936,16 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       </div>
 
       {/* OPTIONAL NOTES */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-1.5">
-        <label className="text-xs font-semibold text-slate-200 block">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-2">
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
           Notes (Optional)
         </label>
         <textarea
-          rows={2}
+          rows={3}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Anything else we should know..."
-          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-600 resize-none"
+          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs sm:text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-600 resize-none"
         />
       </div>
 

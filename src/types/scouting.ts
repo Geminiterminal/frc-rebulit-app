@@ -94,44 +94,42 @@ export interface PitData {
   lastUpdated?: number;
 }
 
+export type FieldRouteType = 'BUMP' | 'TRENCH' | 'BOTH' | 'NEITHER';
+export type DefenseEffectivenessType = 'LOW' | 'MEDIUM' | 'HIGH';
+export type RobotIssuesType = 'NONE' | 'MINOR' | 'MAJOR' | 'DISABLED';
+
 export interface MatchScoutingRecord {
   id: string;
   teamNumber: number;
   matchNumber: number;
-  matchType: 'Qualification' | 'Playoff' | 'Practice';
-  alliance: 'RED' | 'BLUE';
-  scoutName: string;
   timestamp: number;
 
-  // Pre-match
-  preloadBalls: number;
-  startPosition: 'Left' | 'Center' | 'Right';
+  // 1. AUTONOMOUS
+  autoWorked: boolean;
+  autoFuelScored: number;
 
-  // Auto
-  autoMobility: boolean;
-  autoHighScored: number;
-  autoLowScored: number;
-  autoMissed: number;
-  autoNotes?: string;
+  // 2. SCORING
+  teleopFuelScored: number;
 
-  // Teleop
-  teleopHighScored: number;
-  teleopLowScored: number;
-  teleopMissed: number;
-  usedTrench: boolean;
-  usedBump: boolean;
-  defensePlayed: 'None' | 'Effective' | 'Ineffective';
+  // 3. FIELD ROUTE
+  fieldRoute: FieldRouteType;
 
-  // Endgame
-  hangStatus: 'None' | 'Parked' | 'Level Climb' | 'Tilted Climb' | 'Failed';
-  climbSpeed: 'Fast (<5s)' | 'Medium (5-15s)' | 'Slow (>15s)' | 'N/A';
+  // 4. DEFENSE
+  playedDefense: boolean;
+  defenseEffectiveness?: DefenseEffectivenessType;
 
-  // Post match
-  robotBroke: boolean;
-  breakDetails?: string;
-  cards: 'None' | 'Yellow' | 'Red';
-  overallRating: number; // 1 to 5
-  notes: string;
+  // 5. ROBOT RELIABILITY
+  robotIssues: RobotIssuesType;
+  whatHappenedNote?: string;
+
+  // 6. QUICK OBSERVATION
+  quickNote?: string;
+
+  // Legacy optional fields for backward compatibility with existing data
+  autoHighScored?: number;
+  teleopHighScored?: number;
+  notes?: string;
+  hangStatus?: string;
 }
 
 export interface TeamProfile {

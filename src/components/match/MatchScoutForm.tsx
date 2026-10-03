@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { MatchScoutingRecord } from '../../types/scouting';
+import { 
+  MatchScoutingRecord, 
+  FieldRouteType, 
+  DefenseEffectivenessType, 
+  RobotIssuesType 
+} from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
 import { 
   Plus, 
@@ -7,9 +12,13 @@ import {
   Save, 
   ArrowLeft, 
   Check, 
-  ShieldAlert, 
-  Star, 
-  CheckCircle2 
+  CheckCircle2,
+  AlertTriangle,
+  Zap,
+  Target,
+  Route,
+  Shield,
+  MessageSquare
 } from 'lucide-react';
 
 interface MatchScoutFormProps {
@@ -23,45 +32,37 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
   initialMatchNumber = 1,
   onNavigate,
 }) => {
+  // MATCH IDENTIFICATION
   const [matchNumber, setMatchNumber] = useState<number>(initialMatchNumber);
   const [teamNumber, setTeamNumber] = useState<string>(
     initialTeamNumber ? initialTeamNumber.toString() : ''
   );
-  const [matchType, setMatchType] = useState<'Qualification' | 'Playoff' | 'Practice'>('Qualification');
-  const [alliance, setAlliance] = useState<'RED' | 'BLUE'>('BLUE');
-  const [scoutName, setScoutName] = useState<string>('');
 
-  const [preloadBalls, setPreloadBalls] = useState<number>(0);
-  const [startPosition, setStartPosition] = useState<'Left' | 'Center' | 'Right'>('Center');
+  // 1. AUTONOMOUS
+  const [autoWorked, setAutoWorked] = useState<boolean>(true);
+  const [autoFuelScored, setAutoFuelScored] = useState<number>(0);
 
-  const [autoMobility, setAutoMobility] = useState<boolean>(false);
-  const [autoHighScored, setAutoHighScored] = useState<number>(0);
-  const [autoLowScored, setAutoLowScored] = useState<number>(0);
-  const [autoMissed, setAutoMissed] = useState<number>(0);
+  // 2. SCORING
+  const [teleopFuelScored, setTeleopFuelScored] = useState<number>(0);
 
-  const [teleopHighScored, setTeleopHighScored] = useState<number>(0);
-  const [teleopLowScored, setTeleopLowScored] = useState<number>(0);
-  const [teleopMissed, setTeleopMissed] = useState<number>(0);
-  const [usedTrench, setUsedTrench] = useState<boolean>(false);
-  const [usedBump, setUsedBump] = useState<boolean>(false);
-  const [defensePlayed, setDefensePlayed] = useState<'None' | 'Effective' | 'Ineffective'>('None');
+  // 3. FIELD ROUTE
+  const [fieldRoute, setFieldRoute] = useState<FieldRouteType>('NEITHER');
 
-  const [hangStatus, setHangStatus] = useState<'None' | 'Parked' | 'Level Climb' | 'Tilted Climb' | 'Failed'>('None');
-  const [climbSpeed, setClimbSpeed] = useState<'Fast (<5s)' | 'Medium (5-15s)' | 'Slow (>15s)' | 'N/A'>('N/A');
+  // 4. DEFENSE
+  const [playedDefense, setPlayedDefense] = useState<boolean>(false);
+  const [defenseEffectiveness, setDefenseEffectiveness] = useState<DefenseEffectivenessType>('MEDIUM');
 
-  const [robotBroke, setRobotBroke] = useState<boolean>(false);
-  const [breakDetails, setBreakDetails] = useState<string>('');
-  const [cards, setCards] = useState<'None' | 'Yellow' | 'Red'>('None');
-  const [overallRating, setOverallRating] = useState<number>(0);
-  const [notes, setNotes] = useState<string>('');
+  // 5. ROBOT RELIABILITY
+  const [robotIssues, setRobotIssues] = useState<RobotIssuesType>('NONE');
+  const [whatHappenedNote, setWhatHappenedNote] = useState<string>('');
 
+  // 6. QUICK OBSERVATION
+  const [quickNote, setQuickNote] = useState<string>('');
+
+  // UI state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    scoutingDB.getSetting<string>('scoutName', '').then((name) => {
-      if (name) setScoutName(name);
-    });
-
     if (!initialMatchNumber) {
       scoutingDB.getAllMatches().then((matches) => {
         if (matches.length > 0) {
@@ -72,42 +73,57 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
     }
   }, [initialMatchNumber]);
 
+  // Quick increment/decrement helper ensuring values never go below 0
+  const adjustValue = (current: number, delta: number) => {
+    return Math.max(0, current + delta);
+  };
+
   const handleSaveMatch = async (e: React.FormEvent) => {
     e.preventDefault();
     const teamNum = parseInt(teamNumber, 10);
-    if (isNaN(teamNum) || teamNum <= 0) return;
+    if (isNaN(teamNum) || teamNum <= 0) {
+      setToastMessage('Please enter a valid Team Number');
+      setTimeout(() => setToastMessage(null), 2500);
+      return;
+    }
 
     const record: MatchScoutingRecord = {
       id: `match-m${matchNumber}-t${teamNum}-${Date.now()}`,
       teamNumber: teamNum,
       matchNumber,
-      matchType,
-      alliance,
-      scoutName: scoutName || 'Scout',
       timestamp: Date.now(),
-      preloadBalls,
-      startPosition,
-      autoMobility,
-      autoHighScored,
-      autoLowScored,
-      autoMissed,
-      teleopHighScored,
-      teleopLowScored,
-      teleopMissed,
-      usedTrench,
-      usedBump,
-      defensePlayed,
-      hangStatus,
-      climbSpeed,
-      robotBroke,
-      breakDetails: robotBroke ? breakDetails : undefined,
-      cards,
-      overallRating,
-      notes,
+
+      // 1. AUTONOMOUS
+      autoWorked,
+      autoFuelScored,
+
+      // 2. SCORING
+      teleopFuelScored,
+
+      // 3. FIELD ROUTE
+      fieldRoute,
+
+      // 4. DEFENSE
+      playedDefense,
+      defenseEffectiveness: playedDefense ? defenseEffectiveness : undefined,
+
+      // 5. ROBOT RELIABILITY
+      robotIssues,
+      whatHappenedNote: robotIssues !== 'NONE' ? whatHappenedNote : undefined,
+
+      // 6. QUICK OBSERVATION
+      quickNote: quickNote.trim() || undefined,
+
+      // Legacy field aliases for backward compatibility with existing profile aggregations
+      autoHighScored: autoFuelScored,
+      teleopHighScored: teleopFuelScored,
+      notes: quickNote,
     };
 
+    // Save match observation
     await scoutingDB.saveMatch(record);
 
+    // Auto-associate observation with the selected team's existing profile or create new team profile
     const existingTeam = await scoutingDB.getTeam(teamNum);
     if (!existingTeam) {
       await scoutingDB.saveTeam({
@@ -116,465 +132,471 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         createdAt: Date.now(),
         updatedAt: Date.now(),
       });
+    } else {
+      await scoutingDB.saveTeam({
+        ...existingTeam,
+        updatedAt: Date.now(),
+      });
     }
 
-    if (scoutName) {
-      await scoutingDB.setSetting('scoutName', scoutName);
-    }
+    setToastMessage(`Match ${matchNumber} saved for Team ${teamNum}`);
 
-    setToastMessage(`Match ${matchNumber} saved`);
-
+    // Reset form for next match
     setTimeout(() => {
       setToastMessage(null);
       setMatchNumber((prev) => prev + 1);
       setTeamNumber('');
-      setAutoHighScored(0);
-      setAutoLowScored(0);
-      setAutoMissed(0);
-      setTeleopHighScored(0);
-      setTeleopLowScored(0);
-      setTeleopMissed(0);
-      setUsedTrench(false);
-      setUsedBump(false);
-      setDefensePlayed('None');
-      setHangStatus('None');
-      setClimbSpeed('N/A');
-      setRobotBroke(false);
-      setBreakDetails('');
-      setNotes('');
+      setAutoWorked(true);
+      setAutoFuelScored(0);
+      setTeleopFuelScored(0);
+      setFieldRoute('NEITHER');
+      setPlayedDefense(false);
+      setDefenseEffectiveness('MEDIUM');
+      setRobotIssues('NONE');
+      setWhatHappenedNote('');
+      setQuickNote('');
       window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 1000);
+    }, 1200);
   };
 
   return (
-    <div className="max-w-xl mx-auto px-3 sm:px-4 py-3 pb-24 flex flex-col gap-3">
-      {/* Top Header */}
-      <div className="sticky top-13 z-30 bg-slate-950/95 backdrop-blur-md -mx-3 px-3 py-2 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+    <form onSubmit={handleSaveMatch} className="max-w-xl mx-auto px-3.5 sm:px-5 py-5 pb-32 flex flex-col gap-6">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white font-mono font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-xl flex items-center gap-2 border border-emerald-400 animate-bounce">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Top Bar Header */}
+      <div className="sticky top-13 z-30 bg-slate-950/95 backdrop-blur-md -mx-3.5 px-3.5 py-3 border-b border-slate-800 flex items-center justify-between shadow-md">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => onNavigate('home')}
-            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200"
+            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <div className="text-sm font-bold font-mono text-slate-200">
-            MATCH {matchNumber} {teamNumber && `• Team ${teamNumber}`}
+          <div>
+            <h1 className="text-base sm:text-lg font-black font-mono text-slate-100 tracking-tight uppercase">
+              MATCH SCOUT
+            </h1>
           </div>
         </div>
 
         <button
-          type="button"
-          onClick={handleSaveMatch}
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs uppercase shadow transition-colors active:scale-95 cursor-pointer"
+          type="submit"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black font-mono text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer"
         >
-          <Save className="w-3.5 h-3.5" />
-          <span>Save</span>
+          <Save className="w-4 h-4" />
+          <span>SAVE MATCH</span>
         </button>
       </div>
 
-      {/* MATCH & TEAM IDENTIFICATION */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {/* Match Number */}
-          <div>
-            <span className="block text-[10px] font-mono font-semibold uppercase text-slate-400 mb-1">
+      {/* MATCH IDENTIFICATION */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-4">
+        <div className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+          <span>MATCH IDENTIFICATION</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Match Number Counter */}
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col justify-between gap-2">
+            <span className="text-xs font-mono font-bold uppercase text-slate-400">
               Match #
             </span>
-            <input
-              type="number"
-              min="1"
-              required
-              value={matchNumber}
-              onChange={(e) => setMatchNumber(parseInt(e.target.value, 10) || 1)}
-              className="w-full text-center text-base font-mono font-bold bg-slate-950 border border-slate-800 rounded-lg py-1.5 px-2 text-slate-100 focus:outline-none"
-            />
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setMatchNumber((prev) => Math.max(1, prev - 1))}
+                className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-lg active:scale-90 cursor-pointer border border-slate-700"
+              >
+                −
+              </button>
+              <input
+                type="number"
+                min="1"
+                required
+                value={matchNumber}
+                onChange={(e) => setMatchNumber(parseInt(e.target.value, 10) || 1)}
+                className="w-16 text-center text-xl font-mono font-black bg-transparent text-amber-300 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setMatchNumber((prev) => prev + 1)}
+                className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-lg active:scale-90 cursor-pointer border border-slate-700"
+              >
+                +
+              </button>
+            </div>
           </div>
 
-          {/* Team Number */}
-          <div>
-            <span className="block text-[10px] font-mono font-semibold uppercase text-slate-400 mb-1">
-              Team #
+          {/* Team Number Input */}
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col justify-between gap-2">
+            <span className="text-xs font-mono font-bold uppercase text-slate-400">
+              Team Number
             </span>
             <input
               type="number"
               required
-              placeholder="9751"
+              placeholder="e.g. 9751"
               value={teamNumber}
               onChange={(e) => setTeamNumber(e.target.value)}
-              className="w-full text-center text-base font-mono font-bold bg-slate-950 border border-slate-750 rounded-lg py-1.5 px-2 text-slate-100 placeholder-slate-600 focus:outline-none"
+              className="w-full bg-slate-900 border border-slate-750 rounded-lg py-2 px-3 text-lg font-mono font-black text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/80"
             />
           </div>
-
-          {/* Alliance Switcher */}
-          <div className="col-span-2">
-            <span className="block text-[10px] font-mono font-semibold uppercase text-slate-400 mb-1">
-              Alliance
-            </span>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => setAlliance('BLUE')}
-                className={`py-1.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer ${
-                  alliance === 'BLUE'
-                    ? 'bg-slate-800 text-blue-300 border border-blue-700/80 shadow-sm'
-                    : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
-                }`}
-              >
-                Blue
-              </button>
-              <button
-                type="button"
-                onClick={() => setAlliance('RED')}
-                className={`py-1.5 rounded-lg font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer ${
-                  alliance === 'RED'
-                    ? 'bg-slate-800 text-rose-300 border border-rose-700/80 shadow-sm'
-                    : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
-                }`}
-              >
-                Red
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Scout Name */}
-        <input
-          type="text"
-          placeholder="Scout Name (Optional)"
-          value={scoutName}
-          onChange={(e) => setScoutName(e.target.value)}
-          className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-300 placeholder-slate-600 focus:outline-none"
-        />
-      </div>
-
-      {/* PHASE 1: PRE-MATCH */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <span className="text-xs font-semibold text-slate-200 block">
-          Pre-Match
-        </span>
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div>
-            <div className="flex gap-1">
-              {(['Left', 'Center', 'Right'] as const).map((pos) => (
-                <button
-                  key={pos}
-                  type="button"
-                  onClick={() => setStartPosition(pos)}
-                  className={`flex-1 py-1.5 rounded-md font-medium text-xs transition-colors ${
-                    startPosition === pos
-                      ? 'bg-slate-800 text-slate-100 border border-slate-600'
-                      : 'bg-slate-950 text-slate-400 border border-slate-850'
-                  }`}
-                >
-                  {pos}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="flex gap-1">
-              {[0, 1, 2, 3].map((num) => (
-                <button
-                  key={num}
-                  type="button"
-                  onClick={() => setPreloadBalls(num)}
-                  className={`flex-1 py-1.5 rounded-md font-mono text-xs font-semibold transition-colors ${
-                    preloadBalls === num
-                      ? 'bg-slate-800 text-slate-100 border border-slate-600'
-                      : 'bg-slate-950 text-slate-400 border border-slate-850'
-                  }`}
-                >
-                  {num}b
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* PHASE 2: AUTONOMOUS */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-200 uppercase font-mono tracking-wider">
-            Autonomous
+      {/* 1. AUTONOMOUS */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-blue-400">
+          <Zap className="w-4 h-4" />
+          <span>1. AUTONOMOUS</span>
+        </div>
+
+        {/* Auto Worked? YES / NO */}
+        <div>
+          <span className="block text-xs font-mono font-semibold uppercase text-slate-300 mb-2">
+            Auto Worked?
           </span>
-          <button
-            type="button"
-            onClick={() => setAutoMobility(!autoMobility)}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-              autoMobility
-                ? 'bg-slate-800 text-emerald-400 border border-slate-700'
-                : 'bg-slate-950 text-slate-400 border border-slate-850'
-            }`}
-          >
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Crossed Line</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          {/* Auto High Scored */}
-          <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 flex items-center justify-between">
-            <div>
-              <div className="text-[11px] text-slate-400 font-medium">High Hub</div>
-              <div className="text-2xl font-mono font-bold text-slate-100 mt-0.5">
-                {autoHighScored}
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setAutoHighScored(Math.max(0, autoHighScored - 1))}
-                className="w-9 h-9 rounded-md bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 flex items-center justify-center font-bold active:scale-95"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setAutoHighScored(autoHighScored + 1)}
-                className="w-11 h-9 rounded-md bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-100 flex items-center justify-center font-bold active:scale-95"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Auto Low Scored */}
-          <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800/80 flex items-center justify-between">
-            <div>
-              <div className="text-[11px] text-slate-400 font-medium">Low Hub</div>
-              <div className="text-2xl font-mono font-bold text-slate-200 mt-0.5">
-                {autoLowScored}
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setAutoLowScored(Math.max(0, autoLowScored - 1))}
-                className="w-9 h-9 rounded-md bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 flex items-center justify-center font-bold active:scale-95"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setAutoLowScored(autoLowScored + 1)}
-                className="w-11 h-9 rounded-md bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-100 flex items-center justify-center font-bold active:scale-95"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Auto Missed Counter */}
-        <div className="flex items-center justify-between px-2.5 py-1.5 bg-slate-950 rounded-lg border border-slate-800/80 text-xs">
-          <span className="text-slate-400">Missed:</span>
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
             <button
               type="button"
-              onClick={() => setAutoMissed(Math.max(0, autoMissed - 1))}
-              className="p-1 rounded bg-slate-900 border border-slate-800 text-slate-400"
+              onClick={() => setAutoWorked(true)}
+              className={`py-3 rounded-xl font-mono font-bold text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                autoWorked
+                  ? 'bg-blue-600 text-white shadow-md border border-blue-400'
+                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
+              }`}
             >
-              <Minus className="w-3 h-3" />
+              {autoWorked && <Check className="w-4 h-4" />}
+              <span>YES</span>
             </button>
-            <span className="font-mono font-bold text-slate-300 w-5 text-center">
-              {autoMissed}
+
+            <button
+              type="button"
+              onClick={() => setAutoWorked(false)}
+              className={`py-3 rounded-xl font-mono font-bold text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                !autoWorked
+                  ? 'bg-rose-600 text-white shadow-md border border-rose-400'
+                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
+              }`}
+            >
+              {!autoWorked && <Check className="w-4 h-4" />}
+              <span>NO</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Auto Fuel Scored Counter */}
+        <div className="space-y-2 pt-1 border-t border-slate-800/80">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-semibold uppercase text-slate-300">
+              Auto Fuel Scored
             </span>
+            <span className="text-xl font-mono font-black text-blue-400 px-3 py-0.5 rounded-lg bg-slate-950 border border-slate-800">
+              {autoFuelScored}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5 pt-1">
             <button
               type="button"
-              onClick={() => setAutoMissed(autoMissed + 1)}
-              className="p-1 rounded bg-slate-900 border border-slate-800 text-slate-400"
+              onClick={() => setAutoFuelScored((val) => adjustValue(val, -20))}
+              className="py-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-rose-400 font-mono font-bold text-xs border border-slate-800 active:scale-95 cursor-pointer"
             >
-              <Plus className="w-3 h-3" />
+              −20
+            </button>
+            <button
+              type="button"
+              onClick={() => setAutoFuelScored((val) => adjustValue(val, -5))}
+              className="py-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-rose-400 font-mono font-bold text-xs border border-slate-800 active:scale-95 cursor-pointer"
+            >
+              −5
+            </button>
+            <button
+              type="button"
+              onClick={() => setAutoFuelScored((val) => adjustValue(val, -1))}
+              className="py-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-rose-400 font-mono font-bold text-xs border border-slate-800 active:scale-95 cursor-pointer"
+            >
+              −1
+            </button>
+
+            <div className="py-2.5 rounded-lg bg-slate-900 text-slate-200 font-mono font-black text-sm border border-slate-750 flex items-center justify-center">
+              {autoFuelScored}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setAutoFuelScored((val) => adjustValue(val, 1))}
+              className="py-2.5 rounded-lg bg-blue-950/80 hover:bg-blue-900 text-blue-300 font-mono font-bold text-xs border border-blue-800 active:scale-95 cursor-pointer"
+            >
+              +1
+            </button>
+            <button
+              type="button"
+              onClick={() => setAutoFuelScored((val) => adjustValue(val, 5))}
+              className="py-2.5 rounded-lg bg-blue-950/80 hover:bg-blue-900 text-blue-300 font-mono font-bold text-xs border border-blue-800 active:scale-95 cursor-pointer"
+            >
+              +5
+            </button>
+            <button
+              type="button"
+              onClick={() => setAutoFuelScored((val) => adjustValue(val, 20))}
+              className="py-2.5 rounded-lg bg-blue-950/80 hover:bg-blue-900 text-blue-300 font-mono font-bold text-xs border border-blue-800 active:scale-95 cursor-pointer"
+            >
+              +20
             </button>
           </div>
         </div>
       </div>
 
-      {/* PHASE 3: TELEOP */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2.5">
-        <span className="text-xs font-bold text-slate-200 uppercase font-mono tracking-wider block">
-          Teleop
-        </span>
-
-        <div className="grid grid-cols-2 gap-2">
-          {/* Teleop High Hub */}
-          <div className="p-3 rounded-lg bg-slate-950 border border-slate-800/80 flex items-center justify-between">
-            <div>
-              <div className="text-[11px] text-slate-400 font-medium">High Hub (2pt)</div>
-              <div className="text-3xl font-mono font-bold text-slate-100 mt-0.5">
-                {teleopHighScored}
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setTeleopHighScored(Math.max(0, teleopHighScored - 1))}
-                className="w-10 h-10 rounded-md bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 flex items-center justify-center font-bold active:scale-95"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setTeleopHighScored(teleopHighScored + 1)}
-                className="w-13 h-10 rounded-md bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-100 flex items-center justify-center font-bold active:scale-95 cursor-pointer"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Teleop Low Hub */}
-          <div className="p-3 rounded-lg bg-slate-950 border border-slate-800/80 flex items-center justify-between">
-            <div>
-              <div className="text-[11px] text-slate-400 font-medium">Low Hub (1pt)</div>
-              <div className="text-3xl font-mono font-bold text-slate-200 mt-0.5">
-                {teleopLowScored}
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setTeleopLowScored(Math.max(0, teleopLowScored - 1))}
-                className="w-10 h-10 rounded-md bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 flex items-center justify-center font-bold active:scale-95"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setTeleopLowScored(teleopLowScored + 1)}
-                className="w-13 h-10 rounded-md bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-100 flex items-center justify-center font-bold active:scale-95 cursor-pointer"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
+      {/* 2. SCORING */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">
+          <Target className="w-4 h-4" />
+          <span>2. SCORING</span>
         </div>
 
-        {/* Traversal Observed */}
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <button
-            type="button"
-            onClick={() => setUsedTrench(!usedTrench)}
-            className={`py-1.5 px-2 rounded-md font-medium transition-colors ${
-              usedTrench
-                ? 'bg-slate-800 text-slate-100 border border-slate-600'
-                : 'bg-slate-950 text-slate-400 border border-slate-850'
-            }`}
-          >
-            {usedTrench ? '✓ Trench' : 'Trench'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setUsedBump(!usedBump)}
-            className={`py-1.5 px-2 rounded-md font-medium transition-colors ${
-              usedBump
-                ? 'bg-slate-800 text-slate-100 border border-slate-600'
-                : 'bg-slate-950 text-slate-400 border border-slate-850'
-            }`}
-          >
-            {usedBump ? '✓ Bump' : 'Bump'}
-          </button>
+        {/* Teleop Fuel Scored Counter */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono font-semibold uppercase text-slate-300">
+              Teleop Fuel Scored
+            </span>
+            <span className="text-xl font-mono font-black text-emerald-400 px-3 py-0.5 rounded-lg bg-slate-950 border border-slate-800">
+              {teleopFuelScored}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5 pt-1">
+            <button
+              type="button"
+              onClick={() => setTeleopFuelScored((val) => adjustValue(val, -20))}
+              className="py-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-rose-400 font-mono font-bold text-xs border border-slate-800 active:scale-95 cursor-pointer"
+            >
+              −20
+            </button>
+            <button
+              type="button"
+              onClick={() => setTeleopFuelScored((val) => adjustValue(val, -5))}
+              className="py-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-rose-400 font-mono font-bold text-xs border border-slate-800 active:scale-95 cursor-pointer"
+            >
+              −5
+            </button>
+            <button
+              type="button"
+              onClick={() => setTeleopFuelScored((val) => adjustValue(val, -1))}
+              className="py-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-rose-400 font-mono font-bold text-xs border border-slate-800 active:scale-95 cursor-pointer"
+            >
+              −1
+            </button>
+
+            <div className="py-2.5 rounded-lg bg-slate-900 text-slate-200 font-mono font-black text-sm border border-slate-750 flex items-center justify-center">
+              {teleopFuelScored}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setTeleopFuelScored((val) => adjustValue(val, 1))}
+              className="py-2.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-mono font-bold text-xs border border-emerald-800 active:scale-95 cursor-pointer"
+            >
+              +1
+            </button>
+            <button
+              type="button"
+              onClick={() => setTeleopFuelScored((val) => adjustValue(val, 5))}
+              className="py-2.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-mono font-bold text-xs border border-emerald-800 active:scale-95 cursor-pointer"
+            >
+              +5
+            </button>
+            <button
+              type="button"
+              onClick={() => setTeleopFuelScored((val) => adjustValue(val, 20))}
+              className="py-2.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-mono font-bold text-xs border border-emerald-800 active:scale-95 cursor-pointer"
+            >
+              +20
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* PHASE 4: ENDGAME */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <span className="text-xs font-bold text-slate-200 uppercase font-mono tracking-wider block">
-          Endgame (Climb)
+      {/* 3. FIELD ROUTE */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-purple-400">
+          <Route className="w-4 h-4" />
+          <span>3. FIELD ROUTE</span>
+        </div>
+
+        <span className="block text-xs font-mono font-semibold uppercase text-slate-300">
+          Field Route Used
         </span>
-        <div className="flex flex-wrap gap-1.5">
-          {(['None', 'Parked', 'Level Climb', 'Tilted Climb', 'Failed'] as const).map((status) => {
-            const isSelected = hangStatus === status;
-            return (
-              <button
-                key={status}
-                type="button"
-                onClick={() => setHangStatus(status)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
-                  isSelected
-                    ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
-                    : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
-                }`}
-              >
-                {status}
-              </button>
-            );
-          })}
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {(['BUMP', 'TRENCH', 'BOTH', 'NEITHER'] as FieldRouteType[]).map((route) => (
+            <button
+              key={route}
+              type="button"
+              onClick={() => setFieldRoute(route)}
+              className={`py-3 rounded-xl font-mono font-bold text-xs sm:text-sm uppercase transition-all cursor-pointer ${
+                fieldRoute === route
+                  ? 'bg-purple-600 text-white shadow-md border border-purple-400'
+                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
+              }`}
+            >
+              {route}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* PHASE 5: POST-MATCH EVALUATION */}
-      <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <button
-            type="button"
-            onClick={() => setRobotBroke(!robotBroke)}
-            className={`py-2 px-2.5 rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 ${
-              robotBroke
-                ? 'bg-slate-800 text-rose-300 border border-rose-700/80'
-                : 'bg-slate-950 text-slate-400 border border-slate-850'
-            }`}
-          >
-            <ShieldAlert className="w-3.5 h-3.5" />
-            <span>{robotBroke ? 'Robot Broke' : 'No Breakdowns'}</span>
-          </button>
+      {/* 4. DEFENSE */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-amber-400">
+          <Shield className="w-4 h-4" />
+          <span>4. DEFENSE</span>
+        </div>
 
-          <div className="flex items-center justify-center gap-0.5 bg-slate-950 border border-slate-850 rounded-lg px-2">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                type="button"
-                onClick={() => setOverallRating(star)}
-                className="p-1"
-              >
-                <Star
-                  className={`w-4 h-4 ${
-                    star <= overallRating ? 'text-amber-400/90 fill-amber-400/90' : 'text-slate-700'
+        {/* Played Defense? YES / NO */}
+        <div>
+          <span className="block text-xs font-mono font-semibold uppercase text-slate-300 mb-2">
+            Played Defense?
+          </span>
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => setPlayedDefense(true)}
+              className={`py-3 rounded-xl font-mono font-bold text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                playedDefense
+                  ? 'bg-amber-500 text-slate-950 shadow-md border border-amber-300'
+                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
+              }`}
+            >
+              {playedDefense && <Check className="w-4 h-4" />}
+              <span>YES</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPlayedDefense(false)}
+              className={`py-3 rounded-xl font-mono font-bold text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                !playedDefense
+                  ? 'bg-slate-800 text-slate-200 shadow-md border border-slate-700'
+                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
+              }`}
+            >
+              {!playedDefense && <Check className="w-4 h-4" />}
+              <span>NO</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Reveal Defense Effectiveness only if YES */}
+        {playedDefense && (
+          <div className="pt-2 border-t border-slate-800/80 animate-fadeIn space-y-2">
+            <span className="block text-xs font-mono font-semibold uppercase text-amber-300">
+              Defense Effectiveness
+            </span>
+            <div className="grid grid-cols-3 gap-2.5">
+              {(['LOW', 'MEDIUM', 'HIGH'] as DefenseEffectivenessType[]).map((eff) => (
+                <button
+                  key={eff}
+                  type="button"
+                  onClick={() => setDefenseEffectiveness(eff)}
+                  className={`py-2.5 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer ${
+                    defenseEffectiveness === eff
+                      ? 'bg-amber-500 text-slate-950 shadow border border-amber-300'
+                      : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
                   }`}
-                />
-              </button>
-            ))}
+                >
+                  {eff}
+                </button>
+              ))}
+            </div>
           </div>
+        )}
+      </div>
+
+      {/* 5. ROBOT RELIABILITY */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-4">
+        <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rose-400">
+          <AlertTriangle className="w-4 h-4" />
+          <span>5. ROBOT RELIABILITY</span>
         </div>
 
-        {robotBroke && (
-          <input
-            type="text"
-            value={breakDetails}
-            onChange={(e) => setBreakDetails(e.target.value)}
-            placeholder="Break details..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 placeholder-slate-600 focus:outline-none"
-          />
+        <span className="block text-xs font-mono font-semibold uppercase text-slate-300">
+          Robot Issues
+        </span>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {(['NONE', 'MINOR', 'MAJOR', 'DISABLED'] as RobotIssuesType[]).map((issue) => (
+            <button
+              key={issue}
+              type="button"
+              onClick={() => setRobotIssues(issue)}
+              className={`py-3 rounded-xl font-mono font-bold text-xs sm:text-sm uppercase transition-all cursor-pointer ${
+                robotIssues === issue
+                  ? issue === 'NONE'
+                    ? 'bg-emerald-600 text-white shadow-md border border-emerald-400'
+                    : 'bg-rose-600 text-white shadow-md border border-rose-400'
+                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
+              }`}
+            >
+              {issue}
+            </button>
+          ))}
+        </div>
+
+        {/* Reveal note if anything other than NONE */}
+        {robotIssues !== 'NONE' && (
+          <div className="pt-2 border-t border-slate-800/80 animate-fadeIn space-y-2">
+            <span className="block text-xs font-mono font-semibold uppercase text-rose-300">
+              What happened?
+            </span>
+            <input
+              type="text"
+              placeholder="Short optional note regarding the issue..."
+              value={whatHappenedNote}
+              onChange={(e) => setWhatHappenedNote(e.target.value)}
+              className="w-full bg-slate-950 border border-rose-900/60 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-rose-500"
+            />
+          </div>
         )}
+      </div>
+
+      {/* 6. QUICK OBSERVATION */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-3">
+        <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-sky-400">
+          <MessageSquare className="w-4 h-4" />
+          <span>6. QUICK OBSERVATION</span>
+        </div>
+
+        <span className="block text-xs font-mono font-semibold uppercase text-slate-300">
+          Quick Note (Optional)
+        </span>
 
         <textarea
-          rows={2}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Brief match notes..."
-          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none resize-none"
+          rows={3}
+          placeholder="Anything important about this robot..."
+          value={quickNote}
+          onChange={(e) => setQuickNote(e.target.value)}
+          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-700 resize-none"
         />
       </div>
 
-      {/* SAVE MATCH BUTTON */}
-      <button
-        type="button"
-        onClick={handleSaveMatch}
-        className="w-full py-3.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-100 font-bold text-xs uppercase tracking-wider shadow transition-colors cursor-pointer active:scale-95"
-      >
-        Save Match {matchNumber}
-      </button>
-
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs px-4 py-2 rounded-lg shadow-xl flex items-center gap-1.5 animate-bounce">
-          <Check className="w-3.5 h-3.5 text-emerald-400" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-    </div>
+      {/* BOTTOM SAVE BUTTON */}
+      <div className="pt-2">
+        <button
+          type="submit"
+          className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black font-mono text-base uppercase tracking-wider shadow-xl transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+        >
+          <Save className="w-5 h-5" />
+          <span>SAVE MATCH</span>
+        </button>
+      </div>
+    </form>
   );
 };

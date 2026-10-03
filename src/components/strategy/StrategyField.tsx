@@ -10,7 +10,11 @@ import {
   Trash2, 
   Undo2, 
   Save, 
-  Check
+  Check,
+  Maximize2,
+  Minimize2,
+  Eye,
+  Layers
 } from 'lucide-react';
 
 interface StrategyFieldProps {
@@ -21,6 +25,9 @@ export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
   const [teams, setTeams] = useState<TeamProfile[]>([]);
   const [blueTeams, setBlueTeams] = useState<number[]>([0, 0, 0]);
   const [redTeams, setRedTeams] = useState<number[]>([0, 0, 0]);
+
+  // Fullscreen / Presentation Mode
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Overlay toggles (clean slate by default)
   const [showAutoPaths, setShowAutoPaths] = useState<boolean>(false);
@@ -54,6 +61,17 @@ export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
   useEffect(() => {
     loadTeams();
   }, []);
+
+  // Listen for Escape key to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   // Sync token team numbers when team selection inputs change
   useEffect(() => {
@@ -239,6 +257,300 @@ export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
 
   const blueProfiles = blueTeams.map((n) => teams.find((t) => t.teamNumber === n)).filter(Boolean) as TeamProfile[];
 
+  // Field Map Canvas Component
+  const renderFieldMap = (containerClassName: string) => (
+    <div className={`relative select-none touch-none ${containerClassName}`}>
+      <RebuiltFieldSvg className="w-full h-full">
+        {/* Interaction capture layer */}
+        <rect
+          ref={(el) => {
+            if (el) svgRef.current = el.ownerSVGElement;
+          }}
+          width="500"
+          height="1000"
+          fill="transparent"
+          className={activeTool === 'draw' ? 'cursor-crosshair' : 'cursor-default'}
+          onPointerDown={handleCanvasPointerDown}
+          onPointerMove={handleCanvasPointerMove}
+          onPointerUp={handleCanvasPointerUp}
+          onPointerCancel={handleCanvasPointerUp}
+        />
+
+        {/* OVERLAY: Teams' Pit Shooting Zones */}
+        {showShootingZones &&
+          blueProfiles.map((p, pIdx) => {
+            const colors = ['#38bdf8', '#818cf8', '#c084fc'];
+            const color = colors[pIdx % colors.length];
+            return (
+              <g key={`zones-p-${p.teamNumber}`}>
+                {p.pit?.shootingAreas?.map((z) => {
+                  const sx = (z.x / 100) * 500;
+                  const sy = (z.y / 100) * 1000;
+                  return (
+                    <g key={`sz-${p.teamNumber}-${z.id}`}>
+                      <circle cx={sx} cy={sy} r="18" fill={color} fillOpacity="0.3" stroke={color} strokeWidth="1.5" strokeDasharray="3 2" />
+                      <circle cx={sx} cy={sy} r="4" fill={color} />
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
+
+        {/* OVERLAY: Teams' Autonomous Routine Paths with smooth quadratic curves */}
+        {showAutoPaths &&
+          blueProfiles.map((p, pIdx) => {
+            const pathColor = pIdx === 0 ? '#3b82f6' : pIdx === 1 ? '#eab308' : '#10b981';
+            const routine = p.pit?.autoDrawings?.[0];
+            if (!routine) return null;
+
+            return (
+              <g key={`auto-overlay-${p.teamNumber}`}>
+                {routine.paths?.map((path) => (
+                  <path
+                    key={path.id}
+                    d={pointsToSmoothSvgPath(path.points)}
+                    fill="none"
+                    stroke={pathColor}
+                    strokeWidth="3.5"
+                    strokeDasharray="6 3"
+                    strokeLinecap="round"
+                  />
+                ))}
+                {routine.startPosition && (
+                  <circle
+                    cx={(routine.startPosition.x / 100) * 500}
+                    cy={(routine.startPosition.y / 100) * 1000}
+                    r="8"
+                    fill={pathColor}
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                  />
+                )}
+              </g>
+            );
+          })}
+
+        {/* User whiteboard drawings with smooth quadratic curves */}
+        {drawings.map((d) => (
+          <path
+            key={d.id}
+            d={pointsToSmoothSvgPath(d.points)}
+            fill="none"
+            stroke={d.color}
+            strokeWidth={d.width}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+
+        {/* Active drawing stroke with smooth curve */}
+        {isDrawing && activeSegmentPoints.length > 0 && (
+          <path
+            d={pointsToSmoothSvgPath(activeSegmentPoints)}
+            fill="none"
+            stroke={drawColor}
+            strokeWidth={3.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
+
+        {/* Robot Tokens (R1..3, B1..3) with Ultra-Smooth Dragging */}
+        {tokens.map((token) => {
+          const tx = (token.x / 100) * 500;
+          const ty = (token.y / 100) * 1000;
+          const isBlue = token.alliance === 'BLUE';
+          const isSelected = selectedTokenId === token.id;
+          const isDragging = draggedTokenId === token.id;
+
+          return (
+            <g
+              key={token.id}
+              transform={`translate(${tx}, ${ty})`}
+              style={{ touchAction: 'none' }}
+              className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}
+              onPointerDown={(e) => handleTokenPointerDown(token.id, e)}
+              onPointerMove={(e) => handleTokenPointerMove(token.id, e)}
+              onPointerUp={(e) => handleTokenPointerUp(token.id, e)}
+              onPointerCancel={(e) => handleTokenPointerUp(token.id, e)}
+            >
+              {/* Hit area target for effortless grabbing on finger touch */}
+              <circle r="28" fill="transparent" />
+
+              {/* Selected / Dragging Aura Ring */}
+              {(isSelected || isDragging) && (
+                <circle
+                  r={isDragging ? '24' : '22'}
+                  fill="none"
+                  stroke={isBlue ? '#60a5fa' : '#f87171'}
+                  strokeWidth="2"
+                  strokeDasharray={isDragging ? 'none' : '4 2'}
+                  className="animate-pulse"
+                />
+              )}
+
+              {/* Main Token Body */}
+              <circle
+                r={isDragging ? '20' : isSelected ? '19' : '17'}
+                fill={isBlue ? '#1d4ed8' : '#b91c1c'}
+                stroke={isSelected || isDragging ? '#ffffff' : isBlue ? '#60a5fa' : '#f87171'}
+                strokeWidth={isSelected || isDragging ? '2.5' : '1.5'}
+                filter="url(#tokenShadow)"
+              />
+
+              {/* Token identifier (e.g. B1, B2, R1) */}
+              <text
+                textAnchor="middle"
+                dy="4.5"
+                fill="#ffffff"
+                fontSize="10"
+                fontWeight="900"
+                className="select-none pointer-events-none"
+              >
+                {token.id.toUpperCase()}
+              </text>
+
+              {/* Team number badge under token */}
+              <g transform="translate(0, 25)" className="select-none pointer-events-none">
+                <rect
+                  x="-18"
+                  y="-7"
+                  width="36"
+                  height="13"
+                  rx="3"
+                  fill="#020617"
+                  fillOpacity="0.85"
+                  stroke="#334155"
+                  strokeWidth="0.8"
+                />
+                <text
+                  textAnchor="middle"
+                  dy="3"
+                  fill="#e2e8f0"
+                  fontSize="8"
+                  fontWeight="bold"
+                  fontFamily="monospace"
+                >
+                  {token.teamNumber && token.teamNumber > 0 ? token.teamNumber : '--'}
+                </text>
+              </g>
+            </g>
+          );
+        })}
+      </RebuiltFieldSvg>
+    </div>
+  );
+
+  // FULLSCREEN PRESENTATION MODE
+  if (isFullscreen) {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col justify-between p-2 sm:p-4 select-none overflow-hidden animate-fadeIn">
+        {/* Floating Minimal Fullscreen Header Controls */}
+        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl p-2.5 flex flex-wrap items-center justify-between gap-2 shadow-2xl z-50">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(false)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black font-mono text-xs uppercase shadow transition-all cursor-pointer"
+            >
+              <Minimize2 className="w-4 h-4" />
+              <span>Exit Fullscreen</span>
+            </button>
+
+            <div className="h-4 w-px bg-slate-800 mx-1" />
+
+            <button
+              type="button"
+              onClick={() => setActiveTool('draw')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs uppercase transition-colors cursor-pointer ${
+                activeTool === 'draw'
+                  ? 'bg-slate-800 text-white border border-slate-600'
+                  : 'bg-slate-950 text-slate-400 border border-slate-800'
+              }`}
+            >
+              <PenTool className="w-3.5 h-3.5" />
+              <span>Draw</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTool('tokens')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-xl font-bold text-xs uppercase transition-colors cursor-pointer ${
+                activeTool === 'tokens'
+                  ? 'bg-slate-800 text-white border border-slate-600'
+                  : 'bg-slate-950 text-slate-400 border border-slate-800'
+              }`}
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Robots</span>
+            </button>
+
+            {activeTool === 'draw' && (
+              <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-800">
+                {['#cbd5e1', '#60a5fa', '#f87171', '#fbbf24', '#4ade80'].map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setDrawColor(color)}
+                    className={`w-5 h-5 rounded-full border transition-transform cursor-pointer ${
+                      drawColor === color ? 'scale-125 border-white ring-2 ring-slate-400' : 'border-transparent opacity-60 hover:opacity-100'
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleUndo}
+              disabled={drawings.length === 0}
+              className="p-2 rounded-xl bg-slate-950 hover:bg-slate-900 disabled:opacity-30 text-slate-300 border border-slate-800 cursor-pointer"
+              title="Undo"
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleEraseAll}
+              className="p-2 rounded-xl bg-slate-950 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-800 cursor-pointer"
+              title="Erase All"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveStrategy}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs uppercase cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>Save</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Interactive Map Canvas Filling Screen */}
+        <div className="flex-1 flex items-center justify-center p-2 min-h-0">
+          {renderFieldMap('h-full max-h-[85vh] aspect-[1/2]')}
+        </div>
+
+        {/* Toast Notification in Fullscreen */}
+        {saveToast && (
+          <div className="fixed bottom-4 right-4 z-50 bg-slate-800 border border-slate-700 text-slate-100 font-bold text-xs px-4 py-2 rounded-xl shadow-2xl flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-400" />
+            <span>{saveToast}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // STANDARD VIEW MODE
   return (
     <div className="max-w-xl mx-auto px-3 sm:px-4 py-3 pb-24 flex flex-col gap-3">
       {/* Sleek Top Bar */}
@@ -292,14 +604,26 @@ export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleSaveStrategy}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs uppercase shadow transition-colors active:scale-95 cursor-pointer"
-        >
-          <Save className="w-3.5 h-3.5" />
-          <span>Save</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsFullscreen(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase shadow transition-colors cursor-pointer"
+            title="Fullscreen Map View"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Fullscreen</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSaveStrategy}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs uppercase shadow transition-colors active:scale-95 cursor-pointer"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>Save</span>
+          </button>
+        </div>
       </div>
 
       {/* Clean Streamlined Toolbar */}
@@ -393,187 +717,7 @@ export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
       </div>
 
       {/* Field Canvas Display */}
-      <div className="relative max-w-sm mx-auto w-full select-none touch-none">
-        <RebuiltFieldSvg className="w-full">
-          {/* Interaction capture layer */}
-          <rect
-            ref={(el) => {
-              if (el && !svgRef.current) svgRef.current = el.ownerSVGElement;
-            }}
-            width="500"
-            height="1000"
-            fill="transparent"
-            className={activeTool === 'draw' ? 'cursor-crosshair' : 'cursor-default'}
-            onPointerDown={handleCanvasPointerDown}
-            onPointerMove={handleCanvasPointerMove}
-            onPointerUp={handleCanvasPointerUp}
-            onPointerCancel={handleCanvasPointerUp}
-          />
-
-          {/* OVERLAY: Teams' Pit Shooting Zones */}
-          {showShootingZones &&
-            blueProfiles.map((p, pIdx) => {
-              const colors = ['#38bdf8', '#818cf8', '#c084fc'];
-              const color = colors[pIdx % colors.length];
-              return (
-                <g key={`zones-p-${p.teamNumber}`}>
-                  {p.pit?.shootingAreas?.map((z) => {
-                    const sx = (z.x / 100) * 500;
-                    const sy = (z.y / 100) * 1000;
-                    return (
-                      <g key={`sz-${p.teamNumber}-${z.id}`}>
-                        <circle cx={sx} cy={sy} r="18" fill={color} fillOpacity="0.3" stroke={color} strokeWidth="1.5" strokeDasharray="3 2" />
-                        <circle cx={sx} cy={sy} r="4" fill={color} />
-                      </g>
-                    );
-                  })}
-                </g>
-              );
-            })}
-
-          {/* OVERLAY: Teams' Autonomous Routine Paths with smooth quadratic curves */}
-          {showAutoPaths &&
-            blueProfiles.map((p, pIdx) => {
-              const pathColor = pIdx === 0 ? '#3b82f6' : pIdx === 1 ? '#eab308' : '#10b981';
-              const routine = p.pit?.autoDrawings?.[0];
-              if (!routine) return null;
-
-              return (
-                <g key={`auto-overlay-${p.teamNumber}`}>
-                  {routine.paths?.map((path) => (
-                    <path
-                      key={path.id}
-                      d={pointsToSmoothSvgPath(path.points)}
-                      fill="none"
-                      stroke={pathColor}
-                      strokeWidth="3.5"
-                      strokeDasharray="6 3"
-                      strokeLinecap="round"
-                    />
-                  ))}
-                  {routine.startPosition && (
-                    <circle
-                      cx={(routine.startPosition.x / 100) * 500}
-                      cy={(routine.startPosition.y / 100) * 1000}
-                      r="8"
-                      fill={pathColor}
-                      stroke="#ffffff"
-                      strokeWidth="2"
-                    />
-                  )}
-                </g>
-              );
-            })}
-
-          {/* User whiteboard drawings with smooth quadratic curves */}
-          {drawings.map((d) => (
-            <path
-              key={d.id}
-              d={pointsToSmoothSvgPath(d.points)}
-              fill="none"
-              stroke={d.color}
-              strokeWidth={d.width}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ))}
-
-          {/* Active drawing stroke with smooth curve */}
-          {isDrawing && activeSegmentPoints.length > 0 && (
-            <path
-              d={pointsToSmoothSvgPath(activeSegmentPoints)}
-              fill="none"
-              stroke={drawColor}
-              strokeWidth={3.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          )}
-
-          {/* Robot Tokens (R1..3, B1..3) with Ultra-Smooth Dragging */}
-          {tokens.map((token) => {
-            const tx = (token.x / 100) * 500;
-            const ty = (token.y / 100) * 1000;
-            const isBlue = token.alliance === 'BLUE';
-            const isSelected = selectedTokenId === token.id;
-            const isDragging = draggedTokenId === token.id;
-
-            return (
-              <g
-                key={token.id}
-                transform={`translate(${tx}, ${ty})`}
-                style={{ touchAction: 'none' }}
-                className={isDragging ? 'cursor-grabbing' : 'cursor-grab'}
-                onPointerDown={(e) => handleTokenPointerDown(token.id, e)}
-                onPointerMove={(e) => handleTokenPointerMove(token.id, e)}
-                onPointerUp={(e) => handleTokenPointerUp(token.id, e)}
-                onPointerCancel={(e) => handleTokenPointerUp(token.id, e)}
-              >
-                {/* Hit area target for effortless grabbing on finger touch */}
-                <circle r="28" fill="transparent" />
-
-                {/* Selected / Dragging Aura Ring */}
-                {(isSelected || isDragging) && (
-                  <circle
-                    r={isDragging ? '24' : '22'}
-                    fill="none"
-                    stroke={isBlue ? '#60a5fa' : '#f87171'}
-                    strokeWidth="2"
-                    strokeDasharray={isDragging ? 'none' : '4 2'}
-                    className="animate-pulse"
-                  />
-                )}
-
-                {/* Main Token Body */}
-                <circle
-                  r={isDragging ? '20' : isSelected ? '19' : '17'}
-                  fill={isBlue ? '#1d4ed8' : '#b91c1c'}
-                  stroke={isSelected || isDragging ? '#ffffff' : isBlue ? '#60a5fa' : '#f87171'}
-                  strokeWidth={isSelected || isDragging ? '2.5' : '1.5'}
-                  filter="url(#tokenShadow)"
-                />
-
-                {/* Token identifier (e.g. B1, B2, R1) */}
-                <text
-                  textAnchor="middle"
-                  dy="4.5"
-                  fill="#ffffff"
-                  fontSize="10"
-                  fontWeight="900"
-                  className="select-none pointer-events-none"
-                >
-                  {token.id.toUpperCase()}
-                </text>
-
-                {/* Team number badge under token */}
-                <g transform="translate(0, 25)" className="select-none pointer-events-none">
-                  <rect
-                    x="-18"
-                    y="-7"
-                    width="36"
-                    height="13"
-                    rx="3"
-                    fill="#020617"
-                    fillOpacity="0.85"
-                    stroke="#334155"
-                    strokeWidth="0.8"
-                  />
-                  <text
-                    textAnchor="middle"
-                    dy="3"
-                    fill="#e2e8f0"
-                    fontSize="8"
-                    fontWeight="bold"
-                    fontFamily="monospace"
-                  >
-                    {token.teamNumber && token.teamNumber > 0 ? token.teamNumber : '--'}
-                  </text>
-                </g>
-              </g>
-            );
-          })}
-        </RebuiltFieldSvg>
-      </div>
+      {renderFieldMap('max-w-sm mx-auto w-full')}
 
       {/* Quick Notes */}
       <input

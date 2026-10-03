@@ -34,6 +34,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
   const [matches, setMatches] = useState<MatchScoutingRecord[]>([]);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'pit' | 'auto' | 'matches' | 'photos'>('overview');
+  const [activeAutoRoutineIdx, setActiveAutoRoutineIdx] = useState<number>(0);
 
   useEffect(() => {
     loadTeamData();
@@ -67,11 +68,9 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
 
   // Calculate Match Scouting Averages
   const matchCount = matches.length;
-  const avgAutoHigh = matchCount ? (matches.reduce((acc, m) => acc + m.autoHighScored, 0) / matchCount).toFixed(1) : '0';
-  const avgTeleopHigh = matchCount ? (matches.reduce((acc, m) => acc + m.teleopHighScored, 0) / matchCount).toFixed(1) : '0';
-  const climbSuccesses = matches.filter((m) => m.hangStatus === 'Level Climb' || m.hangStatus === 'Tilted Climb').length;
-  const climbPercentage = matchCount ? Math.round((climbSuccesses / matchCount) * 100) : 0;
-  const avgRating = matchCount ? (matches.reduce((acc, m) => acc + m.overallRating, 0) / matchCount).toFixed(1) : 'N/A';
+  const avgAutoFuel = matchCount ? (matches.reduce((acc, m) => acc + (m.autoFuelScored ?? m.autoHighScored ?? 0), 0) / matchCount).toFixed(1) : '0';
+  const avgTeleopFuel = matchCount ? (matches.reduce((acc, m) => acc + (m.teleopFuelScored ?? m.teleopHighScored ?? 0), 0) / matchCount).toFixed(1) : '0';
+  const defenseMatchesCount = matches.filter((m) => m.playedDefense).length;
 
   const pit = team.pit;
 
@@ -124,21 +123,19 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
           </div>
         </div>
 
-        {/* Quick Quick Cards */}
+        {/* Quick Summary Cards */}
         <div className="grid grid-cols-3 gap-2 text-center text-xs">
           <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
             <div className="text-slate-400 font-mono text-[10px] uppercase">Matches</div>
             <div className="text-xl font-mono font-bold text-slate-200 mt-0.5">{matchCount}</div>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-            <div className="text-slate-400 font-mono text-[10px] uppercase">Avg High</div>
-            <div className="text-xl font-mono font-bold text-slate-200 mt-0.5">
-              {(parseFloat(avgAutoHigh) + parseFloat(avgTeleopHigh)).toFixed(1)}
-            </div>
+            <div className="text-slate-400 font-mono text-[10px] uppercase">Avg Auto Fuel</div>
+            <div className="text-xl font-mono font-bold text-blue-400 mt-0.5">{avgAutoFuel}</div>
           </div>
           <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
-            <div className="text-slate-400 font-mono text-[10px] uppercase">Climb %</div>
-            <div className="text-xl font-mono font-black text-amber-400 mt-0.5">{climbPercentage}%</div>
+            <div className="text-slate-400 font-mono text-[10px] uppercase">Avg Teleop Fuel</div>
+            <div className="text-xl font-mono font-bold text-emerald-400 mt-0.5">{avgTeleopFuel}</div>
           </div>
         </div>
       </div>
@@ -289,27 +286,75 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-1.5">
               <Layers className="w-4 h-4 text-emerald-400" />
-              <span>Autonomous Routine</span>
+              <span>Autonomous Routines</span>
             </h3>
             <span className="text-xs text-emerald-400 font-mono">
-              {pit?.autoDrawings?.[0]?.name || 'Drawing'}
+              {pit?.autoDrawings?.length || 0} Routine{(pit?.autoDrawings?.length || 0) === 1 ? '' : 's'}
             </span>
           </div>
 
           {pit?.autoDrawings && pit.autoDrawings.length > 0 ? (
-            <div className="space-y-2">
-              <AutonomousDrawer
-                drawing={pit.autoDrawings[0]}
-                readOnly={true}
-              />
-              {pit.autoDrawings[0].notes && (
-                <div className="p-2.5 rounded-lg bg-slate-950 text-slate-300 text-xs border border-slate-800">
-                  <span className="font-bold text-slate-400 text-[10px] uppercase font-mono block">
-                    Routine Notes:
-                  </span>
-                  {pit.autoDrawings[0].notes}
+            <div className="space-y-3">
+              {/* Routine Tab selector if multiple routines */}
+              {pit.autoDrawings.length > 1 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {pit.autoDrawings.map((routine, idx) => {
+                    const isSelected = activeAutoRoutineIdx === idx;
+                    return (
+                      <button
+                        key={routine.id || idx}
+                        type="button"
+                        onClick={() => setActiveAutoRoutineIdx(idx)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-emerald-950/80 text-emerald-200 border border-emerald-700/80'
+                            : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-900 hover:text-slate-300'
+                        }`}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        <span>{routine.name || `Routine ${idx + 1}`}</span>
+                        {routine.paths && routine.paths.length > 0 && (
+                          <span className="text-[10px] px-1 rounded bg-slate-900 text-slate-400 font-mono">
+                            {routine.paths.length}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
+
+              {/* Active Routine Canvas & Details */}
+              {(() => {
+                const currentDrawing = pit.autoDrawings[activeAutoRoutineIdx] || pit.autoDrawings[0];
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs px-1">
+                      <span className="font-bold text-white font-mono">
+                        {currentDrawing.name || `Routine ${activeAutoRoutineIdx + 1}`}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        {currentDrawing.paths?.length || 0} path segments
+                      </span>
+                    </div>
+
+                    <AutonomousDrawer
+                      key={currentDrawing.id || activeAutoRoutineIdx}
+                      drawing={currentDrawing}
+                      readOnly={true}
+                    />
+
+                    {currentDrawing.notes && (
+                      <div className="p-2.5 rounded-lg bg-slate-950 text-slate-300 text-xs border border-slate-800">
+                        <span className="font-bold text-slate-400 text-[10px] uppercase font-mono block">
+                          Routine Notes:
+                        </span>
+                        {currentDrawing.notes}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <div className="p-8 text-center text-slate-500 text-xs bg-slate-950 rounded-xl border border-slate-800/60">
@@ -371,60 +416,51 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
             {matches.map((m) => (
               <div
                 key={m.id}
-                className="p-4 rounded-xl bg-slate-950 border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                className="p-4 rounded-xl bg-slate-950 border border-slate-800/90 flex flex-col gap-2.5 text-xs"
               >
-                <div className="space-y-1">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-bold text-sm text-white">
-                      Match {m.matchNumber} ({m.matchType.slice(0, 4)})
+                      Match {m.matchNumber}
                     </span>
-                    <span
-                      className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] ${
-                        m.alliance === 'BLUE'
-                          ? 'bg-blue-950 text-blue-300 border border-blue-800'
-                          : 'bg-rose-950 text-rose-300 border border-rose-800'
-                      }`}
-                    >
-                      {m.alliance}
+                    <span className={`px-2 py-0.5 rounded font-mono font-bold text-[10px] ${
+                      m.autoWorked !== false ? 'bg-blue-950 text-blue-300 border border-blue-800' : 'bg-rose-950 text-rose-300 border border-rose-800'
+                    }`}>
+                      {m.autoWorked !== false ? 'Auto Worked' : 'Auto Failed'}
                     </span>
-                    <span className="text-slate-400">Scout: {m.scoutName}</span>
                   </div>
-
-                  <div className="flex flex-wrap gap-2 text-slate-300 pt-1">
-                    <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
-                      Auto High: <strong className="text-blue-400">{m.autoHighScored}</strong>
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
-                      Teleop High: <strong className="text-emerald-400">{m.teleopHighScored}</strong>
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
-                      Climb: <strong className="text-amber-400">{m.hangStatus}</strong>
-                    </span>
-                    {m.usedTrench && (
-                      <span className="px-2 py-0.5 rounded bg-blue-950 text-blue-300">
-                        Trench Traversed
-                      </span>
-                    )}
-                    {m.robotBroke && (
-                      <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 font-bold">
-                        Broke: {m.breakDetails || 'Yes'}
-                      </span>
-                    )}
-                  </div>
-
-                  {m.notes && <p className="text-slate-400 italic pt-1">"{m.notes}"</p>}
+                  <span className="text-slate-500 text-[11px] font-mono">
+                    {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </div>
 
-                <div className="flex items-center gap-1 sm:self-center">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Star
-                      key={s}
-                      className={`w-3.5 h-3.5 ${
-                        s <= m.overallRating ? 'text-amber-400 fill-amber-400' : 'text-slate-800'
-                      }`}
-                    />
-                  ))}
+                <div className="flex flex-wrap gap-2 text-slate-300 pt-0.5">
+                  <span className="px-2 py-1 rounded bg-slate-900 border border-slate-800 font-mono">
+                    Auto Fuel: <strong className="text-blue-400">{m.autoFuelScored ?? m.autoHighScored ?? 0}</strong>
+                  </span>
+                  <span className="px-2 py-1 rounded bg-slate-900 border border-slate-800 font-mono">
+                    Teleop Fuel: <strong className="text-emerald-400">{m.teleopFuelScored ?? m.teleopHighScored ?? 0}</strong>
+                  </span>
+                  {m.fieldRoute && (
+                    <span className="px-2 py-1 rounded bg-slate-900 border border-slate-800 font-mono">
+                      Route: <strong className="text-purple-300">{m.fieldRoute}</strong>
+                    </span>
+                  )}
+                  {m.playedDefense && (
+                    <span className="px-2 py-1 rounded bg-amber-950 text-amber-300 border border-amber-800 font-mono">
+                      Defense: {m.defenseEffectiveness || 'YES'}
+                    </span>
+                  )}
+                  {m.robotIssues && m.robotIssues !== 'NONE' && (
+                    <span className="px-2 py-1 rounded bg-rose-950 text-rose-300 border border-rose-800 font-bold font-mono">
+                      Issue: {m.robotIssues} {m.whatHappenedNote && `(${m.whatHappenedNote})`}
+                    </span>
+                  )}
                 </div>
+
+                {(m.quickNote || m.notes) && (
+                  <p className="text-slate-400 italic pt-0.5">"{m.quickNote || m.notes}"</p>
+                )}
               </div>
             ))}
           </div>

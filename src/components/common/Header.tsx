@@ -3,6 +3,7 @@ import { PWAInstallButton } from './PWAInstallButton';
 import { DistributeModal } from './DistributeModal';
 import { TeamRoomSyncModal } from '../sync/TeamRoomSyncModal';
 import { cloudSync, SyncStatus } from '../../db/cloudSync';
+import { PantherLogo } from './PantherLogo';
 import { 
   Menu, 
   X, 
@@ -60,21 +61,24 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <>
       <header className="sticky top-0 z-40 bg-slate-950/95 border-b border-slate-800/80 backdrop-blur-md">
-        <div className="max-w-4xl mx-auto px-3 sm:px-4 h-13 flex items-center justify-between gap-3">
+        <div className="max-w-4xl mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-3">
           {/* Brand */}
           <div 
             onClick={() => {
               onNavigate('home');
               setMenuOpen(false);
             }}
-            className="flex items-center gap-2 cursor-pointer select-none"
+            className="flex items-center gap-2.5 cursor-pointer select-none group"
           >
-            <div className="w-7 h-7 rounded-lg bg-slate-850 border border-slate-700/80 flex items-center justify-center text-slate-300 font-bold text-xs font-mono">
-              9751
+            <PantherLogo size="sm" className="group-hover:scale-105 transition-transform" />
+            <div className="flex flex-col">
+              <span className="font-black text-sm sm:text-base tracking-tight text-white font-mono uppercase leading-tight">
+                PANTHER SCOUTS
+              </span>
+              <span className="text-[10px] text-amber-400 font-mono tracking-wider font-semibold">
+                TEAM 9751
+              </span>
             </div>
-            <span className="font-bold text-sm tracking-tight text-slate-300 font-mono">
-              REBUILT
-            </span>
           </div>
 
           {/* Center Quick Search (Tablet / Desktop) */}

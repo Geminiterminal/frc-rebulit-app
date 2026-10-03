@@ -92,8 +92,9 @@ export const AutonomousDrawer: React.FC<AutonomousDrawerProps> = ({
       if (onSave) {
         onSave({
           id: drawing?.id || `auto-${Date.now()}`,
-          name: 'Autonomous Routine',
-          createdAt: Date.now(),
+          name: drawing?.name || 'Autonomous Routine',
+          notes: drawing?.notes,
+          createdAt: drawing?.createdAt || Date.now(),
           startPosition: updatedPos,
           paths,
         });
@@ -151,8 +152,9 @@ export const AutonomousDrawer: React.FC<AutonomousDrawerProps> = ({
       if (onSave) {
         onSave({
           id: drawing?.id || `auto-${Date.now()}`,
-          name: 'Autonomous Routine',
-          createdAt: Date.now(),
+          name: drawing?.name || 'Autonomous Routine',
+          notes: drawing?.notes,
+          createdAt: drawing?.createdAt || Date.now(),
           startPosition: startPos,
           paths: updated,
         });
@@ -171,8 +173,9 @@ export const AutonomousDrawer: React.FC<AutonomousDrawerProps> = ({
       if (onSave) {
         onSave({
           id: drawing?.id || `auto-${Date.now()}`,
-          name: 'Autonomous Routine',
-          createdAt: Date.now(),
+          name: drawing?.name || 'Autonomous Routine',
+          notes: drawing?.notes,
+          createdAt: drawing?.createdAt || Date.now(),
           startPosition: startPos,
           paths: history[prevStep],
         });
@@ -190,8 +193,9 @@ export const AutonomousDrawer: React.FC<AutonomousDrawerProps> = ({
     if (onSave) {
       onSave({
         id: drawing?.id || `auto-${Date.now()}`,
-        name: 'Autonomous Routine',
-        createdAt: Date.now(),
+        name: drawing?.name || 'Autonomous Routine',
+        notes: drawing?.notes,
+        createdAt: drawing?.createdAt || Date.now(),
         startPosition: startPos,
         paths: [],
       });
@@ -208,8 +212,9 @@ export const AutonomousDrawer: React.FC<AutonomousDrawerProps> = ({
     if (onSave) {
       onSave({
         id: drawing?.id || `auto-${Date.now()}`,
-        name: 'Autonomous Routine',
-        createdAt: Date.now(),
+        name: drawing?.name || 'Autonomous Routine',
+        notes: drawing?.notes,
+        createdAt: drawing?.createdAt || Date.now(),
         startPosition: updated,
         paths,
       });

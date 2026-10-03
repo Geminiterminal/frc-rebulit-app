@@ -135,32 +135,46 @@ class ScoutingDB {
     onSaveHook?.('team', team);
 
     if (!this.db) {
-      localStorage.setItem(`team_${team.teamNumber}`, JSON.stringify(team));
+      try {
+        localStorage.setItem(`team_${team.teamNumber}`, JSON.stringify(team));
+      } catch {
+        // Safe quota catch
+      }
       return;
     }
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db!.transaction('teams', 'readwrite');
-      const store = tx.objectStore('teams');
-      const req = store.put(team);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db!.transaction('teams', 'readwrite');
+        const store = tx.objectStore('teams');
+        const req = store.put(team);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
     });
   }
 
   async deleteTeam(teamNumber: number): Promise<void> {
     await this.init();
     if (!this.db) {
-      localStorage.removeItem(`team_${teamNumber}`);
+      try {
+        localStorage.removeItem(`team_${teamNumber}`);
+      } catch {}
       return;
     }
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db!.transaction('teams', 'readwrite');
-      const store = tx.objectStore('teams');
-      const req = store.delete(teamNumber);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db!.transaction('teams', 'readwrite');
+        const store = tx.objectStore('teams');
+        const req = store.delete(teamNumber);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
     });
   }
 
@@ -170,16 +184,22 @@ class ScoutingDB {
     onSaveHook?.('match', record);
 
     if (!this.db) {
-      localStorage.setItem(`match_${record.id}`, JSON.stringify(record));
+      try {
+        localStorage.setItem(`match_${record.id}`, JSON.stringify(record));
+      } catch {}
       return;
     }
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db!.transaction('matches', 'readwrite');
-      const store = tx.objectStore('matches');
-      const req = store.put(record);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db!.transaction('matches', 'readwrite');
+        const store = tx.objectStore('matches');
+        const req = store.put(record);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
     });
   }
 
@@ -232,16 +252,22 @@ class ScoutingDB {
   async deleteMatch(id: string): Promise<void> {
     await this.init();
     if (!this.db) {
-      localStorage.removeItem(`match_${id}`);
+      try {
+        localStorage.removeItem(`match_${id}`);
+      } catch {}
       return;
     }
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db!.transaction('matches', 'readwrite');
-      const store = tx.objectStore('matches');
-      const req = store.delete(id);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db!.transaction('matches', 'readwrite');
+        const store = tx.objectStore('matches');
+        const req = store.delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
     });
   }
 
@@ -251,16 +277,22 @@ class ScoutingDB {
     onSaveHook?.('strategy', plan);
 
     if (!this.db) {
-      localStorage.setItem(`strat_${plan.id}`, JSON.stringify(plan));
+      try {
+        localStorage.setItem(`strat_${plan.id}`, JSON.stringify(plan));
+      } catch {}
       return;
     }
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db!.transaction('strategies', 'readwrite');
-      const store = tx.objectStore('strategies');
-      const req = store.put(plan);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db!.transaction('strategies', 'readwrite');
+        const store = tx.objectStore('strategies');
+        const req = store.put(plan);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
     });
   }
 
@@ -271,34 +303,46 @@ class ScoutingDB {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key?.startsWith('strat_')) {
-          plans.push(JSON.parse(localStorage.getItem(key)!));
+          try {
+            plans.push(JSON.parse(localStorage.getItem(key)!));
+          } catch {}
         }
       }
       return plans;
     }
 
     return new Promise((resolve) => {
-      const tx = this.db!.transaction('strategies', 'readonly');
-      const store = tx.objectStore('strategies');
-      const req = store.getAll();
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => resolve([]);
+      try {
+        const tx = this.db!.transaction('strategies', 'readonly');
+        const store = tx.objectStore('strategies');
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      } catch {
+        resolve([]);
+      }
     });
   }
 
   async deleteStrategy(id: string): Promise<void> {
     await this.init();
     if (!this.db) {
-      localStorage.removeItem(`strat_${id}`);
+      try {
+        localStorage.removeItem(`strat_${id}`);
+      } catch {}
       return;
     }
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db!.transaction('strategies', 'readwrite');
-      const store = tx.objectStore('strategies');
-      const req = store.delete(id);
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db!.transaction('strategies', 'readwrite');
+        const store = tx.objectStore('strategies');
+        const req = store.delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
     });
   }
 
@@ -306,32 +350,46 @@ class ScoutingDB {
   async getSetting<T>(key: string, defaultValue: T): Promise<T> {
     await this.init();
     if (!this.db) {
-      const val = localStorage.getItem(`setting_${key}`);
-      return val ? JSON.parse(val) : defaultValue;
+      try {
+        const val = localStorage.getItem(`setting_${key}`);
+        return val ? JSON.parse(val) : defaultValue;
+      } catch {
+        return defaultValue;
+      }
     }
 
     return new Promise((resolve) => {
-      const tx = this.db!.transaction('settings', 'readonly');
-      const store = tx.objectStore('settings');
-      const req = store.get(key);
-      req.onsuccess = () => resolve(req.result ? req.result.value : defaultValue);
-      req.onerror = () => resolve(defaultValue);
+      try {
+        const tx = this.db!.transaction('settings', 'readonly');
+        const store = tx.objectStore('settings');
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result ? req.result.value : defaultValue);
+        req.onerror = () => resolve(defaultValue);
+      } catch {
+        resolve(defaultValue);
+      }
     });
   }
 
   async setSetting<T>(key: string, value: T): Promise<void> {
     await this.init();
     if (!this.db) {
-      localStorage.setItem(`setting_${key}`, JSON.stringify(value));
+      try {
+        localStorage.setItem(`setting_${key}`, JSON.stringify(value));
+      } catch {}
       return;
     }
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db!.transaction('settings', 'readwrite');
-      const store = tx.objectStore('settings');
-      const req = store.put({ key, value });
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db!.transaction('settings', 'readwrite');
+        const store = tx.objectStore('settings');
+        const req = store.put({ key, value });
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
     });
   }
 
@@ -572,28 +630,17 @@ class ScoutingDB {
       id: 'match-q1-9751',
       teamNumber: 9751,
       matchNumber: 1,
-      matchType: 'Qualification',
-      alliance: 'BLUE',
-      scoutName: 'Lead Scout',
       timestamp: Date.now() - 3600000 * 4,
-      preloadBalls: 3,
-      startPosition: 'Right',
-      autoMobility: true,
+      autoWorked: true,
+      autoFuelScored: 4,
+      teleopFuelScored: 20,
+      fieldRoute: 'TRENCH',
+      playedDefense: false,
+      robotIssues: 'NONE',
+      quickNote: 'Awesome trench running speed. Fast cycles.',
       autoHighScored: 4,
-      autoLowScored: 0,
-      autoMissed: 1,
-      teleopHighScored: 18,
-      teleopLowScored: 2,
-      teleopMissed: 3,
-      usedTrench: true,
-      usedBump: false,
-      defensePlayed: 'None',
-      hangStatus: 'Level Climb',
-      climbSpeed: 'Fast (<5s)',
-      robotBroke: false,
-      cards: 'None',
-      overallRating: 5,
-      notes: 'Awesome trench running speed. Fast cycles and reliable climb at the buzzer.',
+      teleopHighScored: 20,
+      notes: 'Awesome trench running speed. Fast cycles.',
     };
 
     await this.saveMatch(match1);
