@@ -73,25 +73,25 @@ export interface TeamPhoto {
 }
 
 export interface PitData {
-  drivetrain: DrivetrainType;
+  drivetrain?: DrivetrainType;
   drivetrainOther?: string;
-  shooter: ShooterType[];
+  shooter?: ShooterType[];
   shooterOther?: string;
-  hopperCapacity: number;
-  shootingAccuracy: ShootingAccuracy;
-  shootingAreas: ShootingZonePoint[];
-  bumpTrench: BumpTrenchCapability;
-  hasAutonomous: 'YES' | 'NO' | 'STILL DEVELOPING';
+  hopperCapacity?: number;
+  shootingAccuracy?: ShootingAccuracy;
+  shootingAreas?: ShootingZonePoint[];
+  bumpTrench?: BumpTrenchCapability;
+  hasAutonomous?: 'YES' | 'NO' | 'STILL DEVELOPING';
   autoRoutinesCount?: '1' | '2' | '3' | '4+';
-  autoDrawings: AutonomousDrawing[];
-  autoConsistency: AutoConsistency;
-  biggestIssues: BiggestIssue[];
+  autoDrawings?: AutonomousDrawing[];
+  autoConsistency?: AutoConsistency;
+  biggestIssues?: BiggestIssue[];
   biggestIssueOther?: string;
-  reliability: ReliabilityRating;
-  photos: TeamPhoto[];
-  notes: string;
+  reliability?: ReliabilityRating;
+  photos?: TeamPhoto[];
+  notes?: string;
   scoutName?: string;
-  lastUpdated: number;
+  lastUpdated?: number;
 }
 
 export interface MatchScoutingRecord {

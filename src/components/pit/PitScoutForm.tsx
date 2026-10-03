@@ -103,28 +103,28 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
   const [teamExistsMessage, setTeamExistsMessage] = useState<string | null>(null);
 
   const [teamName, setTeamName] = useState<string>('');
-  const [drivetrain, setDrivetrain] = useState<DrivetrainType>('SWERVE');
+  const [drivetrain, setDrivetrain] = useState<DrivetrainType | null>(null);
   const [drivetrainOther, setDrivetrainOther] = useState<string>('');
 
-  const [shooter, setShooter] = useState<ShooterType[]>(['TURRET']);
+  const [shooter, setShooter] = useState<ShooterType[]>([]);
   const [shooterOther, setShooterOther] = useState<string>('');
 
-  const [hopperCapacity, setHopperCapacity] = useState<number>(20);
-  const [shootingAccuracy, setShootingAccuracy] = useState<ShootingAccuracy>('85–94%');
+  const [hopperCapacity, setHopperCapacity] = useState<number | ''>('');
+  const [shootingAccuracy, setShootingAccuracy] = useState<ShootingAccuracy | null>(null);
   const [shootingAreas, setShootingAreas] = useState<ShootingZonePoint[]>([]);
 
-  const [bumpTrench, setBumpTrench] = useState<BumpTrenchCapability>('BOTH');
+  const [bumpTrench, setBumpTrench] = useState<BumpTrenchCapability | null>(null);
 
-  const [hasAutonomous, setHasAutonomous] = useState<'YES' | 'NO' | 'STILL DEVELOPING'>('YES');
-  const [autoRoutinesCount, setAutoRoutinesCount] = useState<'1' | '2' | '3' | '4+'>('2');
+  const [hasAutonomous, setHasAutonomous] = useState<'YES' | 'NO' | 'STILL DEVELOPING' | null>(null);
+  const [autoRoutinesCount, setAutoRoutinesCount] = useState<'1' | '2' | '3' | '4+' | null>(null);
   const [autoDrawings, setAutoDrawings] = useState<AutonomousDrawing[]>([]);
 
-  const [autoConsistency, setAutoConsistency] = useState<AutoConsistency>('VERY CONSISTENT');
+  const [autoConsistency, setAutoConsistency] = useState<AutoConsistency | null>(null);
 
-  const [biggestIssues, setBiggestIssues] = useState<BiggestIssue[]>(['NONE']);
+  const [biggestIssues, setBiggestIssues] = useState<BiggestIssue[]>([]);
   const [biggestIssueOther, setBiggestIssueOther] = useState<string>('');
 
-  const [reliability, setReliability] = useState<ReliabilityRating>('VERY RELIABLE');
+  const [reliability, setReliability] = useState<ReliabilityRating | null>(null);
 
   const [photos, setPhotos] = useState<TeamPhoto[]>([]);
   const [notes, setNotes] = useState<string>('');
@@ -135,44 +135,74 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  const resetToBlankState = () => {
+    setTeamName('');
+    setDrivetrain(null);
+    setDrivetrainOther('');
+    setShooter([]);
+    setShooterOther('');
+    setHopperCapacity('');
+    setShootingAccuracy(null);
+    setShootingAreas([]);
+    setBumpTrench(null);
+    setHasAutonomous(null);
+    setAutoRoutinesCount(null);
+    setAutoDrawings([]);
+    setAutoConsistency(null);
+    setBiggestIssues([]);
+    setBiggestIssueOther('');
+    setReliability(null);
+    setPhotos([]);
+    setNotes('');
+  };
+
   useEffect(() => {
     const num = parseInt(teamNumberInput, 10);
     if (!isNaN(num) && num > 0) {
       scoutingDB.getTeam(num).then((existing) => {
         if (existing) {
-          setTeamExistsMessage(`Team ${num} already exists.`);
+          setTeamExistsMessage(`Team ${num} (${existing.teamName || 'Existing Profile'})`);
           if (teamConfirmed) {
             loadExistingTeam(existing);
           }
         } else {
           setTeamExistsMessage(null);
+          if (teamConfirmed) {
+            resetToBlankState();
+          }
         }
       });
     } else {
       setTeamExistsMessage(null);
+      if (teamConfirmed) {
+        resetToBlankState();
+      }
     }
   }, [teamNumberInput, teamConfirmed]);
 
   const loadExistingTeam = (t: TeamProfile) => {
     setTeamName(t.teamName || '');
     if (t.pit) {
-      setDrivetrain(t.pit.drivetrain || 'SWERVE');
+      setDrivetrain(t.pit.drivetrain || null);
       setDrivetrainOther(t.pit.drivetrainOther || '');
-      setShooter(t.pit.shooter || ['TURRET']);
+      setShooter(t.pit.shooter || []);
       setShooterOther(t.pit.shooterOther || '');
-      setHopperCapacity(t.pit.hopperCapacity ?? 20);
-      setShootingAccuracy(t.pit.shootingAccuracy || '85–94%');
+      setHopperCapacity(t.pit.hopperCapacity !== undefined ? t.pit.hopperCapacity : '');
+      setShootingAccuracy(t.pit.shootingAccuracy || null);
       setShootingAreas(t.pit.shootingAreas || []);
-      setBumpTrench(t.pit.bumpTrench || 'BOTH');
-      setHasAutonomous(t.pit.hasAutonomous || 'YES');
-      setAutoRoutinesCount(t.pit.autoRoutinesCount || '2');
+      setBumpTrench(t.pit.bumpTrench || null);
+      setHasAutonomous(t.pit.hasAutonomous || null);
+      setAutoRoutinesCount(t.pit.autoRoutinesCount || null);
       setAutoDrawings(t.pit.autoDrawings || []);
-      setAutoConsistency(t.pit.autoConsistency || 'VERY CONSISTENT');
-      setBiggestIssues(t.pit.biggestIssues || ['NONE']);
+      setAutoConsistency(t.pit.autoConsistency || null);
+      setBiggestIssues(t.pit.biggestIssues || []);
       setBiggestIssueOther(t.pit.biggestIssueOther || '');
-      setReliability(t.pit.reliability || 'VERY RELIABLE');
+      setReliability(t.pit.reliability || null);
       setPhotos(t.pit.photos || []);
       setNotes(t.pit.notes || '');
+    } else {
+      resetToBlankState();
+      setTeamName(t.teamName || '');
     }
   };
 
@@ -185,9 +215,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
   const toggleMultiSelect = <T extends string>(list: T[], item: T, setList: (vals: T[]) => void) => {
     if (list.includes(item)) {
-      if (list.length > 1) {
-        setList(list.filter((x) => x !== item));
-      }
+      setList(list.filter((x) => x !== item));
     } else {
       setList([...list, item]);
     }
@@ -195,13 +223,12 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
   const toggleIssue = (issue: BiggestIssue) => {
     if (issue === 'NONE') {
-      setBiggestIssues(['NONE']);
+      setBiggestIssues(biggestIssues.includes('NONE') ? [] : ['NONE']);
       return;
     }
     const filtered = biggestIssues.filter((i) => i !== 'NONE');
     if (filtered.includes(issue)) {
-      const next = filtered.filter((i) => i !== issue);
-      setBiggestIssues(next.length === 0 ? ['NONE'] : next);
+      setBiggestIssues(filtered.filter((i) => i !== issue));
     } else {
       setBiggestIssues([...filtered, issue]);
     }
@@ -231,21 +258,21 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
     if (isNaN(num) || num <= 0) return;
 
     const pitData: PitData = {
-      drivetrain,
+      drivetrain: drivetrain || undefined,
       drivetrainOther: drivetrain === 'OTHER' ? drivetrainOther : undefined,
-      shooter,
+      shooter: shooter.length > 0 ? shooter : undefined,
       shooterOther: shooter.includes('OTHER') ? shooterOther : undefined,
-      hopperCapacity,
-      shootingAccuracy,
+      hopperCapacity: typeof hopperCapacity === 'number' ? hopperCapacity : undefined,
+      shootingAccuracy: shootingAccuracy || undefined,
       shootingAreas,
-      bumpTrench,
-      hasAutonomous,
-      autoRoutinesCount: hasAutonomous === 'YES' ? autoRoutinesCount : undefined,
+      bumpTrench: bumpTrench || undefined,
+      hasAutonomous: hasAutonomous || undefined,
+      autoRoutinesCount: hasAutonomous === 'YES' ? (autoRoutinesCount || undefined) : undefined,
       autoDrawings,
-      autoConsistency,
-      biggestIssues,
+      autoConsistency: autoConsistency || undefined,
+      biggestIssues: biggestIssues.length > 0 ? biggestIssues : undefined,
       biggestIssueOther: biggestIssues.includes('OTHER') ? biggestIssueOther : undefined,
-      reliability,
+      reliability: reliability || undefined,
       photos,
       notes,
       lastUpdated: Date.now(),
@@ -360,18 +387,18 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
           {DRIVETRAIN_OPTIONS.map((opt) => {
             const isSelected = drivetrain === opt;
             return (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => setDrivetrain(opt)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
-                  isSelected
-                    ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
-                    : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900 hover:text-slate-300'
-                }`}
-              >
-                {opt}
-              </button>
+               <button
+                 key={opt}
+                 type="button"
+                 onClick={() => setDrivetrain(drivetrain === opt ? null : opt)}
+                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
+                   isSelected
+                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
+                     : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900 hover:text-slate-300'
+                 }`}
+               >
+                 {opt}
+               </button>
             );
           })}
         </div>
@@ -432,14 +459,14 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setHopperCapacity(Math.max(0, hopperCapacity - 5))}
+            onClick={() => setHopperCapacity(Math.max(0, (typeof hopperCapacity === 'number' ? hopperCapacity : 0) - 5))}
             className="px-2 py-1 rounded-md bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-mono font-semibold"
           >
             -5
           </button>
           <button
             type="button"
-            onClick={() => setHopperCapacity(Math.max(0, hopperCapacity - 1))}
+            onClick={() => setHopperCapacity(Math.max(0, (typeof hopperCapacity === 'number' ? hopperCapacity : 0) - 1))}
             className="p-1 rounded-md bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200"
           >
             <Minus className="w-3.5 h-3.5" />
@@ -449,21 +476,25 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
             type="number"
             min="0"
             max="100"
+            placeholder="0"
             value={hopperCapacity}
-            onChange={(e) => setHopperCapacity(Math.max(0, parseInt(e.target.value, 10) || 0))}
-            className="w-16 text-center text-base font-mono font-bold bg-slate-950 border border-slate-750 rounded-lg py-0.5 px-1 text-slate-100 focus:outline-none"
+            onChange={(e) => {
+              const val = e.target.value;
+              setHopperCapacity(val === '' ? '' : Math.max(0, parseInt(val, 10) || 0));
+            }}
+            className="w-16 text-center text-base font-mono font-bold bg-slate-950 border border-slate-750 rounded-lg py-0.5 px-1 text-slate-100 focus:outline-none placeholder-slate-600"
           />
 
           <button
             type="button"
-            onClick={() => setHopperCapacity(hopperCapacity + 1)}
+            onClick={() => setHopperCapacity((typeof hopperCapacity === 'number' ? hopperCapacity : 0) + 1)}
             className="p-1 rounded-md bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
-            onClick={() => setHopperCapacity(hopperCapacity + 5)}
+            onClick={() => setHopperCapacity((typeof hopperCapacity === 'number' ? hopperCapacity : 0) + 5)}
             className="px-2 py-1 rounded-md bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 text-xs font-mono font-semibold"
           >
             +5
@@ -483,7 +514,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
               <button
                 key={opt}
                 type="button"
-                onClick={() => setShootingAccuracy(opt)}
+                onClick={() => setShootingAccuracy(shootingAccuracy === opt ? null : opt)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
                   isSelected
                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
@@ -520,7 +551,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
               <button
                 key={opt}
                 type="button"
-                onClick={() => setBumpTrench(opt)}
+                onClick={() => setBumpTrench(bumpTrench === opt ? null : opt)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
                   isSelected
                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
@@ -546,7 +577,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
               <button
                 key={opt}
                 type="button"
-                onClick={() => setHasAutonomous(opt)}
+                onClick={() => setHasAutonomous(hasAutonomous === opt ? null : opt)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
                   isSelected
                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
@@ -569,11 +600,11 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
                 <button
                   key={opt}
                   type="button"
-                  onClick={() => setAutoRoutinesCount(opt)}
+                  onClick={() => setAutoRoutinesCount(autoRoutinesCount === opt ? null : opt)}
                   className={`px-3 py-1 rounded-md font-semibold text-xs transition-colors ${
                     autoRoutinesCount === opt
                       ? 'bg-slate-800 text-slate-100 border border-slate-600'
-                      : 'bg-slate-950 text-slate-400 border border-slate-800'
+                      : 'bg-slate-950 text-slate-400 border border-slate-850'
                   }`}
                 >
                   {opt}
@@ -611,7 +642,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
               <button
                 key={opt}
                 type="button"
-                onClick={() => setAutoConsistency(opt)}
+                onClick={() => setAutoConsistency(autoConsistency === opt ? null : opt)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
                   isSelected
                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
@@ -674,7 +705,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
               <button
                 key={opt}
                 type="button"
-                onClick={() => setReliability(opt)}
+                onClick={() => setReliability(reliability === opt ? null : opt)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
                   isSelected
                     ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'

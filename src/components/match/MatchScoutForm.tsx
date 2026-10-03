@@ -31,10 +31,10 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
   const [alliance, setAlliance] = useState<'RED' | 'BLUE'>('BLUE');
   const [scoutName, setScoutName] = useState<string>('');
 
-  const [preloadBalls, setPreloadBalls] = useState<number>(3);
+  const [preloadBalls, setPreloadBalls] = useState<number>(0);
   const [startPosition, setStartPosition] = useState<'Left' | 'Center' | 'Right'>('Center');
 
-  const [autoMobility, setAutoMobility] = useState<boolean>(true);
+  const [autoMobility, setAutoMobility] = useState<boolean>(false);
   const [autoHighScored, setAutoHighScored] = useState<number>(0);
   const [autoLowScored, setAutoLowScored] = useState<number>(0);
   const [autoMissed, setAutoMissed] = useState<number>(0);
@@ -52,7 +52,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
   const [robotBroke, setRobotBroke] = useState<boolean>(false);
   const [breakDetails, setBreakDetails] = useState<string>('');
   const [cards, setCards] = useState<'None' | 'Yellow' | 'Red'>('None');
-  const [overallRating, setOverallRating] = useState<number>(4);
+  const [overallRating, setOverallRating] = useState<number>(0);
   const [notes, setNotes] = useState<string>('');
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);

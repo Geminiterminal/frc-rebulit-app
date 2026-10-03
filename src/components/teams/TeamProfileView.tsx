@@ -162,7 +162,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
           </h2>
           {pit ? (
             <span className="text-xs text-slate-400 font-mono">
-              Updated {new Date(pit.lastUpdated).toLocaleDateString()}
+              {pit.lastUpdated ? `Updated ${new Date(pit.lastUpdated).toLocaleDateString()}` : 'Pit Scouting Recorded'}
             </span>
           ) : (
             <span className="text-xs text-rose-400 font-mono">Needs Pit Scouting</span>
@@ -174,63 +174,63 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
               <span className="text-slate-400 uppercase font-mono block text-[10px]">Drivetrain</span>
               <span className="font-bold text-sm text-white mt-0.5 block">
-                {pit.drivetrain} {pit.drivetrainOther && `(${pit.drivetrainOther})`}
+                {pit.drivetrain || '—'} {pit.drivetrainOther && `(${pit.drivetrainOther})`}
               </span>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
               <span className="text-slate-400 uppercase font-mono block text-[10px]">Shooter Type</span>
               <span className="font-bold text-sm text-blue-400 mt-0.5 block">
-                {pit.shooter.join(', ')}
+                {pit.shooter && pit.shooter.length > 0 ? pit.shooter.join(', ') : '—'}
               </span>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
               <span className="text-slate-400 uppercase font-mono block text-[10px]">Hopper Capacity</span>
               <span className="font-bold text-sm text-amber-400 mt-0.5 block">
-                {pit.hopperCapacity} balls
+                {pit.hopperCapacity !== undefined ? `${pit.hopperCapacity} balls` : '—'}
               </span>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
               <span className="text-slate-400 uppercase font-mono block text-[10px]">Shooting Accuracy</span>
               <span className="font-bold text-sm text-emerald-400 mt-0.5 block">
-                {pit.shootingAccuracy}
+                {pit.shootingAccuracy || '—'}
               </span>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
               <span className="text-slate-400 uppercase font-mono block text-[10px]">Bump / Trench</span>
               <span className="font-bold text-sm text-white mt-0.5 block">
-                {pit.bumpTrench}
+                {pit.bumpTrench || '—'}
               </span>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
               <span className="text-slate-400 uppercase font-mono block text-[10px]">Autonomous Routines</span>
               <span className="font-bold text-sm text-purple-400 mt-0.5 block">
-                {pit.hasAutonomous === 'YES' ? `${pit.autoRoutinesCount || '1'} routine(s)` : pit.hasAutonomous}
+                {pit.hasAutonomous === 'YES' ? `${pit.autoRoutinesCount || '1'} routine(s)` : (pit.hasAutonomous || '—')}
               </span>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
               <span className="text-slate-400 uppercase font-mono block text-[10px]">Auto Consistency</span>
               <span className="font-bold text-sm text-white mt-0.5 block">
-                {pit.autoConsistency}
+                {pit.autoConsistency || '—'}
               </span>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
               <span className="text-slate-400 uppercase font-mono block text-[10px]">Biggest Issues</span>
               <span className="font-bold text-sm text-amber-300 mt-0.5 block">
-                {pit.biggestIssues.join(', ')}
+                {pit.biggestIssues && pit.biggestIssues.length > 0 ? pit.biggestIssues.join(', ') : 'None'}
               </span>
             </div>
 
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
               <span className="text-slate-400 uppercase font-mono block text-[10px]">Current Reliability</span>
               <span className="font-bold text-sm text-emerald-300 mt-0.5 block">
-                {pit.reliability}
+                {pit.reliability || '—'}
               </span>
             </div>
           </div>

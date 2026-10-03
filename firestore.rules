@@ -8,10 +8,6 @@ service cloud.firestore {
     }
 
     // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
@@ -20,17 +16,12 @@ service cloud.firestore {
       return request.resource.data;
     }
 
-    function existing() {
-      return resource.data;
-    }
-
     // Validation for TeamRoom
     function isValidTeamRoom(data) {
-      return data.keys().hasAll(['roomCode', 'eventName', 'createdAt', 'createdBy']) &&
+      return data.keys().hasAll(['roomCode', 'eventName', 'createdAt']) &&
              data.roomCode is string && data.roomCode.size() > 0 && data.roomCode.size() <= 64 &&
              data.eventName is string && data.eventName.size() > 0 && data.eventName.size() <= 128 &&
-             data.createdAt is number &&
-             data.createdBy is string && data.createdBy.size() > 0 && data.createdBy.size() <= 128;
+             data.createdAt is number;
     }
 
     // Validation for TeamProfile
@@ -40,8 +31,7 @@ service cloud.firestore {
              data.updatedAt is number &&
              (!('teamName' in data) || (data.teamName is string && data.teamName.size() <= 128)) &&
              (!('organization' in data) || (data.organization is string && data.organization.size() <= 128)) &&
-             (!('location' in data) || (data.location is string && data.location.size() <= 128)) &&
-             (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 128));
+             (!('location' in data) || (data.location is string && data.location.size() <= 128));
     }
 
     // Validation for MatchRecord
@@ -52,9 +42,7 @@ service cloud.firestore {
              data.teamNumber is number && data.teamNumber > 0 && data.teamNumber < 100000 &&
              data.matchType in ['Qualification', 'Playoff', 'Practice'] &&
              data.alliance in ['RED', 'BLUE'] &&
-             data.timestamp is number &&
-             (!('scoutName' in data) || (data.scoutName is string && data.scoutName.size() <= 64)) &&
-             (!('scoutUid' in data) || (data.scoutUid is string && data.scoutUid.size() <= 128));
+             data.timestamp is number;
     }
 
     // Validation for StrategyBoard
@@ -63,36 +51,34 @@ service cloud.firestore {
              data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
              data.updatedAt is number &&
              (!('title' in data) || (data.title is string && data.title.size() <= 128)) &&
-             (!('notes' in data) || (data.notes is string && data.notes.size() <= 5000)) &&
-             (!('updatedBy' in data) || (data.updatedBy is string && data.updatedBy.size() <= 128));
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 5000));
     }
 
     // --- SCOUTING ROOMS ---
     match /rooms/{roomCode} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(roomCode) && isValidTeamRoom(incoming());
-      allow update: if isSignedIn() && isValidId(roomCode) && isValidTeamRoom(incoming());
-      allow delete: if isSignedIn() && isValidId(roomCode);
+      allow get, list: if isValidId(roomCode);
+      allow create, update: if isValidId(roomCode) && isValidTeamRoom(incoming());
+      allow delete: if isValidId(roomCode);
 
       // --- TEAMS IN ROOM ---
       match /teams/{teamNumber} {
-        allow get, list: if isSignedIn();
-        allow create, update: if isSignedIn() && isValidTeamProfile(incoming());
-        allow delete: if isSignedIn();
+        allow get, list: if isValidId(roomCode);
+        allow create, update: if isValidId(roomCode) && isValidTeamProfile(incoming());
+        allow delete: if isValidId(roomCode);
       }
 
       // --- MATCHES IN ROOM ---
       match /matches/{matchId} {
-        allow get, list: if isSignedIn();
-        allow create, update: if isSignedIn() && isValidId(matchId) && isValidMatchRecord(incoming());
-        allow delete: if isSignedIn() && isValidId(matchId);
+        allow get, list: if isValidId(roomCode);
+        allow create, update: if isValidId(roomCode) && isValidId(matchId) && isValidMatchRecord(incoming());
+        allow delete: if isValidId(roomCode) && isValidId(matchId);
       }
 
       // --- STRATEGIES IN ROOM ---
       match /strategies/{strategyId} {
-        allow get, list: if isSignedIn();
-        allow create, update: if isSignedIn() && isValidId(strategyId) && isValidStrategyBoard(incoming());
-        allow delete: if isSignedIn() && isValidId(strategyId);
+        allow get, list: if isValidId(roomCode);
+        allow create, update: if isValidId(roomCode) && isValidId(strategyId) && isValidStrategyBoard(incoming());
+        allow delete: if isValidId(roomCode) && isValidId(strategyId);
       }
     }
   }
