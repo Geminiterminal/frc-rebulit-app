@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import QRCode from 'qrcode';
 import { 
   TeamProfile, 
   PitData, 
@@ -14,6 +15,8 @@ import {
   TeamPhoto
 } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
+import { scoutingAssignments } from '../../db/scoutingAssignments';
+import { qrTransferEngine } from '../../utils/qrTransferEngine';
 import { ShootingAreaMapper } from '../common/ShootingAreaMapper';
 import { AutonomousDrawer } from '../common/AutonomousDrawer';
 import { ScoutingAssignmentsCard } from '../scouting/ScoutingAssignmentsCard';
@@ -26,7 +29,8 @@ import {
   Trash2, 
   Plus, 
   Minus, 
-  X 
+  X,
+  QrCode
 } from 'lucide-react';
 
 interface PitScoutFormProps {
@@ -133,6 +137,9 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
   const [saveToast, setSaveToast] = useState<string | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+
+  const [isSingleQrOpen, setIsSingleQrOpen] = useState<boolean>(false);
+  const [singleQrUrl, setSingleQrUrl] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -297,6 +304,45 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       setSaveToast(null);
       onNavigate('team-profile', num);
     }, 1000);
+  };
+
+  const handleGenerateSinglePitQr = async () => {
+    const num = parseInt(teamNumberInput, 10);
+    if (isNaN(num) || num <= 0) return;
+
+    const scoutProfile = scoutingAssignments.getProfile();
+    const scoutName = scoutProfile.name || 'Scout';
+
+    const pitData: PitData = {
+      drivetrain: drivetrain || undefined,
+      drivetrainOther: drivetrain === 'OTHER' ? drivetrainOther : undefined,
+      shooter: shooter.length > 0 ? shooter : undefined,
+      shooterOther: shooter.includes('OTHER') ? shooterOther : undefined,
+      hopperCapacity: typeof hopperCapacity === 'number' ? hopperCapacity : undefined,
+      shootingAccuracy: shootingAccuracy || undefined,
+      shootingAreas,
+      bumpTrench: bumpTrench || undefined,
+      hasAutonomous: hasAutonomous || undefined,
+      autoRoutinesCount: hasAutonomous === 'YES' ? (autoRoutinesCount || undefined) : undefined,
+      autoDrawings,
+      autoConsistency: autoConsistency || undefined,
+      biggestIssues: biggestIssues.length > 0 ? biggestIssues : undefined,
+      biggestIssueOther: biggestIssues.includes('OTHER') ? biggestIssueOther : undefined,
+      reliability: reliability || undefined,
+      photos,
+      notes,
+      lastUpdated: Date.now(),
+    };
+
+    const payloadStr = qrTransferEngine.generateSinglePitQr(scoutName, num, pitData);
+
+    try {
+      const url = await QRCode.toDataURL(payloadStr, { errorCorrectionLevel: 'L', margin: 1, width: 280 });
+      setSingleQrUrl(url);
+      setIsSingleQrOpen(true);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const [rosterTeams, setRosterTeams] = useState<TeamProfile[]>([]);
@@ -993,14 +1039,61 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
         />
       </div>
 
-      {/* SAVE TEAM BUTTON */}
-      <button
-        type="button"
-        onClick={handleSaveTeam}
-        className="w-full py-3.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-100 font-bold text-xs uppercase tracking-wider shadow transition-colors cursor-pointer active:scale-95"
-      >
-        Save Team {teamNumberInput}
-      </button>
+      {/* SAVE TEAM BUTTON & SINGLE QR BUTTON */}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={handleSaveTeam}
+          className="py-3.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-100 font-bold text-xs uppercase tracking-wider shadow transition-colors cursor-pointer active:scale-95"
+        >
+          Save Team {teamNumberInput}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleGenerateSinglePitQr}
+          className="py-3.5 px-4 rounded-xl bg-[#0F172A]/85 hover:bg-slate-800 border border-slate-800 text-slate-200 font-bold text-xs uppercase tracking-wider shadow transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
+        >
+          <QrCode className="w-4 h-4 text-slate-300" />
+          <span>Show QR Code</span>
+        </button>
+      </div>
+
+      {/* SINGLE QR DISPLAY MODAL */}
+      {isSingleQrOpen && singleQrUrl && (
+        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md">
+          <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="text-xs font-black text-slate-200 uppercase tracking-wider">
+                Pit Data QR: Team #{teamNumberInput}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsSingleQrOpen(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 font-mono">
+              Have <strong>Captain</strong> scan this QR code with "Scan Scout Data QR" to import:
+            </p>
+
+            <div className="p-3 bg-white rounded-2xl inline-block mx-auto shadow-lg">
+              <img src={singleQrUrl} alt="Single Pit Data QR" className="w-52 h-52 mx-auto" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsSingleQrOpen(false)}
+              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {saveToast && (

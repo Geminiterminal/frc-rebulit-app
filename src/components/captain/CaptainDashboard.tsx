@@ -136,7 +136,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
     );
 
     try {
-      const url = await QRCode.toDataURL(payloadStr, { margin: 1, width: 280 });
+      const url = await QRCode.toDataURL(payloadStr, { errorCorrectionLevel: 'L', margin: 1, width: 280 });
       setActiveAssignmentQr({ scoutName: assignment.scoutName, qrUrl: url });
     } catch {
       setActiveAssignmentQr(null);

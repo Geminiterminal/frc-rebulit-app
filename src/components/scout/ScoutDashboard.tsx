@@ -79,7 +79,7 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
 
   const renderChunkQr = async (chunkPayloadStr: string) => {
     try {
-      const url = await QRCode.toDataURL(chunkPayloadStr, { margin: 1, width: 280 });
+      const url = await QRCode.toDataURL(chunkPayloadStr, { errorCorrectionLevel: 'L', margin: 1, width: 280 });
       setQrDataUrl(url);
     } catch {
       setQrDataUrl(null);

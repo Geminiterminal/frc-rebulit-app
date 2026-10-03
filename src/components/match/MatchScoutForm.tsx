@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import { 
   MatchScoutingRecord, 
   FieldRouteType, 
@@ -6,6 +7,8 @@ import {
   RobotIssuesType 
 } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
+import { scoutingAssignments } from '../../db/scoutingAssignments';
+import { qrTransferEngine } from '../../utils/qrTransferEngine';
 import { 
   Save, 
   ArrowLeft, 
@@ -16,7 +19,9 @@ import {
   Target,
   Route,
   Shield,
-  MessageSquare
+  MessageSquare,
+  QrCode,
+  X
 } from 'lucide-react';
 
 interface MatchScoutFormProps {
@@ -59,6 +64,8 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
   // UI state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSingleQrOpen, setIsSingleQrOpen] = useState<boolean>(false);
+  const [singleQrUrl, setSingleQrUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!initialMatchNumber) {
@@ -155,6 +162,61 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       setQuickNote('');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }, 1200);
+  };
+
+  const handleGenerateSingleMatchQr = async () => {
+    const teamNum = parseInt(teamNumber, 10);
+    if (isNaN(teamNum) || teamNum <= 0) {
+      setToastMessage('Please enter a valid Team Number first');
+      setTimeout(() => setToastMessage(null), 2500);
+      return;
+    }
+
+    const scoutProfile = scoutingAssignments.getProfile();
+    const scoutName = scoutProfile.name || 'Scout';
+
+    const record: MatchScoutingRecord = {
+      id: `match-m${matchNumber}-t${teamNum}-${Date.now()}`,
+      teamNumber: teamNum,
+      matchNumber,
+      timestamp: Date.now(),
+
+      // 1. AUTONOMOUS
+      autoWorked: autoWorked !== null ? autoWorked : false,
+      autoFuelScored,
+
+      // 2. SCORING
+      teleopFuelScored,
+
+      // 3. FIELD ROUTE
+      fieldRoute: fieldRoute || 'NEITHER',
+
+      // 4. DEFENSE
+      playedDefense: playedDefense === true,
+      defenseEffectiveness: playedDefense === true ? (defenseEffectiveness || 'MEDIUM') : undefined,
+
+      // 5. ROBOT RELIABILITY
+      robotIssues: robotIssues || 'NONE',
+      whatHappenedNote: (robotIssues && robotIssues !== 'NONE') ? whatHappenedNote : undefined,
+
+      // 6. QUICK OBSERVATION
+      quickNote: quickNote.trim() || undefined,
+
+      // Legacy field aliases
+      autoHighScored: autoFuelScored,
+      teleopHighScored: teleopFuelScored,
+      notes: quickNote,
+    };
+
+    const payloadStr = qrTransferEngine.generateSingleMatchQr(scoutName, record);
+
+    try {
+      const url = await QRCode.toDataURL(payloadStr, { errorCorrectionLevel: 'L', margin: 1, width: 280 });
+      setSingleQrUrl(url);
+      setIsSingleQrOpen(true);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (
@@ -509,7 +571,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
                   onClick={() => setDefenseEffectiveness(eff)}
                   className={`py-2.5 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer ${
                     defenseEffectiveness === eff
-                      ? 'bg-amber-500 text-slate-950 shadow border border-amber-300'
+                      ? 'bg-slate-800 text-slate-100 shadow border border-slate-600'
                       : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
                   }`}
                 >
@@ -588,16 +650,61 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         />
       </div>
 
-      {/* BOTTOM SAVE BUTTON */}
-      <div className="pt-2">
+      {/* BOTTOM SAVE & QR BUTTONS */}
+      <div className="grid grid-cols-2 gap-2 pt-2">
         <button
           type="submit"
-          className="w-full py-4 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black font-mono text-base uppercase tracking-wider shadow-xl transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+          className="py-4 rounded-2xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-100 font-bold font-mono text-xs sm:text-sm uppercase tracking-wider shadow-xl transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
         >
-          <Save className="w-5 h-5" />
+          <Save className="w-4 h-4 text-slate-300" />
           <span>SAVE MATCH</span>
         </button>
+
+        <button
+          type="button"
+          onClick={handleGenerateSingleMatchQr}
+          className="py-4 rounded-2xl bg-[#0F172A]/85 hover:bg-slate-800 border border-slate-800 text-slate-200 font-bold font-mono text-xs sm:text-sm uppercase tracking-wider shadow-xl transition-all cursor-pointer active:scale-[0.99] flex items-center justify-center gap-2"
+        >
+          <QrCode className="w-4 h-4 text-slate-300" />
+          <span>Show QR Code</span>
+        </button>
       </div>
+
+      {/* SINGLE QR DISPLAY MODAL */}
+      {isSingleQrOpen && singleQrUrl && (
+        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md">
+          <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="text-xs font-black text-slate-200 uppercase tracking-wider">
+                Match QR: Team #{teamNumber}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsSingleQrOpen(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 font-mono">
+              Have <strong>Captain</strong> scan this QR code with "Scan Scout Data QR" to import:
+            </p>
+
+            <div className="p-3 bg-white rounded-2xl inline-block mx-auto shadow-lg">
+              <img src={singleQrUrl} alt="Single Match Data QR" className="w-52 h-52 mx-auto" />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsSingleQrOpen(false)}
+              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 font-bold text-xs cursor-pointer"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
     </form>
   );
 };

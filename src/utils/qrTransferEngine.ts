@@ -33,7 +33,69 @@ export interface ScoutDataChunkPayload {
   timestamp: number;
 }
 
-const MAX_CHUNK_CHAR_LIMIT = 1100; // Optimal density for phone screen QR scanning
+function cleanEmptyFields(obj: any): any {
+  if (Array.isArray(obj)) {
+    return obj.map(cleanEmptyFields).filter(v => v !== null && v !== undefined && v !== '');
+  } else if (obj !== null && typeof obj === 'object') {
+    const cleaned: any = {};
+    let hasKeys = false;
+    for (const [key, value] of Object.entries(obj)) {
+      // 1. Exclude binary/base64 heavy image properties from QR payloads
+      if (key === 'thumbnailDataUrl' || key === 'photos' || key === 'dataUrl') {
+        continue;
+      }
+
+      if (value === null || value === undefined || value === '') continue;
+      if (Array.isArray(value) && value.length === 0) continue;
+      if (typeof value === 'object' && Object.keys(value).length === 0) continue;
+
+      // 2. Downsample drawing points to keep QR coordinate string length tiny
+      if (key === 'points' && Array.isArray(value)) {
+        cleaned[key] = downsamplePoints(value);
+        hasKeys = true;
+        continue;
+      }
+
+      let child = cleanEmptyFields(value);
+      if (child !== null && child !== undefined && child !== '') {
+        // Round standard x/y coordinates to 1 decimal place to save characters
+        if ((key === 'x' || key === 'y') && typeof child === 'number') {
+          child = Math.round(child * 10) / 10;
+        }
+        cleaned[key] = child;
+        hasKeys = true;
+      }
+    }
+    return hasKeys ? cleaned : undefined;
+  }
+  return obj;
+}
+
+function downsamplePoints(points: any[]): any[] {
+  if (!Array.isArray(points)) return [];
+  const maxPoints = 15; // 15 coordinates is the sweet spot for smooth curve vectors and minimum storage
+  if (points.length <= maxPoints) {
+    return points.map(p => ({
+      x: typeof p.x === 'number' ? Math.round(p.x * 10) / 10 : p.x,
+      y: typeof p.y === 'number' ? Math.round(p.y * 10) / 10 : p.y
+    }));
+  }
+  const step = (points.length - 1) / (maxPoints - 1);
+  const result = [];
+  for (let i = 0; i < maxPoints; i++) {
+    const idx = Math.round(i * step);
+    const p = points[idx];
+    if (p) {
+      result.push({
+        x: typeof p.x === 'number' ? Math.round(p.x * 10) / 10 : p.x,
+        y: typeof p.y === 'number' ? Math.round(p.y * 10) / 10 : p.y
+      });
+    }
+  }
+  return result;
+}
+
+const MAX_CHUNK_CHAR_LIMIT = 450; // Ultra-low density for instant phone scanning
 
 export const qrTransferEngine = {
   /**
@@ -104,24 +166,30 @@ export const qrTransferEngine = {
     // Collect Pit Scouted teams
     for (const team of allTeams) {
       if (team.pit && Object.keys(team.pit).length > 0) {
-        records.push({
-          type: 'PIT',
-          id: `pit-${team.teamNumber}`,
-          teamNumber: team.teamNumber,
-          data: team.pit,
-        });
+        const cleanedPit = cleanEmptyFields(team.pit);
+        if (cleanedPit && Object.keys(cleanedPit).length > 0) {
+          records.push({
+            type: 'PIT',
+            id: `pit-${team.teamNumber}`,
+            teamNumber: team.teamNumber,
+            data: cleanedPit,
+          });
+        }
       }
     }
 
     // Collect Match Records
     for (const match of allMatches) {
-      records.push({
-        type: 'MATCH',
-        id: match.id || `match-${match.matchNumber}-${match.teamNumber}`,
-        teamNumber: match.teamNumber,
-        matchNumber: match.matchNumber,
-        data: match,
-      });
+      const cleanedMatch = cleanEmptyFields(match);
+      if (cleanedMatch && Object.keys(cleanedMatch).length > 0) {
+        records.push({
+          type: 'MATCH',
+          id: match.id || `match-${match.matchNumber}-${match.teamNumber}`,
+          teamNumber: match.teamNumber,
+          matchNumber: match.matchNumber,
+          data: cleanedMatch,
+        });
+      }
     }
 
     if (records.length === 0) {
@@ -169,6 +237,49 @@ export const qrTransferEngine = {
       };
       return JSON.stringify(payload);
     });
+  },
+
+  /**
+   * Generate a standard single-record SCOUT_DATA QR payload for PIT scouting
+   */
+  generateSinglePitQr(scoutId: string, teamNumber: number, pitData: PitData): string {
+    const cleanedPit = cleanEmptyFields(pitData);
+    const payload: ScoutDataChunkPayload = {
+      type: 'SCOUT_DATA',
+      scoutId,
+      chunkIndex: 0,
+      totalChunks: 1,
+      records: [{
+        type: 'PIT',
+        id: `pit-${teamNumber}`,
+        teamNumber: teamNumber,
+        data: cleanedPit || {},
+      }],
+      timestamp: Date.now(),
+    };
+    return JSON.stringify(payload);
+  },
+
+  /**
+   * Generate a standard single-record SCOUT_DATA QR payload for MATCH scouting
+   */
+  generateSingleMatchQr(scoutId: string, matchRecord: MatchScoutingRecord): string {
+    const cleanedMatch = cleanEmptyFields(matchRecord);
+    const payload: ScoutDataChunkPayload = {
+      type: 'SCOUT_DATA',
+      scoutId,
+      chunkIndex: 0,
+      totalChunks: 1,
+      records: [{
+        type: 'MATCH',
+        id: matchRecord.id || `match-${matchRecord.matchNumber}-${matchRecord.teamNumber}`,
+        teamNumber: matchRecord.teamNumber,
+        matchNumber: matchRecord.matchNumber,
+        data: cleanedMatch || {},
+      }],
+      timestamp: Date.now(),
+    };
+    return JSON.stringify(payload);
   },
 
   /**
@@ -224,12 +335,22 @@ export const qrTransferEngine = {
 
           // Check if match record already exists in Captain's DB
           const existingMatches = await scoutingDB.getAllMatches();
-          const isDuplicate = existingMatches.some(
+          const existingMatch = existingMatches.find(
             (m: MatchScoutingRecord) => m.id === matchId || (m.matchNumber === matchRecord.matchNumber && m.teamNumber === matchRecord.teamNumber)
           );
 
-          if (isDuplicate) {
-            duplicateCount++;
+          if (existingMatch) {
+            // Overwrite/merge if incoming match contains different values (e.g. updated notes or scores)
+            if (JSON.stringify(existingMatch) === JSON.stringify(matchRecord)) {
+              duplicateCount++;
+            } else {
+              await scoutingDB.saveMatch({
+                ...existingMatch,
+                ...matchRecord,
+                id: existingMatch.id || matchId,
+              });
+              importedCount++;
+            }
           } else {
             await scoutingDB.saveMatch({
               ...matchRecord,
