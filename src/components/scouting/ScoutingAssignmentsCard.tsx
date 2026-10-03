@@ -18,6 +18,8 @@ import {
 } from '../../db/scoutingAssignments';
 import { cloudSync } from '../../db/cloudSync';
 import { p2pSync } from '../../db/p2pSync';
+import { bluetoothSync } from '../../db/bluetoothSync';
+import { Bluetooth } from 'lucide-react';
 
 interface ScoutingAssignmentsCardProps {
   onSelectTeam?: (teamNumber: number) => void;
@@ -157,6 +159,20 @@ export function ScoutingAssignmentsCard({ onSelectTeam, onNavigate, compact = fa
 
         {/* Sync Actions */}
         <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={async () => {
+              const res = await bluetoothSync.shareDataViaBluetooth();
+              setSyncFeedback(res.message);
+              setTimeout(() => setSyncFeedback(null), 3000);
+            }}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-950/70 border border-cyan-700/60 text-cyan-300 hover:bg-cyan-900 text-[11px] font-semibold cursor-pointer"
+            title="1-Click Bluetooth / Quick Share to nearby scouts"
+          >
+            <Bluetooth className="w-3 h-3 text-cyan-400" />
+            <span>Bluetooth</span>
+          </button>
+
           <button
             type="button"
             onClick={handlePushData}

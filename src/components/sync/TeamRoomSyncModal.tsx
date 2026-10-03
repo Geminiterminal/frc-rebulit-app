@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { cloudSync, SyncStatus, AvailableRoom } from '../../db/cloudSync';
 import { p2pSync, P2PStatus, P2PAvailableRoom } from '../../db/p2pSync';
 import { scoutingAssignments } from '../../db/scoutingAssignments';
+import { bluetoothSync } from '../../db/bluetoothSync';
 import { 
   Cloud, 
   Radio, 
@@ -19,7 +20,10 @@ import {
   EyeOff,
   Radar,
   UploadCloud,
-  DownloadCloud
+  DownloadCloud,
+  Bluetooth,
+  Share2,
+  Upload
 } from 'lucide-react';
 
 interface TeamRoomSyncModalProps {
@@ -28,9 +32,10 @@ interface TeamRoomSyncModalProps {
 }
 
 export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, onClose }) => {
-  const [syncType, setSyncType] = useState<'p2p' | 'cloud'>('p2p');
+  const [syncType, setSyncType] = useState<'p2p' | 'cloud' | 'bluetooth'>('bluetooth');
   const [p2pMode, setP2pMode] = useState<'join' | 'create'>('join');
   const [cloudMode, setCloudMode] = useState<'join' | 'create'>('join');
+  const [bluetoothInputText, setBluetoothInputText] = useState('');
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(cloudSync.getStatus());
   const [p2pStatus, setP2pStatus] = useState<P2PStatus>(p2pSync.getStatus());
@@ -469,19 +474,32 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
 
         {/* Modal Content */}
         <div className="p-4 overflow-y-auto space-y-3.5 text-xs font-mono">
-          {/* Top Two Mode Buttons: P2P and Cloud */}
-          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800">
+          {/* Mode Tabs: Bluetooth / Share, P2P WiFi, Cloud */}
+          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setSyncType('bluetooth')}
+              className={`py-2 px-2 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                syncType === 'bluetooth'
+                  ? 'bg-cyan-600 text-white shadow'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <Bluetooth className="w-3.5 h-3.5" />
+              <span>Bluetooth</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setSyncType('p2p')}
-              className={`py-2 px-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              className={`py-2 px-2 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition-all cursor-pointer ${
                 syncType === 'p2p'
                   ? 'bg-emerald-600 text-white shadow'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
               }`}
             >
               <Radio className="w-3.5 h-3.5" />
-              <span>P2P</span>
+              <span>P2P WiFi</span>
               {p2pStatus.isConnected && (
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
               )}
@@ -490,7 +508,7 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
             <button
               type="button"
               onClick={() => setSyncType('cloud')}
-              className={`py-2 px-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              className={`py-2 px-2 rounded-lg font-bold text-[11px] flex items-center justify-center gap-1 transition-all cursor-pointer ${
                 syncType === 'cloud'
                   ? 'bg-blue-600 text-white shadow'
                   : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -536,6 +554,73 @@ export const TeamRoomSyncModal: React.FC<TeamRoomSyncModalProps> = ({ isOpen, on
               >
                 <X className="w-3.5 h-3.5" />
               </button>
+            </div>
+          )}
+
+          {/* ================= BLUETOOTH / NEARBY SHARE TAB ================= */}
+          {syncType === 'bluetooth' && (
+            <div className="space-y-3">
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-cyan-400">
+                    <Bluetooth className="w-4 h-4" />
+                    <span className="font-bold text-xs text-white">Bluetooth / Quick Share</span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    100% Offline
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
+                  Share scouting records device-to-device without internet or WiFi. Triggers native Android Quick Share, Bluetooth, or iOS AirDrop.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const res = await bluetoothSync.shareDataViaBluetooth();
+                    if (res.success) {
+                      showSuccessMsg(res.message);
+                    } else {
+                      showErrorMsg(res.message);
+                    }
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs cursor-pointer transition-all shadow-md flex items-center justify-center gap-2"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span>⚡ 1-Click Share via Bluetooth</span>
+                </button>
+              </div>
+
+              {/* Receive / Import Bluetooth payload */}
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="text-[11px] font-bold text-slate-200">
+                  Receive / Import Bluetooth Data
+                </div>
+                <textarea
+                  rows={2}
+                  placeholder="Paste received payload or drop .scout file string..."
+                  value={bluetoothInputText}
+                  onChange={(e) => setBluetoothInputText(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs font-mono text-white focus:outline-none focus:border-cyan-500"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!bluetoothInputText.trim()) return;
+                    try {
+                      const res = await bluetoothSync.importBluetoothPayload(bluetoothInputText.trim());
+                      showSuccessMsg(`Merged ${res.teams} teams and ${res.matches} matches!`);
+                      setBluetoothInputText('');
+                    } catch (e: any) {
+                      showErrorMsg(e.message || 'Import failed');
+                    }
+                  }}
+                  className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold cursor-pointer transition-colors"
+                >
+                  Merge Bluetooth Payload
+                </button>
+              </div>
             </div>
           )}
 
