@@ -298,35 +298,67 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
     }, 1000);
   };
 
-  // STEP 1: Direct team number prompt (Muted, simple)
+  const [rosterTeams, setRosterTeams] = useState<TeamProfile[]>([]);
+
+  useEffect(() => {
+    scoutingDB.getAllTeams().then((all) => {
+      // Sort ascending by team number
+      setRosterTeams(all.sort((a, b) => a.teamNumber - b.teamNumber));
+    });
+  }, []);
+
+  // STEP 1: Direct team number prompt with Event Roster Selector
   if (!teamConfirmed) {
     return (
-      <div className="max-w-xs mx-auto px-4 py-12">
+      <div className="max-w-sm mx-auto px-4 py-10 space-y-6">
         <button
           type="button"
           onClick={() => onNavigate('home')}
-          className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 mb-6 font-semibold"
+          className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 font-semibold cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </button>
 
-        <form onSubmit={handleStartQuestionnaire} className="space-y-4 text-center">
+        {rosterTeams.length > 0 && (
+          <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+            <label className="text-xs font-mono font-bold uppercase text-amber-400 block">
+              SELECT FROM EVENT ROSTER ({rosterTeams.length} TEAMS)
+            </label>
+            <select
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val) {
+                  setTeamNumberInput(val);
+                  setTeamConfirmed(true);
+                }
+              }}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500 cursor-pointer"
+            >
+              <option value="">-- Choose Team to Pit Scout --</option>
+              {rosterTeams.map((t) => (
+                <option key={t.teamNumber} value={t.teamNumber}>
+                  #{t.teamNumber} - {t.teamName} {t.officialRank ? `(Rank ${t.officialRank})` : '(N/A)'}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <form onSubmit={handleStartQuestionnaire} className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 text-center">
           <div className="text-xs font-mono font-semibold uppercase text-slate-400 tracking-wider">
-            TEAM NUMBER
+            OR ENTER TEAM NUMBER
           </div>
           <input
             type="number"
-            autoFocus
-            required
             placeholder="9751"
             value={teamNumberInput}
             onChange={(e) => setTeamNumberInput(e.target.value)}
-            className="w-full text-center text-3xl font-mono font-bold tracking-wider bg-slate-900 border border-slate-750 rounded-xl py-3 px-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-500"
+            className="w-full text-center text-3xl font-mono font-bold tracking-wider bg-slate-950 border border-slate-800 rounded-xl py-3 px-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-slate-500"
           />
 
           {teamExistsMessage && (
-            <div className="text-xs text-slate-400 font-mono">
+            <div className="text-xs text-amber-300 font-mono">
               {teamExistsMessage}
             </div>
           )}
@@ -336,7 +368,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
             disabled={!teamNumberInput.trim()}
             className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider transition-colors shadow active:scale-95 cursor-pointer disabled:opacity-40"
           >
-            Start
+            Start Pit Scouting
           </button>
         </form>
       </div>

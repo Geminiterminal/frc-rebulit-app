@@ -7,80 +7,102 @@ export interface SyncRankingsResult {
   teamsUpdatedCount: number;
 }
 
-export async function syncOfficialRankings(eventCode: string = '2026REBUILT'): Promise<SyncRankingsResult> {
+export async function importEventRosterAndRankings(eventCode: string = '2026REBUILT'): Promise<SyncRankingsResult> {
   try {
-    const teams = await scoutingDB.getAllTeams();
-    if (teams.length === 0) {
+    const cleanCode = eventCode.trim().toLowerCase();
+    if (!cleanCode || cleanCode === '2026rebuilt') {
       return {
         success: false,
-        message: 'No teams registered in local scouting database yet.',
+        message: 'Enter a valid competition event code (e.g. 2026micmp, 2026cmp, 2026mifor) to import teams.',
         teamsUpdatedCount: 0,
       };
     }
 
-    let rankMap: Record<number, number> = {};
     let isLiveFetch = false;
+    let fetchedTeams: Array<{
+      team_number: number;
+      nickname?: string;
+      city?: string;
+      state_prov?: string;
+    }> = [];
+    let rankMap: Record<number, number> = {};
 
-    // Try fetching from TBA public API if online
-    if (typeof navigator !== 'undefined' && navigator.onLine && eventCode && eventCode !== '2026REBUILT') {
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      const apiKey = (await scoutingDB.getSetting<string>('tbaApiKey', '')) || 'public';
+      const headers = { 'X-TBA-Auth-Key': apiKey };
+
       try {
-        const apiKey = (await scoutingDB.getSetting<string>('tbaApiKey', '')) || 'public';
-        const response = await fetch(`https://www.thebluealliance.com/api/v3/event/${eventCode}/rankings`, {
-          headers: {
-            'X-TBA-Auth-Key': apiKey,
-          },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data && Array.isArray(data.rankings)) {
-            data.rankings.forEach((item: { rank: number; team_key: string }) => {
-              const teamNum = parseInt(item.team_key.replace('frc', ''), 10);
-              if (!isNaN(teamNum)) {
-                rankMap[teamNum] = item.rank;
+        // 1. Fetch Event Teams Roster
+        const teamsRes = await fetch(`https://www.thebluealliance.com/api/v3/event/${cleanCode}/teams`, { headers });
+        if (teamsRes.ok) {
+          fetchedTeams = await teamsRes.json();
+          isLiveFetch = true;
+        }
+
+        // 2. Fetch Event Rankings
+        const rankRes = await fetch(`https://www.thebluealliance.com/api/v3/event/${cleanCode}/rankings`, { headers });
+        if (rankRes.ok) {
+          const rankData = await rankRes.json();
+          if (rankData && Array.isArray(rankData.rankings)) {
+            rankData.rankings.forEach((item: { rank: number; team_key: string }) => {
+              const num = parseInt(item.team_key.replace('frc', ''), 10);
+              if (!isNaN(num)) {
+                rankMap[num] = item.rank;
               }
             });
-            isLiveFetch = true;
           }
         }
-      } catch {
-        // Fetch issue - fallback to keeping existing manual/saved ranks or N/A
+      } catch (e) {
+        console.warn('Network error fetching event roster:', e);
       }
     }
 
-    if (!isLiveFetch || Object.keys(rankMap).length === 0) {
+    if (!isLiveFetch || fetchedTeams.length === 0) {
       return {
         success: false,
-        message: `Could not fetch live ranks for event "${eventCode}". Unmatched teams will display N/A. You can manually enter official ranks anytime.`,
+        message: `Could not reach live roster for event "${eventCode}". Verify network connection & event code. Unmatched teams remain N/A.`,
         teamsUpdatedCount: 0,
       };
     }
 
-    // Save updated live ranks locally in IndexedDB for offline access
-    let updatedCount = 0;
-    for (const team of teams) {
-      if (rankMap[team.teamNumber] !== undefined) {
-        const newRank = rankMap[team.teamNumber];
-        if (team.officialRank !== newRank) {
-          await scoutingDB.saveTeam({
-            ...team,
-            officialRank: newRank,
-            updatedAt: Date.now(),
-          });
-          updatedCount++;
-        }
-      }
+    // Save/seed team profiles into IndexedDB
+    let savedCount = 0;
+    const existingTeams = await scoutingDB.getAllTeams();
+    const existingMap = new Map<number, TeamProfile>(existingTeams.map((t) => [t.teamNumber, t]));
+
+    for (const item of fetchedTeams) {
+      const teamNum = item.team_number;
+      const existing = existingMap.get(teamNum);
+      const locationStr = item.city && item.state_prov ? `${item.city}, ${item.state_prov}` : item.state_prov || '';
+      const officialRank = rankMap[teamNum];
+
+      const updatedProfile: TeamProfile = {
+        teamNumber: teamNum,
+        teamName: item.nickname || existing?.teamName || `Team ${teamNum}`,
+        location: locationStr || existing?.location,
+        officialRank: officialRank !== undefined ? officialRank : existing?.officialRank,
+        pit: existing?.pit,
+        createdAt: existing?.createdAt || Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      await scoutingDB.saveTeam(updatedProfile);
+      savedCount++;
     }
 
     return {
       success: true,
-      message: `Successfully synced ${updatedCount} official team ranks from live event ${eventCode}!`,
-      teamsUpdatedCount: updatedCount,
+      message: `Successfully imported ${savedCount} teams & official ranks from event "${eventCode}"!`,
+      teamsUpdatedCount: savedCount,
     };
   } catch (err) {
     return {
       success: false,
-      message: err instanceof Error ? err.message : 'Failed to sync rankings.',
+      message: err instanceof Error ? err.message : 'Failed to import event roster.',
       teamsUpdatedCount: 0,
     };
   }
 }
+
+// Backward compatibility alias for sync button
+export const syncOfficialRankings = importEventRosterAndRankings;

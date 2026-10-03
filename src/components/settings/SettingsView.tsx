@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { scoutingDB } from '../../db/indexedDB';
+import { importEventRosterAndRankings } from '../../utils/rankingsSync';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 import { 
   Sliders, 
@@ -89,13 +90,28 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
               <Calendar className="w-4 h-4 text-emerald-400" />
               <span>Event Code (e.g. 2026cmp or 2026micmp)</span>
             </label>
-            <input
-              type="text"
-              value={eventCode}
-              onChange={(e) => setEventCode(e.target.value)}
-              placeholder="2026REBUILT"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={eventCode}
+                onChange={(e) => setEventCode(e.target.value)}
+                placeholder="2026REBUILT"
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  await scoutingDB.setSetting('eventCode', eventCode);
+                  if (tbaApiKey) await scoutingDB.setSetting('tbaApiKey', tbaApiKey);
+                  const res = await importEventRosterAndRankings(eventCode);
+                  alert(res.message);
+                  loadSettings();
+                }}
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs uppercase cursor-pointer shrink-0"
+              >
+                Fetch Event Teams
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2">
