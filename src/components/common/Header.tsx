@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { DistributeModal } from './DistributeModal';
 import { TeamRoomSyncModal } from '../sync/TeamRoomSyncModal';
-import { ScoutRoleSetupModal } from '../setup/ScoutRoleSetupModal';
-import { scoutingAssignments, ScoutProfile, SCOUT_POSITIONS } from '../../db/scoutingAssignments';
+import { scoutingAssignments, ScoutProfile } from '../../db/scoutingAssignments';
 import { cloudSync, SyncStatus } from '../../db/cloudSync';
 import { p2pSync, P2PStatus } from '../../db/p2pSync';
 import { PantherLogo } from './PantherLogo';
@@ -27,11 +26,15 @@ interface HeaderProps {
   onNavigate: (view: string, teamNumber?: number) => void;
   quickSearchTeam?: string;
   onSearchChange?: (val: string) => void;
+  appMode?: 'captain' | 'scout';
+  onAppModeChange?: (mode: 'captain' | 'scout') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentView,
   onNavigate,
+  appMode,
+  onAppModeChange,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDistributeModal, setShowDistributeModal] = useState(false);
@@ -80,8 +83,6 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'settings', label: 'Settings' },
   ];
 
-  const posMeta = SCOUT_POSITIONS.find((p) => p.id === profile.position) || SCOUT_POSITIONS[1];
-
   return (
     <>
       <header className="sticky top-0 z-40 bg-slate-950/95 border-b border-slate-800/80 backdrop-blur-md">
@@ -105,73 +106,48 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Center Quick Search (Tablet / Desktop) */}
-          <form onSubmit={handleSearchSubmit} className="hidden md:flex items-center relative max-w-[180px] w-full">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 text-slate-500" />
-            <input
-              type="number"
-              placeholder="Team #"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-2 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono"
-            />
-          </form>
-
           {/* Right Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {/* Position / Role Setup Pill */}
-            <button
-              type="button"
-              onClick={() => setShowRoleModal(true)}
-              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-lg border transition-all active:scale-95 cursor-pointer ${
-                profile.position === 'LEAD_SCOUT'
-                  ? 'bg-amber-950/70 border-amber-700/80 text-amber-300'
-                  : 'bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800'
-              }`}
-              title="Change Scout Role"
-            >
-              {profile.position === 'LEAD_SCOUT' ? (
-                <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              ) : (
-                <Target className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-              )}
-              <span className="truncate max-w-[80px] sm:max-w-[120px]">
-                {profile.name}
-              </span>
-            </button>
-
-            {/* Cloud Sync Status Button */}
-            <button
-              type="button"
-              onClick={() => setShowSyncModal(true)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border transition-colors active:scale-95 cursor-pointer ${
-                syncStatus.roomCode || p2pStatus.roomCode
-                  ? 'bg-emerald-950/50 border-emerald-800/80 text-emerald-300 hover:bg-emerald-900/50'
-                  : 'bg-slate-900 border-slate-750 text-slate-300 hover:bg-slate-800'
-              }`}
-              title={syncStatus.roomCode || p2pStatus.roomCode ? `Connected to Room ${syncStatus.roomCode || p2pStatus.roomCode}` : 'Team Sync'}
-            >
-              <Cloud className={`w-3.5 h-3.5 ${syncStatus.roomCode || p2pStatus.roomCode ? 'text-emerald-400' : 'text-blue-400'}`} />
-              <span className="font-mono text-xs">
-                {syncStatus.roomCode || p2pStatus.roomCode || 'Sync'}
-              </span>
-              {(syncStatus.roomCode || p2pStatus.roomCode) && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              )}
-            </button>
-
             <PWAInstallButton />
 
             {!isOnline && (
-              <div className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-950/80 text-amber-300 border border-amber-800/80">
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-950/80 text-amber-300 border border-amber-800/80 font-mono">
                 <WifiOff className="w-3 h-3" />
                 <span>Offline</span>
               </div>
             )}
 
+            {/* Global Mode Switcher */}
+            {appMode && onAppModeChange && (
+              <div className="p-0.5 bg-slate-900 border border-slate-800/80 rounded-xl flex items-center text-[10px] sm:text-xs shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onAppModeChange('captain')}
+                  className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    appMode === 'captain'
+                      ? 'bg-amber-500 text-slate-950 shadow font-extrabold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Captain
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onAppModeChange('scout')}
+                  className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                    appMode === 'scout'
+                      ? 'bg-cyan-500 text-slate-950 shadow font-extrabold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Scout
+                </button>
+              </div>
+            )}
+
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors"
+              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors cursor-pointer"
               aria-label="Navigation Menu"
             >
               {menuOpen ? <X className="w-4 h-4 text-white" /> : <Menu className="w-4 h-4 text-slate-300" />}
@@ -223,16 +199,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
       </header>
-
-      {/* Scout Role Setup Modal */}
-      <ScoutRoleSetupModal
-        isOpen={showRoleModal}
-        onClose={() => {
-          setShowRoleModal(false);
-          setProfile(scoutingAssignments.getProfile());
-        }}
-        onSaved={(newProf) => setProfile(newProf)}
-      />
 
       {/* Distribute & Install Modal */}
       <DistributeModal

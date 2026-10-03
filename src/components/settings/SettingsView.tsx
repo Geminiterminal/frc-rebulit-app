@@ -44,6 +44,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
   const [savedToast, setSavedToast] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [tbaStatusMsg, setTbaStatusMsg] = useState<string | null>(null);
+  const [isFetchingTba, setIsFetchingTba] = useState(false);
 
   useEffect(() => {
     loadSettings();
@@ -210,36 +212,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
               />
               <button
                 type="button"
+                disabled={isFetchingTba}
                 onClick={async () => {
+                  setIsFetchingTba(true);
+                  setTbaStatusMsg(null);
                   await scoutingDB.setSetting('eventCode', eventCode);
                   if (tbaApiKey) await scoutingDB.setSetting('tbaApiKey', tbaApiKey);
                   const res = await importEventRosterAndRankings(eventCode);
-                  alert(res.message);
+                  setTbaStatusMsg(res.message);
+                  setIsFetchingTba(false);
                   loadSettings();
+                  setTimeout(() => {
+                    setTbaStatusMsg(null);
+                  }, 3000);
                 }}
-                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-xs uppercase cursor-pointer shrink-0"
+                className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-mono font-bold text-xs uppercase cursor-pointer shrink-0"
               >
-                Fetch Event Teams
+                {isFetchingTba ? 'Fetching...' : 'Fetch Event Teams'}
               </button>
             </div>
+            {tbaStatusMsg && (
+              <div className="mt-2 p-2.5 rounded-xl bg-slate-950 border border-emerald-500/30 text-xs font-mono text-emerald-400">
+                {tbaStatusMsg}
+              </div>
+            )}
           </div>
 
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-bold uppercase text-slate-300 block flex items-center gap-2">
-              <Info className="w-4 h-4 text-amber-400" />
-              <span>Optional TBA Auth Key (The Blue Alliance)</span>
-            </label>
-            <input
-              type="password"
-              value={tbaApiKey}
-              onChange={(e) => setTbaApiKey(e.target.value)}
-              placeholder="Paste TBA API Key..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
-            />
-            <p className="text-[11px] text-slate-400">
-              Optional API Key for live qualification event rankings from The Blue Alliance.
-            </p>
-          </div>
+
 
           {/* Manual Bulk Team Import */}
           <div className="space-y-2 pt-3 border-t border-slate-800">

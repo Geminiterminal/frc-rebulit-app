@@ -234,6 +234,10 @@ class ScoutingDB {
     });
   }
 
+  async saveMatchRecord(record: MatchScoutingRecord): Promise<void> {
+    return this.saveMatch(record);
+  }
+
   async getAllMatches(): Promise<MatchScoutingRecord[]> {
     await this.init();
     if (!this.db) {
@@ -257,6 +261,10 @@ class ScoutingDB {
       };
       req.onerror = () => resolve([]);
     });
+  }
+
+  async getAllMatchRecords(): Promise<MatchScoutingRecord[]> {
+    return this.getAllMatches();
   }
 
   async getMatch(id: string): Promise<MatchScoutingRecord | null> {

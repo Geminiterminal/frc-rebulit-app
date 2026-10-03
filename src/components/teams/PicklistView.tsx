@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TeamProfile, MatchScoutingRecord, DrivetrainType, ShooterType, BumpTrenchCapability } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
+import { tbaApi } from '../../utils/tbaApi';
 import { 
   Trophy, 
   ArrowUpDown, 
@@ -21,7 +22,8 @@ import {
   ChevronRight,
   Ban,
   SlidersHorizontal,
-  RotateCw
+  RotateCw,
+  RefreshCw
 } from 'lucide-react';
 
 interface PicklistViewProps {
@@ -86,9 +88,26 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
   // Drag and drop state
   const [draggedTeamNum, setDraggedTeamNum] = useState<number | null>(null);
 
+  // Live Rankings Sync State
+  const [isSyncingRankings, setIsSyncingRankings] = useState(false);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleSyncRankings = async () => {
+    setIsSyncingRankings(true);
+    setSyncStatusMsg(null);
+    const code = localStorage.getItem('frc_active_event_code') || '2025micmp';
+    const key = localStorage.getItem('frc_tba_auth_key') || (await scoutingDB.getSetting<string>('tbaApiKey', ''));
+
+    const res = await tbaApi.fetchEventTeams(code, key);
+    setSyncStatusMsg(res.message);
+    setIsSyncingRankings(false);
+    await loadData();
+    setTimeout(() => setSyncStatusMsg(null), 5000);
+  };
 
   const loadData = async () => {
     const allTeams = await scoutingDB.getAllTeams();
@@ -328,17 +347,34 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
 
     const avgTotalFuel = avgAutoFuel + avgTeleopFuel;
 
-    // Reliability Rating
-    const majorIssues = teamMatches.filter((m) => m.robotIssues === 'MAJOR' || m.robotIssues === 'DISABLED').length;
-    const minorIssues = teamMatches.filter((m) => m.robotIssues === 'MINOR').length;
-    let reliabilityVal = 3;
-    let reliabilityLabel = 'HIGH';
-    if (majorIssues >= 2) {
-      reliabilityVal = 1;
-      reliabilityLabel = 'LOW';
-    } else if (majorIssues === 1 || minorIssues >= 2) {
-      reliabilityVal = 2;
-      reliabilityLabel = 'MED';
+    // Reliability Rating based on pit scouting & match observation issues
+    let reliabilityVal = 0;
+    let reliabilityLabel = 'N/A';
+
+    if (count > 0) {
+      const majorIssues = teamMatches.filter((m) => m.robotIssues === 'MAJOR' || m.robotIssues === 'DISABLED').length;
+      const minorIssues = teamMatches.filter((m) => m.robotIssues === 'MINOR').length;
+      if (majorIssues >= 2) {
+        reliabilityVal = 1;
+        reliabilityLabel = 'LOW';
+      } else if (majorIssues === 1 || minorIssues >= 2) {
+        reliabilityVal = 2;
+        reliabilityLabel = 'MED';
+      } else {
+        reliabilityVal = 3;
+        reliabilityLabel = 'HIGH';
+      }
+    } else if (team.pit?.reliability) {
+      if (team.pit.reliability === 'VERY RELIABLE') {
+        reliabilityVal = 3;
+        reliabilityLabel = 'HIGH';
+      } else if (team.pit.reliability === 'MOSTLY RELIABLE') {
+        reliabilityVal = 2;
+        reliabilityLabel = 'MED';
+      } else if (team.pit.reliability === 'SOMEWHAT RELIABLE') {
+        reliabilityVal = 1;
+        reliabilityLabel = 'LOW';
+      }
     }
 
     // Defense Effectiveness
@@ -659,7 +695,9 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                 ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
                 : item.reliabilityLabel === 'MED'
                 ? 'bg-amber-950 text-amber-300 border border-amber-800'
-                : 'bg-rose-950 text-rose-300 border border-rose-800'
+                : item.reliabilityLabel === 'LOW'
+                ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                : 'bg-slate-900 text-slate-500 border border-slate-800'
             }`}
           >
             {item.reliabilityLabel}
@@ -816,6 +854,17 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
 
         {/* Filter Trigger Button & Tools */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Sync Live Rankings Button */}
+          <button
+            type="button"
+            onClick={handleSyncRankings}
+            disabled={isSyncingRankings}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono text-xs font-black cursor-pointer shadow transition-transform active:scale-98 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-slate-950 ${isSyncingRankings ? 'animate-spin' : ''}`} />
+            <span>{isSyncingRankings ? 'Syncing...' : 'Sync Rankings'}</span>
+          </button>
+
           {/* Preset Custom Initializer */}
           <div className="relative group">
             <button
@@ -892,6 +941,15 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
           )}
         </div>
       </div>
+
+      {syncStatusMsg && (
+        <div className="p-3 rounded-xl bg-[#0F172A] border border-amber-500/50 text-amber-300 font-mono text-xs font-bold shadow flex items-center justify-between">
+          <span>{syncStatusMsg}</span>
+          <button type="button" onClick={() => setSyncStatusMsg(null)} className="text-slate-400 hover:text-white p-1">
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* SECTION 1: AVAILABLE FOR OUR ALLIANCE */}
       <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/80 shadow-2xl">

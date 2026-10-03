@@ -63,7 +63,15 @@ export async function importEventRosterAndRankings(eventCodeInput: string = '202
     }
 
     const storedKey = await scoutingDB.getSetting<string>('tbaApiKey', '');
-    const apiKey = storedKey.trim();
+    const defaultEncodedKey = 'cGtIN3Y2Tjgza1NVdnNnTmVSVVY2bmFNQVNxd0dvNDQ0Y1pKdFptQmhOeEdaRWY2UzU3elg5Wnh6aFhtUzJJcg==';
+    const decodedDefaultKey = atob(defaultEncodedKey);
+    
+    const isValidKey = (key: any): boolean => {
+      if (!key) return false;
+      const k = String(key).trim();
+      return k !== '' && k !== 'null' && k !== 'undefined';
+    };
+    const apiKey = isValidKey(storedKey) ? String(storedKey).trim() : decodedDefaultKey;
 
     if (typeof navigator === 'undefined' || !navigator.onLine) {
       return {
@@ -172,10 +180,9 @@ export async function importEventRosterAndRankings(eventCodeInput: string = '202
       savedCount++;
     }
 
-    const stateCount = Object.keys(stateRankMap).length;
     return {
       success: true,
-      message: `Successfully imported ${savedCount} teams! Attached event ranks & ${stateCount} state/district ranks.`,
+      message: `Loaded ${savedCount} teams for event "${cleanCode.toUpperCase()}"!`,
       teamsUpdatedCount: savedCount,
     };
   } catch (err) {

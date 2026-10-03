@@ -65,6 +65,7 @@ export interface ScoutProfile {
 export interface ScoutAssignment {
   scoutName: string;
   assignedTeams: number[];
+  role?: 'PIT_SCOUT' | 'MATCH_SCOUT';
   notes?: string;
   updatedAt: number;
 }
@@ -155,6 +156,13 @@ export const scoutingAssignments = {
     }
   },
 
+  // Get assigned teams for a specific scout ID (e.g. PIT-1, PIT-2, MATCH-1, MATCH-2)
+  getAssignedTeamsForScout(scoutName: string): number[] {
+    const assignments = this.getAllAssignments();
+    const found = assignments.find((a) => a.scoutName.toLowerCase() === scoutName.toLowerCase());
+    return found ? found.assignedTeams : [];
+  },
+
   // Set all scout assignments (from Cloud / P2P sync)
   setAllAssignments(list: ScoutAssignment[]): void {
     if (typeof localStorage === 'undefined' || !Array.isArray(list)) return;
@@ -193,14 +201,16 @@ export const scoutingAssignments = {
 
       // Also sync to all assignments list
       const scoutName = this.getScoutName();
-      this.assignTeamsToScout(scoutName, clean);
+      const profile = this.getProfile();
+      const role = (profile.position === 'PIT_SCOUT' || profile.position === 'MATCH_SCOUT') ? profile.position : undefined;
+      this.assignTeamsToScout(scoutName, clean, role);
     } catch (e) {
       console.error('Failed to set target teams:', e);
     }
   },
 
   // Assign team numbers to a specific scout (Lead Scout or custom)
-  assignTeamsToScout(scoutName: string, teams: number[], notes?: string): void {
+  assignTeamsToScout(scoutName: string, teams: number[], role?: 'PIT_SCOUT' | 'MATCH_SCOUT', notes?: string): void {
     if (typeof localStorage === 'undefined') return;
     try {
       const clean = Array.from(new Set(teams.filter((t) => Number.isInteger(t) && t > 0))).sort((a, b) => a - b);
@@ -210,6 +220,7 @@ export const scoutingAssignments = {
       filtered.push({
         scoutName: scoutName.trim(),
         assignedTeams: clean,
+        role: role,
         notes: notes || '',
         updatedAt: Date.now(),
       });
@@ -217,6 +228,18 @@ export const scoutingAssignments = {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     } catch (e) {
       console.error('Failed to assign teams:', e);
+    }
+  },
+
+  // Delete assignment for a scout
+  deleteAssignment(scoutName: string): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const all = this.getAllAssignments();
+      const filtered = all.filter((a) => a.scoutName.trim().toLowerCase() !== scoutName.trim().toLowerCase());
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    } catch (e) {
+      console.error('Failed to delete assignment:', e);
     }
   },
 
