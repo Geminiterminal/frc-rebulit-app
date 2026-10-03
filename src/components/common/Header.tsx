@@ -52,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const navItems = [
     { id: 'home', label: 'Home' },
-    { id: 'picklist', label: 'Picklist' },
+    { id: 'picklist', label: 'Ranking' },
     { id: 'compare', label: 'Compare' },
     { id: 'teams', label: 'Teams' },
     { id: 'event-data', label: 'Matches' },
@@ -175,32 +175,6 @@ export const Header: React.FC<HeaderProps> = ({
                     {item.label}
                   </button>
                 ))}
-              </div>
-
-              <div className="flex flex-col gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setShowSyncModal(true);
-                  }}
-                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800/80 text-xs font-bold transition-colors cursor-pointer"
-                >
-                  <Radio className="w-4 h-4" />
-                  <span>{syncStatus.roomCode ? `Connected: Room ${syncStatus.roomCode}` : 'Join Team Cloud Sync Room'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setShowDistributeModal(true);
-                  }}
-                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-bold transition-colors cursor-pointer"
-                >
-                  <Share2 className="w-4 h-4" />
-                  <span>Distribute & Share App</span>
-                </button>
               </div>
             </div>
           </div>

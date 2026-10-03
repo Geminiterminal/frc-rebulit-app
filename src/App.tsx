@@ -152,7 +152,7 @@ export default function App() {
           }`}
         >
           <Trophy className="w-4 h-4" />
-          <span className="text-[10px]">Picklist</span>
+          <span className="text-[10px]">Ranking</span>
         </button>
 
         <button
