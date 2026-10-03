@@ -26,7 +26,7 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDrivetrain, setFilterDrivetrain] = useState<string>('ALL');
   const [filterCapability, setFilterCapability] = useState<string>('ALL');
-  const [sortBy, setSortBy] = useState<'number' | 'matches' | 'reliability'>('number');
+  const [sortBy, setSortBy] = useState<'number' | 'matches' | 'reliability' | 'scouted'>('number');
   const [newTeamNumber, setNewTeamNumber] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -103,6 +103,10 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
         if (!t.pit?.shooter?.includes('TURRET')) return false;
       } else if (filterCapability === 'AUTO') {
         if (t.pit?.hasAutonomous !== 'YES') return false;
+      } else if (filterCapability === 'PIT') {
+        if (!t.pit || Object.keys(t.pit).length === 0) return false;
+      } else if (filterCapability === 'NOT_SCOUTED') {
+        if (t.pit && Object.keys(t.pit).length > 0) return false;
       } else if (filterCapability === 'MATCHES') {
         if ((matchCountMap.get(t.teamNumber) || 0) === 0) return false;
       }
@@ -122,6 +126,14 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
           return 1;
         };
         return score(b) - score(a);
+      } else if (sortBy === 'scouted') {
+        const getScoutScore = (t: TeamProfile) => {
+          let s = 0;
+          if (t.pit && Object.keys(t.pit).length > 0) s += 2;
+          if ((matchCountMap.get(t.teamNumber) || 0) > 0) s += 1;
+          return s;
+        };
+        return getScoutScore(b) - getScoutScore(a);
       }
       return 0;
     });
@@ -202,7 +214,7 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
             </button>
           ))}
 
-          {['TRENCH', 'TURRET', 'MATCHES'].map((cap) => (
+          {['TRENCH', 'TURRET', 'MATCHES', 'PIT', 'NOT_SCOUTED'].map((cap) => (
             <button
               key={cap}
               type="button"
@@ -213,7 +225,10 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
                   : 'bg-slate-950 text-slate-400 hover:bg-slate-900 border border-slate-850'
               }`}
             >
-              {cap === 'TRENCH' ? 'Trench Traversal' : cap === 'TURRET' ? 'Turret Shooter' : 'Has Matches'}
+              {cap === 'TRENCH' ? 'Trench Traversal' : 
+               cap === 'TURRET' ? 'Turret Shooter' : 
+               cap === 'MATCHES' ? 'Has Matches' :
+               cap === 'PIT' ? 'Pit Scouted' : 'Not Scouted'}
             </button>
           ))}
         </div>
@@ -226,6 +241,7 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
             className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-300 text-xs focus:outline-none"
           >
             <option value="number">Sort by Team #</option>
+            <option value="scouted">Sort by Scouted Status</option>
             <option value="matches">Sort by Match Count</option>
             <option value="reliability">Sort by Reliability</option>
           </select>
@@ -238,6 +254,8 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
           filteredTeams.map((t) => {
             const mCount = matchCountMap.get(t.teamNumber) || 0;
             const pit = t.pit;
+            const hasPit = pit && Object.keys(pit).length > 0;
+            const isFullyScouted = hasPit && mCount > 0;
 
             return (
               <div
@@ -246,7 +264,13 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
                 className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
               >
                 <div className="flex items-start sm:items-center gap-3">
-                  <div className="w-14 h-12 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center font-mono font-black text-lg text-white group-hover:border-blue-500 transition-colors shrink-0">
+                  <div className={`w-14 h-12 rounded-xl border flex items-center justify-center font-mono font-black text-lg group-hover:border-blue-500 transition-colors shrink-0 ${
+                    isFullyScouted 
+                      ? 'bg-emerald-950/30 border-emerald-500/50 text-emerald-400' 
+                      : hasPit 
+                      ? 'bg-blue-950/30 border-blue-500/50 text-blue-400'
+                      : 'bg-slate-950 border-slate-800 text-white'
+                  }`}>
                     {t.teamNumber}
                   </div>
 
@@ -255,6 +279,12 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
                       <span className="font-bold text-white text-sm">
                         {t.teamName}
                       </span>
+                      {isFullyScouted && (
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase tracking-tighter">
+                          <CheckCircle2 className="w-2.5 h-2.5" />
+                          <span>Scouted</span>
+                        </div>
+                      )}
                       {pit?.reliability && (
                         <span
                           className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
