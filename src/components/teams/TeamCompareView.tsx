@@ -107,7 +107,7 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
     return {
       team,
       teamNum,
-      officialRank: team?.officialRank ? `#${team.officialRank}` : 'Unranked',
+      officialRank: team?.officialRank ? `Rank ${team.officialRank}` : 'N/A',
       matchesScouted: count,
       autoSuccessStr,
       avgAutoFuel: avgAutoFuel.toFixed(1),

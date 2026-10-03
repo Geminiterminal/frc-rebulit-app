@@ -11,11 +11,9 @@ import {
   Layers, 
   CheckSquare, 
   Square, 
-  Check, 
-  Wifi, 
-  WifiOff,
-  MoveUp,
-  MoveDown
+  Edit3,
+  Check,
+  X
 } from 'lucide-react';
 
 interface PicklistViewProps {
@@ -30,8 +28,7 @@ export type SortOption =
   | 'defense' 
   | 'defenseEffectiveness' 
   | 'matchesScouted' 
-  | 'officialRank'
-  | 'customRank';
+  | 'officialRank';
 
 export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
   const [teams, setTeams] = useState<TeamProfile[]>([]);
@@ -41,6 +38,10 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
   const [selectedTeamNums, setSelectedTeamNums] = useState<number[]>([]);
   const [isSyncingRanks, setIsSyncingRanks] = useState<boolean>(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
+
+  // Manual rank editing state
+  const [editingRankTeamNum, setEditingRankTeamNum] = useState<number | null>(null);
+  const [tempRankValue, setTempRankValue] = useState<string>('');
 
   useEffect(() => {
     loadData();
@@ -60,7 +61,25 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     setIsSyncingRanks(false);
     setSyncToast(result.message);
     await loadData();
-    setTimeout(() => setSyncToast(null), 3000);
+    setTimeout(() => setSyncToast(null), 3500);
+  };
+
+  const handleSaveManualRank = async (teamNum: number) => {
+    const targetTeam = teams.find((t) => t.teamNumber === teamNum);
+    if (!targetTeam) return;
+
+    const parsed = parseInt(tempRankValue, 10);
+    const newRank = !isNaN(parsed) && parsed > 0 ? parsed : undefined;
+
+    await scoutingDB.saveTeam({
+      ...targetTeam,
+      officialRank: newRank,
+      updatedAt: Date.now(),
+    });
+
+    setEditingRankTeamNum(null);
+    setTempRankValue('');
+    await loadData();
   };
 
   const toggleSelectTeam = (teamNum: number) => {
@@ -140,8 +159,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
       reliabilityLabel,
       defenseVal,
       defenseLabel,
-      officialRank: team.officialRank || 99,
-      customRank: team.customPicklistRank || 999,
+      officialRank: team.officialRank,
     };
   });
 
@@ -162,9 +180,9 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
       case 'matchesScouted':
         return b.matchesCount - a.matchesCount;
       case 'officialRank':
-        return a.officialRank - b.officialRank;
-      case 'customRank':
-        return a.customRank - b.customRank;
+        const rA = a.officialRank !== undefined ? a.officialRank : 999;
+        const rB = b.officialRank !== undefined ? b.officialRank : 999;
+        return rA - rB;
       default:
         return b.avgTotalFuel - a.avgTotalFuel;
     }
@@ -181,7 +199,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     if (selectedTeamNums.length > 0) {
       onNavigate('compare', undefined, selectedTeamNums);
     } else {
-      // Default to top 3 teams if none selected
       const topNums = filteredTeams.slice(0, 3).map((t) => t.teamNumber);
       onNavigate('compare', undefined, topNums);
     }
@@ -189,9 +206,9 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
 
   return (
     <div className="max-w-4xl mx-auto px-3.5 sm:px-5 py-5 pb-32 flex flex-col gap-6">
-      {/* Toast */}
+      {/* Toast Notification */}
       {syncToast && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-slate-100 font-mono text-xs px-4 py-2 rounded-xl shadow-2xl border border-slate-700 animate-fadeIn">
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-slate-100 font-mono text-xs px-4 py-2.5 rounded-xl shadow-2xl border border-slate-700 max-w-md text-center animate-fadeIn">
           {syncToast}
         </div>
       )}
@@ -204,7 +221,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
             <span>TEAM PICKLIST</span>
           </h1>
           <p className="text-xs text-slate-400">
-            Alliance captain decision matrix with auto-computed analytics & official ranks
+            Alliance captain decision matrix with editable official ranks & N/A status
           </p>
         </div>
 
@@ -285,6 +302,8 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
             ) : (
               filteredTeams.map((item, idx) => {
                 const isSelected = selectedTeamNums.includes(item.teamNumber);
+                const isEditingRank = editingRankTeamNum === item.teamNumber;
+
                 return (
                   <tr
                     key={item.teamNumber}
@@ -367,9 +386,55 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                       </span>
                     </td>
 
-                    {/* Official Rank */}
-                    <td className="p-3 text-center font-mono font-bold text-slate-300">
-                      {item.officialRank && item.officialRank < 99 ? `Rank ${item.officialRank}` : '—'}
+                    {/* Official Rank (With Inline Edit Ability) */}
+                    <td className="p-3 text-center font-mono font-bold">
+                      {isEditingRank ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <input
+                            type="number"
+                            value={tempRankValue}
+                            onChange={(e) => setTempRankValue(e.target.value)}
+                            placeholder="Rank #"
+                            autoFocus
+                            className="w-14 bg-slate-900 border border-amber-500 rounded px-1 py-0.5 text-center font-mono text-xs text-amber-300 focus:outline-none"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveManualRank(item.teamNumber);
+                              if (e.key === 'Escape') setEditingRankTeamNum(null);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveManualRank(item.teamNumber)}
+                            className="p-1 rounded bg-amber-500 text-slate-950 hover:bg-amber-400 cursor-pointer"
+                          >
+                            <Check className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingRankTeamNum(null)}
+                            className="p-1 rounded bg-slate-800 text-slate-400 hover:text-slate-200 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1.5 group">
+                          <span className={item.officialRank ? 'text-amber-300 font-black' : 'text-slate-500 font-bold'}>
+                            {item.officialRank ? `Rank ${item.officialRank}` : 'N/A'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingRankTeamNum(item.teamNumber);
+                              setTempRankValue(item.officialRank ? item.officialRank.toString() : '');
+                            }}
+                            className="opacity-40 group-hover:opacity-100 p-1 text-slate-400 hover:text-amber-400 transition-opacity cursor-pointer"
+                            title="Edit Official Rank"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
                     </td>
 
                     {/* Action View */}

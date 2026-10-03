@@ -19,6 +19,7 @@ interface SettingsViewProps {
 export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
   const [scoutName, setScoutName] = useState('');
   const [eventCode, setEventCode] = useState('2026REBUILT');
+  const [tbaApiKey, setTbaApiKey] = useState('');
   const [teamCount, setTeamCount] = useState(0);
   const [matchCount, setMatchCount] = useState(0);
   const [savedToast, setSavedToast] = useState(false);
@@ -30,8 +31,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
   const loadSettings = async () => {
     const name = await scoutingDB.getSetting<string>('scoutName', '');
     const code = await scoutingDB.getSetting<string>('eventCode', '2026REBUILT');
+    const key = await scoutingDB.getSetting<string>('tbaApiKey', '');
     setScoutName(name);
     setEventCode(code);
+    setTbaApiKey(key);
 
     const teams = await scoutingDB.getAllTeams();
     const matches = await scoutingDB.getAllMatches();
@@ -43,6 +46,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
     e.preventDefault();
     await scoutingDB.setSetting('scoutName', scoutName);
     await scoutingDB.setSetting('eventCode', eventCode);
+    await scoutingDB.setSetting('tbaApiKey', tbaApiKey);
     setSavedToast(true);
     setTimeout(() => setSavedToast(false), 1500);
   };
@@ -78,19 +82,38 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
           </p>
         </div>
 
-        {/* Event Code */}
-        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
-          <label className="text-xs font-mono font-bold uppercase text-slate-300 block flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-emerald-400" />
-            <span>Event Code</span>
-          </label>
-          <input
-            type="text"
-            value={eventCode}
-            onChange={(e) => setEventCode(e.target.value)}
-            placeholder="2026REBUILT"
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
-          />
+        {/* Event Code & TBA Key */}
+        <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+          <div className="space-y-2">
+            <label className="text-xs font-mono font-bold uppercase text-slate-300 block flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-emerald-400" />
+              <span>Event Code (e.g. 2026cmp or 2026micmp)</span>
+            </label>
+            <input
+              type="text"
+              value={eventCode}
+              onChange={(e) => setEventCode(e.target.value)}
+              placeholder="2026REBUILT"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-xs font-mono font-bold uppercase text-slate-300 block flex items-center gap-2">
+              <Info className="w-4 h-4 text-amber-400" />
+              <span>Optional TBA Auth Key (The Blue Alliance)</span>
+            </label>
+            <input
+              type="password"
+              value={tbaApiKey}
+              onChange={(e) => setTbaApiKey(e.target.value)}
+              placeholder="Paste TBA API Key..."
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
+            />
+            <p className="text-[11px] text-slate-400">
+              Optional API Key for live qualification event rankings from The Blue Alliance.
+            </p>
+          </div>
         </div>
 
         {/* Save button */}
