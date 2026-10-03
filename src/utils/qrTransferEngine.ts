@@ -58,6 +58,11 @@ function cleanEmptyFields(obj: any): any {
 
       let child = cleanEmptyFields(value);
       if (child !== null && child !== undefined && child !== '') {
+        // Strip out legacy/redundant fields from MatchScoutingRecord
+        if (['autoHighScored', 'teleopHighScored', 'notes', 'hangStatus'].includes(key)) {
+          continue;
+        }
+
         // Round standard x/y coordinates to 1 decimal place to save characters
         if ((key === 'x' || key === 'y') && typeof child === 'number') {
           child = Math.round(child * 10) / 10;
@@ -95,7 +100,7 @@ function downsamplePoints(points: any[]): any[] {
   return result;
 }
 
-const MAX_CHUNK_CHAR_LIMIT = 450; // Ultra-low density for instant phone scanning
+const MAX_CHUNK_CHAR_LIMIT = 900; // Increased limit for better reliability while still scannable
 
 export const qrTransferEngine = {
   /**
