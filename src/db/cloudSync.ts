@@ -23,6 +23,16 @@ import {
 } from '../types/scouting';
 import { signInAnonymously } from 'firebase/auth';
 
+export interface AvailableRoom {
+  roomCode: string;
+  eventName: string;
+  createdAt: number;
+  lastActiveAt?: number;
+  teamCount?: number;
+  matchCount?: number;
+  createdBy?: string;
+}
+
 export interface SyncStatus {
   roomCode: string | null;
   eventName: string;
@@ -129,6 +139,33 @@ class CloudSyncManager {
     }
   }
 
+  // Fetch all active/available scouting rooms from Firestore
+  public async fetchAvailableRooms(): Promise<AvailableRoom[]> {
+    try {
+      await this.ensureAuth();
+      const snap = await getDocs(collection(db, 'rooms'));
+      const list: AvailableRoom[] = [];
+      snap.forEach((d) => {
+        const data = d.data();
+        if (data && data.roomCode) {
+          list.push({
+            roomCode: data.roomCode,
+            eventName: data.eventName || 'FRC REBUILT Competition',
+            createdAt: data.createdAt || Date.now(),
+            lastActiveAt: data.lastActiveAt || data.createdAt || Date.now(),
+            teamCount: data.teamCount || 0,
+            matchCount: data.matchCount || 0,
+            createdBy: data.createdBy,
+          });
+        }
+      });
+      return list.sort((a, b) => (b.lastActiveAt || b.createdAt || 0) - (a.lastActiveAt || a.createdAt || 0));
+    } catch (err) {
+      console.warn('Could not fetch available rooms:', err);
+      return [];
+    }
+  }
+
   // Connect / Join a Team Scouting Room
   public async connectToRoom(rawCode: string, eventName: string = 'FRC REBUILT Competition'): Promise<boolean> {
     const code = rawCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
@@ -141,23 +178,34 @@ class CloudSyncManager {
     try {
       const uid = await this.ensureAuth();
       this.activeRoomCode = code;
-      this.activeEventName = eventName;
-
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('frc_sync_room_code', code);
-        localStorage.setItem('frc_sync_event_name', eventName);
-      }
 
       // 1. Create or update room doc
       const roomRef = doc(db, 'rooms', code);
       const roomSnap = await getDoc(roomRef);
-      if (!roomSnap.exists()) {
+      const now = Date.now();
+
+      if (roomSnap.exists()) {
+        const data = roomSnap.data();
+        const effectiveEvent = (eventName && eventName !== 'FRC REBUILT Competition') ? eventName : (data?.eventName || 'FRC REBUILT Competition');
+        this.activeEventName = effectiveEvent;
+        await setDoc(roomRef, {
+          lastActiveAt: now,
+          eventName: effectiveEvent,
+        }, { merge: true });
+      } else {
+        this.activeEventName = eventName || 'FRC REBUILT Competition';
         await setDoc(roomRef, {
           roomCode: code,
-          eventName: eventName,
-          createdAt: Date.now(),
+          eventName: this.activeEventName,
+          createdAt: now,
           createdBy: uid,
+          lastActiveAt: now,
         });
+      }
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('frc_sync_room_code', code);
+        localStorage.setItem('frc_sync_event_name', this.activeEventName);
       }
 
       // 2. Initial bidirectional push & pull
@@ -372,6 +420,17 @@ class CloudSyncManager {
       } catch (err) {
         handleFirestoreError(err, OperationType.WRITE, stratDocPath);
       }
+    }
+
+    // Update room activity and statistics
+    try {
+      await setDoc(doc(db, 'rooms', roomCode), {
+        teamCount: teams.length,
+        matchCount: matches.length,
+        lastActiveAt: Date.now(),
+      }, { merge: true });
+    } catch {
+      // safe fallback
     }
   }
 

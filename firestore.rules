@@ -7,6 +7,11 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Connection test document
+    match /test/{docId} {
+      allow read: if true;
+    }
+
     // Helper functions
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
@@ -28,20 +33,15 @@ service cloud.firestore {
     function isValidTeamProfile(data) {
       return data.keys().hasAll(['teamNumber', 'updatedAt']) &&
              data.teamNumber is number && data.teamNumber > 0 && data.teamNumber < 100000 &&
-             data.updatedAt is number &&
-             (!('teamName' in data) || (data.teamName is string && data.teamName.size() <= 128)) &&
-             (!('organization' in data) || (data.organization is string && data.organization.size() <= 128)) &&
-             (!('location' in data) || (data.location is string && data.location.size() <= 128));
+             data.updatedAt is number;
     }
 
     // Validation for MatchRecord
     function isValidMatchRecord(data) {
-      return data.keys().hasAll(['id', 'matchNumber', 'teamNumber', 'matchType', 'alliance', 'timestamp']) &&
+      return data.keys().hasAll(['id', 'matchNumber', 'teamNumber', 'timestamp']) &&
              data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
              data.matchNumber is number && data.matchNumber > 0 && data.matchNumber < 1000 &&
              data.teamNumber is number && data.teamNumber > 0 && data.teamNumber < 100000 &&
-             data.matchType in ['Qualification', 'Playoff', 'Practice'] &&
-             data.alliance in ['RED', 'BLUE'] &&
              data.timestamp is number;
     }
 
@@ -49,14 +49,13 @@ service cloud.firestore {
     function isValidStrategyBoard(data) {
       return data.keys().hasAll(['id', 'updatedAt']) &&
              data.id is string && data.id.size() > 0 && data.id.size() <= 128 &&
-             data.updatedAt is number &&
-             (!('title' in data) || (data.title is string && data.title.size() <= 128)) &&
-             (!('notes' in data) || (data.notes is string && data.notes.size() <= 5000));
+             data.updatedAt is number;
     }
 
     // --- SCOUTING ROOMS ---
     match /rooms/{roomCode} {
-      allow get, list: if isValidId(roomCode);
+      allow get: if isValidId(roomCode);
+      allow list: if true; // Allows searching and listing active team rooms
       allow create, update: if isValidId(roomCode) && isValidTeamRoom(incoming());
       allow delete: if isValidId(roomCode);
 

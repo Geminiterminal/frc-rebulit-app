@@ -24,9 +24,21 @@
           "type": "string",
           "description": "User UID who created the room",
           "maxLength": 128
+        },
+        "lastActiveAt": {
+          "type": "number",
+          "description": "Last activity timestamp in milliseconds"
+        },
+        "teamCount": {
+          "type": "number",
+          "description": "Count of scouted teams in room"
+        },
+        "matchCount": {
+          "type": "number",
+          "description": "Count of scouted matches in room"
         }
       },
-      "required": ["roomCode", "eventName", "createdAt", "createdBy"]
+      "required": ["roomCode", "eventName", "createdAt"]
     },
     "TeamProfile": {
       "title": "TeamProfile",
@@ -112,7 +124,7 @@
           "description": "Submission timestamp"
         }
       },
-      "required": ["id", "matchNumber", "teamNumber", "matchType", "alliance", "timestamp"]
+      "required": ["id", "matchNumber", "teamNumber", "timestamp"]
     },
     "StrategyBoard": {
       "title": "StrategyBoard",
