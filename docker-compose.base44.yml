@@ -1,0 +1,19 @@
+services:
+  web:
+    image: oven/bun:1.4.0
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS
+    command: ["sh", "-ec", "bun install && exec bun run dev"]
+    healthcheck:
+      test: ["CMD", "bun", "-e", "const r=await fetch('http://localhost:3000/');if(!r.ok)throw 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: on-failure
