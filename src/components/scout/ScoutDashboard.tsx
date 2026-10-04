@@ -100,22 +100,41 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
     setTimeout(() => setScanAssignmentMsg(null), 4000);
   };
 
-  const handleGenerateTaskQr = async (task: any) => {
+  const handleGenerateTaskQr = async (task: { type: 'PIT' | 'MATCH'; teamNumber: number; matchNumber?: number; data?: any }) => {
     const scoutName = scoutProfile.name || 'Scout';
     let payloadStr = '';
+    let recordData = task.data;
 
     if (task.type === 'PIT') {
-      payloadStr = qrTransferEngine.generateSinglePitQr(scoutName, task.teamNumber, task.data);
+      if (!recordData) {
+        const teamProfile = await scoutingDB.getTeam(task.teamNumber);
+        recordData = teamProfile?.pit;
+      }
+      if (recordData) {
+        payloadStr = qrTransferEngine.generateSinglePitQr(scoutName, task.teamNumber, recordData);
+      }
     } else {
-      payloadStr = qrTransferEngine.generateSingleMatchQr(scoutName, task.data);
+      if (!recordData) {
+        const matches = await scoutingDB.getMatchesForTeam(task.teamNumber);
+        if (task.matchNumber) {
+          recordData = matches.find((m) => m.matchNumber === task.matchNumber);
+        } else {
+          recordData = matches[0];
+        }
+      }
+      if (recordData) {
+        payloadStr = qrTransferEngine.generateSingleMatchQr(scoutName, recordData);
+      }
     }
 
-    try {
-      const url = await QRCode.toDataURL(payloadStr, { errorCorrectionLevel: 'L', margin: 1, width: 280 });
-      setActiveTaskQrUrl(url);
-      setActiveTaskTitle(`Team ${task.teamNumber} (${task.type === 'PIT' ? 'Pit' : `Match ${task.matchNumber}`})`);
-    } catch (e) {
-      console.error(e);
+    if (payloadStr) {
+      try {
+        const url = await QRCode.toDataURL(payloadStr, { errorCorrectionLevel: 'L', margin: 1, width: 280 });
+        setActiveTaskQrUrl(url);
+        setActiveTaskTitle(`Team ${task.teamNumber} (${task.type === 'PIT' ? 'Pit' : `Match ${recordData?.matchNumber || task.matchNumber || 1}`})`);
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
@@ -204,9 +223,10 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
                 return (
                   <div
                     key={`task-m${task.matchNumber}-t${task.teamNumber}`}
-                    className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                    onClick={() => onNavigate('match-scout', task.teamNumber, task.matchNumber, taskAlliance)}
+                    className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all cursor-pointer ${
                       isMatchDone
-                        ? 'bg-slate-950 border-emerald-600/40 text-emerald-200'
+                        ? 'bg-slate-950 border-emerald-600/40 text-emerald-200 hover:border-emerald-500'
                         : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-100'
                     }`}
                   >
@@ -232,17 +252,30 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
                         </span>
                       )}
 
-                      <button
-                        type="button"
-                        onClick={() => onNavigate('match-scout', task.teamNumber, task.matchNumber, taskAlliance)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors font-mono shrink-0 ${
-                          isMatchDone
-                            ? 'bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-750'
-                            : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow font-black'
-                        }`}
-                      >
-                        {isMatchDone ? 'Review Match' : 'Scout Match'}
-                      </button>
+                      {isMatchDone ? (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleGenerateTaskQr({ type: 'MATCH', teamNumber: task.teamNumber, matchNumber: task.matchNumber });
+                          }}
+                          className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-100 border border-slate-700 text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors shrink-0 font-mono"
+                        >
+                          <QrCode className="w-3.5 h-3.5 text-slate-300" />
+                          <span>QR</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onNavigate('match-scout', task.teamNumber, task.matchNumber, taskAlliance);
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors font-mono shrink-0 bg-amber-500 hover:bg-amber-400 text-slate-950 shadow font-black"
+                        >
+                          Scout Match
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -252,195 +285,94 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
         )}
 
         {/* Queue Items */}
-        {myTargetTeams.length > 0 ? (
-          <div className="space-y-1.5">
-            {myTargetTeams.map((teamNum) => {
-              const status = teamStatuses[teamNum];
-              const schedMatches = teamSchedulesMap[teamNum] || [];
-              const scoutedMatches = teamScoutedMatchesMap[teamNum] || [];
-              const isExpanded = expandedTeams.has(teamNum);
-              const isDone = isPitMode ? status?.isPitScouted : (scoutedMatches.length > 0);
+        {(() => {
+          const queueTeams = isPitMode
+            ? myTargetTeams
+            : myTargetTeams.filter((t) => !myMatchTargets.some((m) => m.teamNumber === t));
 
-              return (
-                <div
-                  key={teamNum}
-                  className={`rounded-xl border transition-all overflow-hidden ${
-                    isDone
-                      ? 'bg-slate-950 border-slate-800'
-                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  {/* Primary Team Header Row */}
+          if (queueTeams.length === 0) return null;
+
+          return (
+            <div className="space-y-1.5 font-mono">
+              {!isPitMode && myMatchTargets.length > 0 && queueTeams.length > 0 && (
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono pt-1">
+                  Additional Target Teams ({queueTeams.length})
+                </div>
+              )}
+              {queueTeams.map((teamNum) => {
+                const status = teamStatuses[teamNum];
+                const scoutedMatches = teamScoutedMatchesMap[teamNum] || [];
+                const isDone = isPitMode ? status?.isPitScouted : (scoutedMatches.length > 0);
+
+                return (
                   <div
-                    onClick={() => {
-                      if (isPitMode) {
-                        onNavigate('pit-scout', teamNum);
-                      } else {
-                        toggleExpandTeam(teamNum);
-                      }
-                    }}
-                    className="p-3 flex items-center justify-between cursor-pointer select-none text-xs"
+                    key={teamNum}
+                    className={`rounded-xl border transition-all overflow-hidden ${
+                      isDone
+                        ? 'bg-slate-950 border-slate-800'
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                    }`}
                   >
-                    <div className="flex items-center gap-2 font-bold">
-                      <span className="text-slate-100">
-                        Team #{teamNum}
-                      </span>
-                      {!isPitMode && schedMatches.length > 0 && (
-                        <span className="text-[10px] text-slate-400 font-normal">
-                          ({schedMatches.length} {schedMatches.length === 1 ? 'match' : 'matches'})
+                    <div
+                      onClick={() => {
+                        if (isPitMode) {
+                          onNavigate('pit-scout', teamNum);
+                        } else {
+                          onNavigate('match-scout', teamNum);
+                        }
+                      }}
+                      className="p-3 flex items-center justify-between cursor-pointer select-none text-xs"
+                    >
+                      <div className="flex items-center gap-2 font-bold">
+                        <span className="text-slate-100">
+                          Team #{teamNum}
                         </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {isDone && (
-                        <span className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Done</span>
-                        </span>
-                      )}
-
-                      {isPitMode ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onNavigate('pit-scout', teamNum);
-                          }}
-                          className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
-                            isDone
-                              ? 'bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-750'
-                              : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow'
-                          }`}
-                        >
-                          {isDone ? 'Review' : 'Scout'}
-                        </button>
-                      ) : (
-                        <div className="flex items-center gap-1 text-slate-400 hover:text-white text-xs">
-                          <span className="text-[10px] font-bold">
-                            {isExpanded ? 'Hide Schedule' : 'Schedule'}
-                          </span>
-                          {isExpanded ? (
-                            <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-                          ) : (
-                            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Extended Match Schedule Dropdown */}
-                  {!isPitMode && isExpanded && (
-                    <div className="p-2.5 bg-slate-900 border-t border-slate-800/80 space-y-1.5">
-                      <div className="text-[10px] text-slate-400 font-mono font-bold uppercase flex items-center justify-between">
-                        <span>Team {teamNum} Matches:</span>
-                        <span>{schedMatches.length} Scheduled</span>
                       </div>
 
-                      {schedMatches.length > 0 ? (
-                        <div className="space-y-1">
-                          {schedMatches.map((m) => {
-                            const isMatchDone = scoutedMatches.includes(m.matchNumber);
-                            const isRed = m.redTeams.includes(teamNum);
-                            const badgeBg = isRed
-                              ? 'bg-rose-950/80 border-rose-900 text-rose-300'
-                              : 'bg-sky-950/80 border-sky-900 text-sky-300';
+                      <div className="flex items-center gap-2">
+                        {isDone && (
+                          <span className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Done</span>
+                          </span>
+                        )}
 
-                            return (
-                              <div
-                                key={m.key}
-                                className={`p-2 rounded-lg border flex items-center justify-between text-xs transition-all ${
-                                  isMatchDone
-                                    ? 'bg-slate-950 border-emerald-600/40 text-emerald-200'
-                                    : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-200'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-white uppercase text-xs">
-                                    {m.compLevel === 'qm' ? `Qual ${m.matchNumber}` : `Match ${m.matchNumber}`}
-                                  </span>
-                                  <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase border ${badgeBg}`}>
-                                    {isRed ? 'Red' : 'Blue'}
-                                  </span>
-                                </div>
-
-                                <div className="flex items-center gap-1.5">
-                                  {isMatchDone && (
-                                    <span className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
-                                      <CheckCircle2 className="w-3 h-3" />
-                                    </span>
-                                  )}
-
-                                  <button
-                                    type="button"
-                                    onClick={() => onNavigate('match-scout', teamNum, m.matchNumber)}
-                                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer transition-colors ${
-                                      isMatchDone
-                                        ? 'bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-750'
-                                        : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow font-black'
-                                    }`}
-                                  >
-                                    {isMatchDone ? 'Review' : 'Scout'}
-                                  </button>
-
-                                  {isMatchDone && (
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        const matches = await scoutingDB.getMatchesForTeam(teamNum);
-                                        const matched = matches.find((rc) => rc.matchNumber === m.matchNumber) || matches[0];
-                                        if (matched) {
-                                          handleGenerateTaskQr({ type: 'MATCH', teamNumber: teamNum, data: matched, matchNumber: m.matchNumber });
-                                        }
-                                      }}
-                                      className="py-1 px-2 rounded-md bg-slate-850 hover:bg-slate-800 border border-slate-750 text-slate-100 text-[10px] font-bold cursor-pointer flex items-center gap-1"
-                                      title="Show QR"
-                                    >
-                                      <QrCode className="w-3 h-3 text-slate-300" />
-                                      <span>QR</span>
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-center space-y-1.5">
-                          <p className="text-[11px] text-slate-400">
-                            No match schedule imported yet.
-                          </p>
+                        {isDone ? (
                           <button
                             type="button"
-                            onClick={() => onNavigate('match-scout', teamNum)}
-                            className="px-3 py-1 rounded-md bg-slate-800 hover:bg-slate-750 text-white text-[11px] font-bold border border-slate-700 cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleGenerateTaskQr({ type: isPitMode ? 'PIT' : 'MATCH', teamNumber: teamNum });
+                            }}
+                            className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-100 border border-slate-700 text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors shrink-0 font-mono"
                           >
-                            + Scout Match Directly
+                            <QrCode className="w-3.5 h-3.5 text-slate-300" />
+                            <span>QR</span>
                           </button>
-                        </div>
-                      )}
-
-                      <div className="pt-1 flex items-center justify-end">
-                        <button
-                          type="button"
-                          onClick={() => onNavigate('match-scout', teamNum)}
-                          className="text-[10px] text-amber-400 hover:text-amber-300 font-bold cursor-pointer underline"
-                        >
-                          + Scout Custom Match #
-                        </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isPitMode) {
+                                onNavigate('pit-scout', teamNum);
+                              } else {
+                                onNavigate('match-scout', teamNum);
+                              }
+                            }}
+                            className="px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors bg-amber-500 hover:bg-amber-400 text-slate-950 shadow"
+                          >
+                            {isPitMode ? 'Scout' : 'Scout Match'}
+                          </button>
+                        )}
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="p-4 text-center rounded-xl bg-slate-950 text-xs text-slate-400">
-            No assignments loaded yet. Scan QR or add team # below.
-          </div>
-        )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* Manual Add Queue */}
         <form onSubmit={handleAddManualTeam} className="flex items-center gap-2 pt-2 border-t border-slate-800/80">

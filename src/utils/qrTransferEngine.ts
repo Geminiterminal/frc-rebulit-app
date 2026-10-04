@@ -172,28 +172,28 @@ export const qrTransferEngine = {
         }
       }
 
-      // Merge pit target teams without losing previous ones
-      const newTeamNums = matchTasks.map((t) => t.teamNumber);
-      const mergedTargetTeams = Array.from(
-        new Set([...existingTargetTeams, ...assignedTeams, ...newTeamNums])
-      ).filter((t) => Number.isInteger(t) && t > 0);
+      // Handle assignments based on role
+      if (scoutRole === 'MATCH_SCOUT') {
+        scoutingAssignments.setMyMatchTasks(mergedMatchTasks);
+        scoutingAssignments.assignScout(scoutId, scoutRole, [], mergedMatchTasks);
+      } else {
+        const mergedTargetTeams = Array.from(
+          new Set([...existingTargetTeams, ...assignedTeams])
+        ).filter((t) => Number.isInteger(t) && t > 0);
 
-      scoutingAssignments.setMyMatchTasks(mergedMatchTasks);
-      scoutingAssignments.setMyTargetTeams(mergedTargetTeams);
-      scoutingAssignments.assignScout(scoutId, scoutRole, mergedTargetTeams, mergedMatchTasks);
+        scoutingAssignments.setMyTargetTeams(mergedTargetTeams);
+        scoutingAssignments.assignScout(scoutId, scoutRole, mergedTargetTeams, []);
+      }
 
       const newMatchCount = matchTasks.length;
       const newPitCount = assignedTeams.length;
       const totalMatchTasks = mergedMatchTasks.length;
-      const totalPitTeams = mergedTargetTeams.length;
 
       let summaryText = '';
-      if (newMatchCount > 0 && newPitCount > 0) {
-        summaryText = `Added ${newMatchCount} match task(s) & ${newPitCount} pit team(s) (Total: ${totalMatchTasks} match, ${totalPitTeams} pit)`;
-      } else if (newMatchCount > 0) {
-        summaryText = `Added ${newMatchCount} match task(s) (Total: ${totalMatchTasks} match tasks)`;
+      if (scoutRole === 'MATCH_SCOUT') {
+        summaryText = `Loaded ${newMatchCount} match task(s) (Total: ${totalMatchTasks} match tasks)`;
       } else {
-        summaryText = `Added ${newPitCount} pit team(s) (Total: ${totalPitTeams} pit teams)`;
+        summaryText = `Loaded ${newPitCount} pit team(s)`;
       }
 
       return {
