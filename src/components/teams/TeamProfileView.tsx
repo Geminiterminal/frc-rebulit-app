@@ -18,7 +18,12 @@ import {
   Activity,
   Award,
   ChevronUp,
-  HelpCircle
+  HelpCircle,
+  Eye,
+  Settings,
+  Shield,
+  Wrench,
+  Check
 } from 'lucide-react';
 
 interface TeamProfileViewProps {
@@ -111,15 +116,10 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
   const routeBothCount = matches.filter((m) => m.fieldRoute === 'BOTH').length;
   const routeNeitherCount = matches.filter((m) => m.fieldRoute === 'NEITHER' || !m.fieldRoute).length;
 
-  let preferredRouteStr = '—';
-  if (matchCount > 0) {
-    const percentages: string[] = [];
-    if (routeBothCount) percentages.push(`${Math.round((routeBothCount / matchCount) * 100)}% Both`);
-    if (routeBumpCount) percentages.push(`${Math.round((routeBumpCount / matchCount) * 100)}% Bump`);
-    if (routeTrenchCount) percentages.push(`${Math.round((routeTrenchCount / matchCount) * 100)}% Trench`);
-    if (routeNeitherCount && percentages.length === 0) percentages.push('100% Neither');
-    preferredRouteStr = percentages.join(', ');
-  }
+  const routeBumpPct = matchCount ? Math.round((routeBumpCount / matchCount) * 100) : 0;
+  const routeTrenchPct = matchCount ? Math.round((routeTrenchCount / matchCount) * 100) : 0;
+  const routeBothPct = matchCount ? Math.round((routeBothCount / matchCount) * 100) : 0;
+  const routeNeitherPct = matchCount ? Math.round((routeNeitherCount / matchCount) * 100) : 0;
 
   // Defense breakdown
   const playedDefenseCount = matches.filter((m) => m.playedDefense).length;
@@ -191,14 +191,14 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
             </div>
 
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <span className="px-2 py-0.5 rounded-md bg-slate-950 text-slate-300 border border-slate-800 text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-md bg-slate-950 text-emerald-400 border border-emerald-900/40 text-[10px] font-bold">
                 [{pit?.drivetrain || 'No Pit Data'}]
               </span>
-              <span className="px-2 py-0.5 rounded-md bg-slate-950 text-sky-400 border border-slate-800 text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-md bg-slate-950 text-sky-400 border border-sky-900/40 text-[10px] font-bold">
                 [{pit?.bumpTrench ? `${pit.bumpTrench}: BUMP/TRENCH` : 'No Clearance Spec'}]
               </span>
               {team.officialRank && (
-                <span className="px-2 py-0.5 rounded-md bg-amber-950/80 text-amber-300 border border-amber-800/80 text-[10px] font-bold">
+                <span className="px-2 py-0.5 rounded-md bg-amber-950/85 text-amber-300 border border-amber-800/80 text-[10px] font-bold">
                   Rank #{team.officialRank}
                 </span>
               )}
@@ -243,47 +243,83 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
         {/* Left Column — Pit Scout Specs & Claims */}
         <div className="p-4 sm:p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col justify-between gap-4">
           <div className="space-y-3.5">
-            <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider border-b border-slate-800 pb-2">
-              PIT SPECS & CLAIMS (Team Profile)
-            </h3>
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+              <Cpu className="w-4 h-4 text-blue-400" />
+              <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
+                PIT SPECS & CLAIMS
+              </h3>
+            </div>
 
-            <ul className="space-y-2.5 text-xs text-slate-300 font-mono">
-              <li className="flex items-start gap-1.5">
-                <span className="text-slate-500">•</span>
-                <span><strong className="text-slate-400 font-bold">Drivetrain:</strong> {pit?.drivetrain || '—'} {pit?.drivetrainOther && `(${pit.drivetrainOther})`}</span>
-              </li>
-              <li className="flex items-start gap-1.5">
-                <span className="text-slate-500">•</span>
-                <span><strong className="text-slate-400 font-bold">Shooter:</strong> {pit?.shooter && pit.shooter.length > 0 ? pit.shooter.join(', ') : '—'} {pit?.shooterOther && `Other: (${pit.shooterOther})`}</span>
-              </li>
-              <li className="flex items-start gap-1.5">
-                <span className="text-slate-500">•</span>
-                <span><strong className="text-slate-400 font-bold">Hopper Capacity:</strong> {pit?.hopperCapacity !== undefined ? `${pit.hopperCapacity} balls` : '—'}</span>
-              </li>
-              <li className="flex items-start gap-1.5">
-                <span className="text-slate-500">•</span>
-                <span><strong className="text-slate-400 font-bold">Claimed Accuracy:</strong> {pit?.shootingAccuracy || '—'}</span>
-              </li>
-              <li className="flex items-start gap-1.5">
-                <span className="text-slate-500">•</span>
-                <span>
-                  <strong className="text-slate-400 font-bold">Auto Routines:</strong> {pit?.hasAutonomous === 'YES' ? `${pit.autoRoutinesCount || '1'} routines` : 'None'} {pit?.autoConsistency && `(${pit.autoConsistency})`}
+            <div className="grid grid-cols-1 gap-2.5 text-xs">
+              <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-850 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <span className="text-slate-400 font-bold">Drivetrain</span>
+                </div>
+                <span className="font-bold text-white text-right">
+                  {pit?.drivetrain || '—'} {pit?.drivetrainOther && `(${pit.drivetrainOther})`}
                 </span>
-              </li>
-              <li className="flex items-start gap-1.5">
-                <span className="text-slate-500">•</span>
-                <span><strong className="text-slate-400 font-bold font-mono">Known Issues (Pit):</strong> {pit?.biggestIssues && pit.biggestIssues.length > 0 ? pit.biggestIssues.join(', ') : 'None'} {pit?.biggestIssueOther && `(${pit.biggestIssueOther})`}</span>
-              </li>
-            </ul>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-850 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <span className="text-slate-400 font-bold">Shooter</span>
+                </div>
+                <span className="font-bold text-sky-400 text-right">
+                  {pit?.shooter && pit.shooter.length > 0 ? pit.shooter.join(', ') : '—'} {pit?.shooterOther && `Other: (${pit.shooterOther})`}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-850 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <span className="text-slate-400 font-bold">Hopper Capacity</span>
+                </div>
+                <span className="font-bold text-amber-400">
+                  {pit?.hopperCapacity !== undefined ? `${pit.hopperCapacity} balls` : '—'}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-850 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <span className="text-slate-400 font-bold">Claimed Accuracy</span>
+                </div>
+                <span className="font-bold text-emerald-400">
+                  {pit?.shootingAccuracy || '—'}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-850 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <span className="text-slate-400 font-bold">Auto Routines</span>
+                </div>
+                <span className="font-bold text-purple-400">
+                  {pit?.hasAutonomous === 'YES' ? `${pit.autoRoutinesCount || '1'} routines` : 'None'} {pit?.autoConsistency && `(${pit.autoConsistency})`}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-850 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <span className="text-slate-400 font-bold">Known Issues (Pit)</span>
+                </div>
+                <span className="font-bold text-rose-300">
+                  {pit?.biggestIssues && pit.biggestIssues.length > 0 ? pit.biggestIssues.join(', ') : 'None'} {pit?.biggestIssueOther && `(${pit.biggestIssueOther})`}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Robot Photo Preview */}
-          <div className="space-y-3 pt-2">
+          <div className="space-y-2 pt-2">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-mono">[ Robot Photo Preview / Thumbnail ]</span>
             {pit?.photos && pit.photos.length > 0 ? (
               <div 
                 onClick={() => setSelectedPhoto(pit.photos![0].dataUrl)}
-                className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 aspect-video max-h-40 cursor-pointer group shrink-0"
+                className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 aspect-video max-h-40 cursor-pointer group shrink-0 shadow-inner"
               >
                 <img 
                   src={pit.photos[0].dataUrl} 
@@ -291,8 +327,8 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
                   className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-200"
                 />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white text-xs gap-1 font-bold">
-                  <Maximize2 className="w-4 h-4 text-slate-200" />
-                  <span>View Larger</span>
+                  <Eye className="w-4 h-4 text-slate-200" />
+                  <span>Enlarge Photo</span>
                 </div>
               </div>
             ) : (
@@ -312,55 +348,112 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
 
         {/* Right Column — Real Match Averages (Verified Empirical Data) */}
         <div className="p-4 sm:p-5 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-4">
-          <div className="space-y-3.5">
-            <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider border-b border-slate-800 pb-2 flex items-center gap-1.5">
-              <span>OBSERVED PERFORMANCE TRENDS</span>
-            </h3>
+          <div className="space-y-3.5 flex-1">
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+              <TrendingUp className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-xs sm:text-sm font-black text-white uppercase tracking-wider">
+                OBSERVED TRENDS & STATS
+              </h3>
+            </div>
 
             {matchCount > 0 ? (
-              <ul className="space-y-3 text-xs text-slate-300 font-mono">
-                <li className="flex items-start gap-1.5">
-                  <span className="text-slate-500">•</span>
-                  <span>
-                    <strong className="text-slate-400">Avg Teleop Fuel:</strong> <span className="text-emerald-400 font-bold">{avgTeleopFuel}</span> (Max: <span className="text-slate-400 font-bold">{maxTeleopFuel}</span>)
-                  </span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-slate-500">•</span>
-                  <span>
-                    <strong className="text-slate-400 font-bold">Avg Auto Fuel:</strong> <span className="text-blue-400 font-bold">{avgAutoFuel}</span> (Max: <span className="text-slate-400 font-bold">{maxAutoFuel}</span>)
-                  </span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-slate-500">•</span>
-                  <span>
-                    <strong className="text-slate-400 font-bold">Route Usage:</strong> <span className="text-amber-400 font-bold">{preferredRouteStr}</span>
-                  </span>
-                </li>
-                <li className="flex items-start gap-1.5">
-                  <span className="text-slate-500">•</span>
-                  <span>
-                    <strong className="text-slate-400 font-bold">Defense:</strong> Played in <span className="text-purple-300 font-bold">{defensePercentage}%</span> of matches {playedDefenseCount > 0 && `(Effectiveness: ${avgDefenseEffectiveness})`}
-                  </span>
-                </li>
-                <li className="flex flex-col gap-1.5 pt-1">
-                  <span className="text-slate-400 font-bold font-mono uppercase text-[10px] tracking-wider">Issue Breakdown:</span>
-                  <div className="grid grid-cols-2 gap-1.5 text-center text-[10px] font-bold">
-                    <div className="p-1.5 rounded-lg bg-rose-950/60 border border-rose-900 text-rose-300">
-                      {issueDisabledCount} Disabled
+              <div className="space-y-3.5 text-xs font-mono">
+                {/* Visual Average Auto Fuel Bar */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400 font-bold">Avg Auto Fuel Scored</span>
+                    <span className="text-blue-400 font-bold">{avgAutoFuel} <span className="text-slate-500 font-normal">(Max: {maxAutoFuel})</span></span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-850">
+                    <div 
+                      className="h-full bg-blue-500 rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min(100, (avgAutoFuelNum / 30) * 100)}%` }} 
+                    />
+                  </div>
+                </div>
+
+                {/* Visual Average Teleop Fuel Bar */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400 font-bold">Avg Teleop Fuel Scored</span>
+                    <span className="text-emerald-400 font-bold">{avgTeleopFuel} <span className="text-slate-500 font-normal">(Max: {maxTeleopFuel})</span></span>
+                  </div>
+                  <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden border border-slate-850">
+                    <div 
+                      className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
+                      style={{ width: `${Math.min(100, (avgTeleopFuelNum / 100) * 100)}%` }} 
+                    />
+                  </div>
+                </div>
+
+                {/* Visual Route Usage Breakdown */}
+                <div className="space-y-1.5 pt-1.5 border-t border-slate-800/60">
+                  <span className="text-slate-400 font-bold text-[10px] uppercase block tracking-wider">Route Usage Breakdown</span>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] text-slate-300">
+                      <span>Both Routes</span>
+                      <span>{routeBothPct}%</span>
                     </div>
-                    <div className="p-1.5 rounded-lg bg-amber-950/60 border border-amber-900 text-amber-300">
-                      {issueMajorCount} Major
+                    <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
+                      <div className="h-full bg-amber-500" style={{ width: `${routeBothPct}%` }} />
                     </div>
-                    <div className="p-1.5 rounded-lg bg-yellow-950/40 border border-yellow-800/60 text-yellow-200">
-                      {issueMinorCount} Minor
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-300">
+                      <span>Bump Only</span>
+                      <span>{routeBumpPct}%</span>
                     </div>
-                    <div className="p-1.5 rounded-lg bg-emerald-950/40 border border-emerald-900/60 text-emerald-200">
-                      {issueCleanCount} Clean
+                    <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
+                      <div className="h-full bg-orange-500" style={{ width: `${routeBumpPct}%` }} />
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-slate-300">
+                      <span>Trench Only</span>
+                      <span>{routeTrenchPct}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
+                      <div className="h-full bg-sky-500" style={{ width: `${routeTrenchPct}%` }} />
                     </div>
                   </div>
-                </li>
-              </ul>
+                </div>
+
+                {/* Defense Bar */}
+                <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-400 font-bold">Played Defense</span>
+                    <span className="text-purple-300 font-bold">{defensePercentage}% of Matches</span>
+                  </div>
+                  {playedDefenseCount > 0 && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                      <span className="px-1.5 py-0.2 rounded bg-purple-950 text-purple-200 border border-purple-800">
+                        Effectiveness: {avgDefenseEffectiveness}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Issue Breakdown Tags */}
+                <div className="space-y-2 pt-2 border-t border-slate-800/60">
+                  <span className="text-slate-400 font-bold text-[10px] uppercase block tracking-wider">Scouted Matches Health</span>
+                  <div className="grid grid-cols-4 gap-1.5 text-center text-[10px] font-bold">
+                    <div className="p-1.5 rounded-lg bg-rose-950/60 border border-rose-900 text-rose-300 flex flex-col items-center">
+                      <span className="text-sm font-black">{issueDisabledCount}</span>
+                      <span>Disabled</span>
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-amber-950/60 border border-amber-900 text-amber-300 flex flex-col items-center">
+                      <span className="text-sm font-black">{issueMajorCount}</span>
+                      <span>Major</span>
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-yellow-950/30 border border-yellow-800/50 text-yellow-300 flex flex-col items-center">
+                      <span className="text-sm font-black">{issueMinorCount}</span>
+                      <span>Minor</span>
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-emerald-950/40 border border-emerald-900/60 text-emerald-200 flex flex-col items-center">
+                      <span className="text-sm font-black">{issueCleanCount}</span>
+                      <span>Clean</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="p-8 text-center text-xs text-slate-500 border border-slate-800 bg-slate-950 rounded-xl space-y-1">
                 <p>No verified matches scouted for Team {teamNumber} yet.</p>
@@ -370,7 +463,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
           </div>
 
           {matchCount > 0 && (
-            <div className="mt-auto p-3 rounded-xl bg-slate-950 border border-slate-850 text-xs text-slate-400 flex items-center gap-2">
+            <div className="p-3 rounded-xl bg-slate-950 border border-slate-850 text-xs text-slate-400 flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
               <span>Real-time averages calculated from verified match sheets.</span>
             </div>

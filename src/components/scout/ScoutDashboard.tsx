@@ -9,7 +9,8 @@ import {
   ChevronUp,
   Target,
   Gamepad2,
-  Plus
+  Plus,
+  HelpCircle
 } from 'lucide-react';
 import { scoutingAssignments, MatchTarget } from '../../db/scoutingAssignments';
 import { scoutingDB } from '../../db/indexedDB';
@@ -147,8 +148,9 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
       if (!isPitMode && matchNum > 0) {
         const updated = [...myMatchTargets, { matchNumber: matchNum, teamNumber: num }];
         scoutingAssignments.setMyMatchTargets(updated);
+      } else if (isPitMode || isNaN(matchNum)) {
+        scoutingAssignments.addTeamToTarget(num);
       }
-      scoutingAssignments.addTeamToTarget(num);
       setExpandedTeams((prev) => new Set(prev).add(num));
       setManualTeamInput('');
       setManualMatchInput('');
@@ -165,7 +167,7 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
         <button
           type="button"
           onClick={() => setIsScanAssignmentOpen(true)}
-          className="w-full py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-100 border border-slate-800 font-bold text-xs uppercase cursor-pointer flex items-center justify-center gap-2 transition-colors shadow-sm"
+          className="w-full py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-100 border border-slate-800 font-bold text-xs uppercase cursor-pointer flex items-center justify-center gap-2 transition-colors shadow-sm animate-pulse"
         >
           <Camera className="w-4 h-4 text-slate-300" />
           <span>Scan Assignment QR</span>
@@ -179,85 +181,140 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
         </div>
       )}
 
-      {/* ASSIGNMENTS CARD */}
-      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
-        <div className="border-b border-slate-800/80 pb-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {isPitMode ? (
-              <Target className="w-4 h-4 text-blue-400" />
-            ) : (
-              <Gamepad2 className="w-4 h-4 text-amber-400" />
-            )}
+      {/* 1. MATCH SCOUTING ASSIGNMENTS BLOCK */}
+      {myMatchTargets.length > 0 && (
+        <div className="p-4 rounded-2xl bg-slate-900 border border-amber-900/40 space-y-2.5 shadow-md">
+          <div className="border-b border-slate-800 pb-2 flex items-center gap-2">
+            <Gamepad2 className="w-4 h-4 text-amber-400" />
             <span className="text-xs font-bold text-white uppercase tracking-wider">
-              Assignments ({myTargetTeams.length})
+              Match Scouting Assignments ({myMatchTargets.length})
             </span>
           </div>
-          <span className="text-[10px] text-slate-400 uppercase font-mono">
-            {isPitMode ? 'Pit Mode' : 'Match Mode'}
-          </span>
-        </div>
 
-        {/* MATCH SCOUT SPECIFIC TASKS LIST */}
-        {myMatchTargets.length > 0 && (
-          <div className="space-y-2 mb-3">
-            <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider font-mono flex items-center justify-between">
-              <span>Match Scouting Assignments ({myMatchTargets.length})</span>
-            </div>
+          <div className="space-y-1.5">
+            {myMatchTargets.map((task) => {
+              const scoutedMatches = teamScoutedMatchesMap[task.teamNumber] || [];
+              const isMatchDone = scoutedMatches.includes(task.matchNumber);
 
-            <div className="space-y-1.5">
-              {myMatchTargets.map((task) => {
-                const scoutedMatches = teamScoutedMatchesMap[task.teamNumber] || [];
-                const isMatchDone = scoutedMatches.includes(task.matchNumber);
-
-                // Determine alliance
-                let taskAlliance = task.alliance;
-                if (!taskAlliance) {
-                  const sched = teamSchedulesMap[task.teamNumber] || [];
-                  const m = sched.find((s) => s.matchNumber === task.matchNumber);
-                  if (m) {
-                    if (m.redTeams.includes(task.teamNumber)) taskAlliance = 'red';
-                    else if (m.blueTeams.includes(task.teamNumber)) taskAlliance = 'blue';
-                  }
+              // Determine alliance
+              let taskAlliance = task.alliance;
+              if (!taskAlliance) {
+                const sched = teamSchedulesMap[task.teamNumber] || [];
+                const m = sched.find((s) => s.matchNumber === task.matchNumber);
+                if (m) {
+                  if (m.redTeams.includes(task.teamNumber)) taskAlliance = 'red';
+                  else if (m.blueTeams.includes(task.teamNumber)) taskAlliance = 'blue';
                 }
+              }
 
-                return (
-                  <div
-                    key={`task-m${task.matchNumber}-t${task.teamNumber}`}
-                    onClick={() => onNavigate('match-scout', task.teamNumber, task.matchNumber, taskAlliance)}
-                    className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all cursor-pointer ${
-                      isMatchDone
-                        ? 'bg-slate-950 border-emerald-600/40 text-emerald-200 hover:border-emerald-500'
-                        : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-100'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 flex-wrap font-mono font-bold text-xs sm:text-sm">
-                      <span className="text-white">Team #{task.teamNumber},</span>
-                      <span className="text-slate-200">Match #{task.matchNumber}</span>
-                      {taskAlliance === 'red' ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-950 text-rose-300 border border-rose-600 shadow-sm">
-                          Red
-                        </span>
-                      ) : taskAlliance === 'blue' ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-sky-950 text-sky-300 border border-sky-600 shadow-sm">
-                          Blue
-                        </span>
-                      ) : null}
+              return (
+                <div
+                  key={`task-m${task.matchNumber}-t${task.teamNumber}`}
+                  onClick={() => onNavigate('match-scout', task.teamNumber, task.matchNumber, taskAlliance)}
+                  className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all cursor-pointer ${
+                    isMatchDone
+                      ? 'bg-slate-950 border-emerald-600/40 text-emerald-200 hover:border-emerald-500'
+                      : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 flex-wrap font-mono font-bold text-xs sm:text-sm">
+                    <span className="text-white">Team #{task.teamNumber},</span>
+                    <span className="text-slate-200">Match #{task.matchNumber}</span>
+                    {taskAlliance === 'red' ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-950 text-rose-300 border border-rose-600 shadow-sm">
+                        Red
+                      </span>
+                    ) : taskAlliance === 'blue' ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-sky-950 text-sky-300 border border-sky-600 shadow-sm">
+                        Blue
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {isMatchDone && (
+                      <span className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Done</span>
+                      </span>
+                    )}
+
+                    {isMatchDone ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleGenerateTaskQr({ type: 'MATCH', teamNumber: task.teamNumber, matchNumber: task.matchNumber });
+                        }}
+                        className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-100 border border-slate-700 text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors shrink-0 font-mono"
+                      >
+                        <QrCode className="w-3.5 h-3.5 text-slate-300" />
+                        <span>QR</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNavigate('match-scout', task.teamNumber, task.matchNumber, taskAlliance);
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors font-mono shrink-0 bg-amber-500 hover:bg-amber-400 text-slate-950 shadow font-black"
+                      >
+                        Scout Match
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 2. PIT SCOUTING TARGETS BLOCK */}
+      {myTargetTeams.length > 0 && (
+        <div className="p-4 rounded-2xl bg-slate-900 border border-blue-900/40 space-y-2.5 shadow-md">
+          <div className="border-b border-slate-800 pb-2 flex items-center gap-2">
+            <Target className="w-4 h-4 text-blue-400" />
+            <span className="text-xs font-bold text-white uppercase tracking-wider">
+              Pit Scouting Targets ({myTargetTeams.length})
+            </span>
+          </div>
+
+          <div className="space-y-1.5 font-mono">
+            {myTargetTeams.map((teamNum) => {
+              const status = teamStatuses[teamNum];
+              const isDone = status?.isPitScouted;
+
+              return (
+                <div
+                  key={`pit-${teamNum}`}
+                  onClick={() => onNavigate('pit-scout', teamNum)}
+                  className={`rounded-xl border transition-all overflow-hidden cursor-pointer ${
+                    isDone
+                      ? 'bg-slate-950 border-emerald-600/40 hover:border-emerald-500'
+                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  <div className="p-3 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 font-bold text-xs sm:text-sm">
+                      <span className="text-slate-100">Team #{teamNum}</span>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {isMatchDone && (
+                      {isDone && (
                         <span className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>Done</span>
                         </span>
                       )}
 
-                      {isMatchDone ? (
+                      {isDone ? (
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleGenerateTaskQr({ type: 'MATCH', teamNumber: task.teamNumber, matchNumber: task.matchNumber });
+                            handleGenerateTaskQr({ type: 'PIT', teamNumber: teamNum });
                           }}
                           className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-100 border border-slate-700 text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors shrink-0 font-mono"
                         >
@@ -269,134 +326,59 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            onNavigate('match-scout', task.teamNumber, task.matchNumber, taskAlliance);
+                            onNavigate('pit-scout', teamNum);
                           }}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors font-mono shrink-0 bg-amber-500 hover:bg-amber-400 text-slate-950 shadow font-black"
+                          className="px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors bg-amber-500 hover:bg-amber-400 text-slate-950 shadow"
                         >
-                          Scout Match
+                          Scout Pit
                         </button>
                       )}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Queue Items */}
-        {(() => {
-          const queueTeams = isPitMode
-            ? myTargetTeams
-            : myTargetTeams.filter((t) => !myMatchTargets.some((m) => m.teamNumber === t));
-
-          if (queueTeams.length === 0) return null;
-
-          return (
-            <div className="space-y-1.5 font-mono">
-              {!isPitMode && myMatchTargets.length > 0 && queueTeams.length > 0 && (
-                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono pt-1">
-                  Additional Target Teams ({queueTeams.length})
                 </div>
-              )}
-              {queueTeams.map((teamNum) => {
-                const status = teamStatuses[teamNum];
-                const scoutedMatches = teamScoutedMatchesMap[teamNum] || [];
-                const isDone = isPitMode ? status?.isPitScouted : (scoutedMatches.length > 0);
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-                return (
-                  <div
-                    key={teamNum}
-                    className={`rounded-xl border transition-all overflow-hidden ${
-                      isDone
-                        ? 'bg-slate-950 border-slate-800'
-                        : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <div
-                      onClick={() => {
-                        if (isPitMode) {
-                          onNavigate('pit-scout', teamNum);
-                        } else {
-                          onNavigate('match-scout', teamNum);
-                        }
-                      }}
-                      className="p-3 flex items-center justify-between cursor-pointer select-none text-xs"
-                    >
-                      <div className="flex items-center gap-2 font-bold">
-                        <span className="text-slate-100">
-                          Team #{teamNum}
-                        </span>
-                      </div>
+      {/* 3. NO ASSIGNMENTS PLACEHOLDER */}
+      {myMatchTargets.length === 0 && myTargetTeams.length === 0 && (
+        <div className="p-8 text-center rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 text-xs space-y-2">
+          <HelpCircle className="w-8 h-8 text-slate-500 mx-auto" />
+          <p className="font-bold text-white uppercase text-xs">No active assignments found</p>
+          <p className="text-[11px] text-slate-500 leading-normal">
+            Scan a Pit or Match assignment QR code from your team captain, or manually add targets below.
+          </p>
+        </div>
+      )}
 
-                      <div className="flex items-center gap-2">
-                        {isDone && (
-                          <span className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Done</span>
-                          </span>
-                        )}
-
-                        {isDone ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleGenerateTaskQr({ type: isPitMode ? 'PIT' : 'MATCH', teamNumber: teamNum });
-                            }}
-                            className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-100 border border-slate-700 text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors shrink-0 font-mono"
-                          >
-                            <QrCode className="w-3.5 h-3.5 text-slate-300" />
-                            <span>QR</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (isPitMode) {
-                                onNavigate('pit-scout', teamNum);
-                              } else {
-                                onNavigate('match-scout', teamNum);
-                              }
-                            }}
-                            className="px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors bg-amber-500 hover:bg-amber-400 text-slate-950 shadow"
-                          >
-                            {isPitMode ? 'Scout' : 'Scout Match'}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
-
-        {/* Manual Add Queue */}
-        <form onSubmit={handleAddManualTeam} className="flex items-center gap-2 pt-2 border-t border-slate-800/80">
+      {/* 4. MANUAL TARGET / MATCH ENROLLER */}
+      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block font-mono">
+          Enroll Custom Team / Match Target
+        </span>
+        <form onSubmit={handleAddManualTeam} className="flex items-center gap-2">
           <input
             type="number"
-            placeholder="+ Team #"
+            placeholder="Team #"
             value={manualTeamInput}
             onChange={(e) => setManualTeamInput(e.target.value)}
             className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono"
             min={1}
+            required
           />
-          {!isPitMode && (
-            <input
-              type="number"
-              placeholder="Match #"
-              value={manualMatchInput}
-              onChange={(e) => setManualMatchInput(e.target.value)}
-              className="w-20 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono"
-              min={1}
-            />
-          )}
+          <input
+            type="number"
+            placeholder="Match # (Optional)"
+            value={manualMatchInput}
+            onChange={(e) => setManualMatchInput(e.target.value)}
+            className="w-32 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono"
+            min={1}
+          />
           <button
             type="submit"
-            className="py-1.5 px-3 bg-slate-850 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-bold cursor-pointer transition-colors border border-slate-750 flex items-center gap-1"
+            className="py-1.5 px-3 bg-slate-850 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-bold cursor-pointer transition-colors border border-slate-750 flex items-center gap-1 font-mono uppercase"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add</span>
