@@ -169,7 +169,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
           className="flex-1 py-3 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-100 font-bold border border-slate-700 text-xs uppercase tracking-wider cursor-pointer shadow transition-all active:scale-98 flex items-center justify-center gap-2"
         >
           <Camera className="w-4 h-4 text-slate-300" />
-          <span>Scan Scout Data QR</span>
+          <span>Scan Data QR</span>
         </button>
 
         <button
@@ -256,7 +256,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
             ) : (
               <Download className="w-3.5 h-3.5 text-slate-300" />
             )}
-            <span>{isFetchingTba ? 'Fetching...' : 'Fetch Teams from TBA'}</span>
+            <span>{isFetchingTba ? 'Fetching...' : 'Fetch Teams'}</span>
           </button>
         </form>
 
@@ -339,7 +339,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
             ))}
           </div>
         ) : (
-          <p className="text-xs text-slate-500">No scout assignments created yet. Tap + Create New above.</p>
+          <p className="text-xs text-slate-500">None yet</p>
         )}
       </div>
 
@@ -347,7 +347,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
       <div className="p-4 rounded-2xl bg-[#0F172A] border border-slate-800 space-y-3">
         <div className="flex items-center justify-between text-xs">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            RECENTLY SCOUTED TEAMS ({scoutedTeams.length})
+            RECENTLY SCOUTED ({scoutedTeams.length})
           </span>
           <button
             type="button"
@@ -372,7 +372,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
             ))}
           </div>
         ) : (
-          <p className="text-xs text-slate-500">No teams scouted yet. Fill match or pit data to see recently scouted teams.</p>
+          <p className="text-xs text-slate-500">None yet</p>
         )}
       </div>
 

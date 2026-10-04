@@ -229,7 +229,7 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
           </div>
         ) : (
           <div className="p-5 text-center rounded-xl bg-[#0B132B] text-xs text-slate-400">
-            No assignments loaded yet. Scan Assignment QR from Captain or add team # below.
+            No assignments yet
           </div>
         )}
 
