@@ -17,7 +17,6 @@ import { TeamCompareView } from './components/teams/TeamCompareView';
 import { EventDataView } from './components/data/EventDataView';
 import { DataManagement } from './components/data/DataManagement';
 import { SettingsView } from './components/settings/SettingsView';
-import { scoutingAssignments } from './db/scoutingAssignments';
 import { scoutingDB } from './db/indexedDB';
 import { 
   Home, 
@@ -33,7 +32,6 @@ export default function App() {
   const [selectedMatchNumber, setSelectedMatchNumber] = useState<number | undefined>(undefined);
   const [compareTeamNums, setCompareTeamNums] = useState<number[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
-  const [showInitialSetup, setShowInitialSetup] = useState<boolean>(false);
   const [appMode, setAppMode] = useState<'captain' | 'scout'>(() => {
     return (localStorage.getItem('frc_app_mode') as 'captain' | 'scout') || 'captain';
   });
@@ -44,7 +42,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Initialize local database on app start without seeding default mock data
+    // Initialize local database on app start
     scoutingDB.init().finally(() => {
       setIsDbLoaded(true);
     });

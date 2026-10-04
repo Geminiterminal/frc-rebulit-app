@@ -1,29 +1,53 @@
 @import "tailwindcss";
 
-body {
-  background-color: #050814 !important;
-  color: #f1f5f9;
+@theme {
+  --color-slate-950: #070a11;
+  --color-slate-900: #0e1422;
+  --color-slate-850: #141d2f;
+  --color-slate-800: #141d2f;
+  --color-slate-750: #1a2438;
+  --color-slate-700: #1a2438;
+  --color-slate-100: #ffffff;
+  --color-slate-200: #f8fafc;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
 }
 
-/* Custom modern scrollbar styling */
+:root {
+  --bg-canvas: #070a11;
+  --bg-surface: #0e1422;
+  --bg-surface-elevated: #141d2f;
+  --border-subtle: #1a2438;
+  --accent: #f59e0b;
+  --accent-text: #fbbf24;
+}
+
+body {
+  background-color: #070a11;
+  color: #ffffff;
+  min-height: 100vh;
+}
+
+/* Custom subtle scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #050814;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: #1a2438;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #f59e0b;
 }
 
-/* Crisp focus styles without overly bright glow */
+/* Crisp high-contrast focus styles */
 input:focus, textarea:focus, select:focus {
   outline: none !important;
-  border-color: #38bdf8 !important; /* sky-400 */
-  box-shadow: 0 0 0 1px #38bdf8 !important;
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 1px #f59e0b !important;
 }

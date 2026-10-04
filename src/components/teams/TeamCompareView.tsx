@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TeamProfile, MatchScoutingRecord } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
-import { ArrowLeft, Users, Zap, Shield, Wrench, Trophy, Check, Plus, X } from 'lucide-react';
+import { ArrowLeft, Users, Trophy, Plus, X } from 'lucide-react';
 
 interface TeamCompareViewProps {
   initialSelectedTeams?: number[];
@@ -51,7 +51,6 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
     setSelectedTeamNums(selectedTeamNums.filter((n) => n !== teamNum));
   };
 
-  // Helper to calculate comparison stats for a team
   const getTeamStats = (teamNum: number) => {
     const team = allTeams.find((t) => t.teamNumber === teamNum);
     const matches = allMatches.filter((m) => m.teamNumber === teamNum);
@@ -70,7 +69,6 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
 
     const avgTotalFuel = avgAutoFuel + avgTeleopFuel;
 
-    // Reliability & Defense
     const majorIssuesCount = matches.filter((m) => m.robotIssues === 'MAJOR' || m.robotIssues === 'DISABLED').length;
     const minorIssuesCount = matches.filter((m) => m.robotIssues === 'MINOR').length;
 
@@ -88,7 +86,6 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
       else defenseLabel = 'LOW';
     }
 
-    // Routes
     const usedBump = matches.some((m) => m.fieldRoute === 'BUMP' || m.fieldRoute === 'BOTH');
     const usedTrench = matches.some((m) => m.fieldRoute === 'TRENCH' || m.fieldRoute === 'BOTH');
     let routeLabel = 'NEITHER';
@@ -96,7 +93,6 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
     else if (usedTrench) routeLabel = 'TRENCH';
     else if (usedBump) routeLabel = 'BUMP';
 
-    // Pit Data
     const pit = team?.pit;
     const drivetrain = pit?.drivetrain || 'Unknown';
     const shooter = pit?.shooter?.join(', ') || 'Unknown';
@@ -107,9 +103,9 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
     return {
       team,
       teamNum,
-      officialRank: team?.officialRank ? `Rank ${team.officialRank}` : 'N/A',
-      stateRank: team?.stateRank ? `Rank ${team.stateRank}` : 'N/A',
-      prefRank: team?.customPicklistRank ? `#${team.customPicklistRank}` : 'N/A',
+      officialRank: team?.officialRank ? `Rank ${team.officialRank}` : '—',
+      stateRank: team?.stateRank ? `Rank ${team.stateRank}` : '—',
+      prefRank: team?.customPicklistRank ? `#${team.customPicklistRank}` : '—',
       isUnavailable: !!team?.isUnavailable,
       matchesScouted: count,
       autoSuccessStr,
@@ -130,40 +126,34 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
   const comparedStats = selectedTeamNums.map(getTeamStats);
 
   return (
-    <div className="max-w-5xl mx-auto px-3.5 sm:px-5 py-5 pb-32 flex flex-col gap-6">
-      {/* Top Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+    <div className="max-w-5xl mx-auto px-3.5 sm:px-5 py-4 pb-32 flex flex-col gap-4">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 pb-2 border-b border-slate-800">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => onNavigate('picklist')}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 cursor-pointer"
+            className="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-slate-200 border border-slate-800 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <div>
-            <h1 className="text-lg sm:text-xl font-black font-mono text-slate-100 uppercase tracking-tight flex items-center gap-2">
-              <Users className="w-5 h-5 text-amber-400" />
-              <span>TEAM COMPARISON</span>
-            </h1>
-            <p className="text-xs text-slate-400">
-              Side-by-side performance matrix for alliance selection
-            </p>
-          </div>
+          <h1 className="text-base sm:text-lg font-bold font-mono text-slate-100 uppercase tracking-tight flex items-center gap-2">
+            <Users className="w-4 h-4 text-slate-400" />
+            <span>Team Comparison</span>
+          </h1>
         </div>
 
-        {/* Add Team Input */}
         <form onSubmit={handleAddTeam} className="flex items-center gap-2">
           <input
             type="number"
-            placeholder="Add Team #"
+            placeholder="Team #"
             value={addTeamInput}
             onChange={(e) => setAddTeamInput(e.target.value)}
-            className="w-28 bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500"
+            className="w-24 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1 text-xs font-mono font-bold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600"
           />
           <button
             type="submit"
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black font-mono text-xs uppercase cursor-pointer"
+            className="flex items-center gap-1 px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 font-mono text-xs uppercase cursor-pointer border border-slate-700 font-bold"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add</span>
@@ -172,15 +162,12 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
       </div>
 
       {comparedStats.length === 0 ? (
-        <div className="text-center py-12 bg-slate-900/60 rounded-2xl border border-slate-800">
-          <Users className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-300 font-bold">No teams selected for comparison</p>
-          <p className="text-slate-500 text-xs mt-1">Select 2 to 4 teams from the Picklist or enter a team number above.</p>
+        <div className="text-center py-10 bg-slate-900/60 rounded-2xl border border-slate-800">
+          <p className="text-slate-400 text-xs">No teams selected for comparison.</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/80 shadow-2xl">
           <table className="w-full text-left border-collapse text-xs sm:text-sm">
-            {/* Table Header: Team Badges */}
             <thead>
               <tr className="bg-slate-900 border-b border-slate-800">
                 <th className="p-3 font-mono font-bold text-slate-400 uppercase text-xs w-40">
@@ -188,18 +175,18 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
                 </th>
                 {comparedStats.map((s) => (
                   <th key={s.teamNum} className="p-3 text-center min-w-[120px]">
-                    <div className="flex flex-col items-center gap-1">
+                    <div className="flex flex-col items-center gap-0.5">
                       <div className="flex items-center justify-center gap-1">
                         <span 
                           onClick={() => onNavigate('team-profile', s.teamNum)}
-                          className="font-mono font-black text-base text-amber-400 hover:underline cursor-pointer"
+                          className="font-mono font-bold text-sm text-slate-200 hover:underline cursor-pointer"
                         >
                           #{s.teamNum}
                         </span>
                         <button
                           type="button"
                           onClick={() => handleRemoveTeam(s.teamNum)}
-                          className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-rose-400 cursor-pointer"
+                          className="p-0.5 rounded hover:bg-slate-800 text-slate-500 hover:text-rose-400 cursor-pointer"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -213,33 +200,29 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-850">
-              {/* OUR PREFERENCE RANK */}
-              <tr className="bg-amber-950/20 font-bold">
-                <td className="p-3 font-mono uppercase text-amber-400 flex items-center gap-1.5">
-                  <Trophy className="w-4 h-4 text-amber-400" />
-                  <span>Our Preference Rank</span>
+            <tbody className="divide-y divide-slate-850 font-mono">
+              <tr className="bg-slate-900/40">
+                <td className="p-3 font-bold text-slate-300 flex items-center gap-1.5">
+                  <Trophy className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Custom Rank</span>
                 </td>
                 {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono font-black text-amber-300 text-sm">
+                  <td key={s.teamNum} className="p-3 text-center font-bold text-slate-200">
                     {s.prefRank}
                   </td>
                 ))}
               </tr>
 
-              {/* ALLIANCE AVAILABILITY */}
-              <tr className="bg-slate-900/60 font-bold">
-                <td className="p-3 font-mono uppercase text-slate-300">
-                  <span>Alliance Availability</span>
-                </td>
+              <tr>
+                <td className="p-3 font-semibold text-slate-400">Availability</td>
                 {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono text-xs">
+                  <td key={s.teamNum} className="p-3 text-center text-xs">
                     {s.isUnavailable ? (
-                      <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-bold uppercase">
-                        PICKED / UNAVAILABLE
+                      <span className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-bold">
+                        PICKED
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold uppercase">
+                      <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-750 font-bold">
                         AVAILABLE
                       </span>
                     )}
@@ -247,165 +230,85 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
                 ))}
               </tr>
 
-              {/* OFFICIAL EVENT RANK */}
-              <tr className="bg-slate-900/50 font-bold">
-                <td className="p-3 font-mono uppercase text-slate-400 flex items-center gap-1.5">
-                  <Trophy className="w-4 h-4" />
-                  <span>Event Rank</span>
-                </td>
+              <tr>
+                <td className="p-3 font-semibold text-slate-400">Event Rank</td>
                 {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono font-black text-slate-300">
+                  <td key={s.teamNum} className="p-3 text-center font-bold text-slate-300">
                     {s.officialRank}
                   </td>
                 ))}
               </tr>
 
-              {/* STATE RANK */}
-              <tr className="bg-slate-900/50 font-bold border-b border-slate-800">
-                <td className="p-3 font-mono uppercase text-blue-400 flex items-center gap-1.5">
-                  <Trophy className="w-4 h-4 text-blue-400" />
-                  <span>State Rank</span>
-                </td>
+              <tr>
+                <td className="p-3 font-semibold text-slate-400">State Rank</td>
                 {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono font-black text-blue-300">
+                  <td key={s.teamNum} className="p-3 text-center font-bold text-slate-300">
                     {s.stateRank}
                   </td>
                 ))}
               </tr>
 
-              {/* SECTION: MATCH DATA */}
-              <tr className="bg-slate-900/80">
-                <td colSpan={comparedStats.length + 1} className="p-2 px-3 font-mono font-bold text-[11px] text-blue-400 uppercase tracking-wider">
-                  MATCH OBSERVATION DATA
-                </td>
-              </tr>
               <tr>
-                <td className="p-3 font-semibold text-slate-300">Matches Scouted</td>
+                <td className="p-3 font-semibold text-slate-400">Matches Scouted</td>
                 {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono text-slate-200">
+                  <td key={s.teamNum} className="p-3 text-center text-slate-200">
                     {s.matchesScouted}
                   </td>
                 ))}
               </tr>
+
               <tr>
-                <td className="p-3 font-semibold text-slate-300">Auto Success</td>
+                <td className="p-3 font-semibold text-slate-400">Auto Success</td>
                 {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono font-bold text-blue-400">
+                  <td key={s.teamNum} className="p-3 text-center font-bold text-slate-200">
                     {s.autoSuccessStr}
                   </td>
                 ))}
               </tr>
+
               <tr>
-                <td className="p-3 font-semibold text-slate-300">Avg Auto Fuel</td>
+                <td className="p-3 font-semibold text-slate-400">Avg Total Fuel</td>
                 {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono font-bold text-blue-300">
-                    {s.avgAutoFuel}
-                  </td>
-                ))}
-              </tr>
-              <tr>
-                <td className="p-3 font-semibold text-slate-300">Avg Teleop Fuel</td>
-                {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono font-bold text-emerald-400">
-                    {s.avgTeleopFuel}
-                  </td>
-                ))}
-              </tr>
-              <tr className="bg-slate-900/40 font-bold">
-                <td className="p-3 font-semibold text-white">Avg Total Fuel</td>
-                {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono font-black text-amber-400 text-base">
+                  <td key={s.teamNum} className="p-3 text-center font-bold text-slate-100 text-sm">
                     {s.avgTotalFuel}
                   </td>
                 ))}
               </tr>
 
-              {/* SECTION: RELIABILITY & DEFENSE */}
-              <tr className="bg-slate-900/80">
-                <td colSpan={comparedStats.length + 1} className="p-2 px-3 font-mono font-bold text-[11px] text-purple-400 uppercase tracking-wider">
-                  RELIABILITY & FIELD ROUTE
-                </td>
-              </tr>
               <tr>
-                <td className="p-3 font-semibold text-slate-300">Robot Issues / Reliability</td>
+                <td className="p-3 font-semibold text-slate-400">Reliability</td>
                 {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono font-bold">
-                    <span className={`px-2 py-0.5 rounded text-xs ${
-                      s.reliabilityLabel === 'HIGH' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
-                      s.reliabilityLabel === 'MED' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
-                      'bg-rose-950 text-rose-300 border border-rose-800'
-                    }`}>
+                  <td key={s.teamNum} className="p-3 text-center">
+                    <span className="px-2 py-0.5 rounded text-xs bg-slate-900 border border-slate-800 text-slate-300">
                       {s.reliabilityLabel}
                     </span>
                   </td>
                 ))}
               </tr>
+
               <tr>
-                <td className="p-3 font-semibold text-slate-300">Defense Capability</td>
+                <td className="p-3 font-semibold text-slate-400">Defense</td>
                 {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono font-bold">
-                    <span className={`px-2 py-0.5 rounded text-xs ${
-                      s.defenseLabel === 'HIGH' ? 'bg-purple-950 text-purple-300 border border-purple-800' :
-                      s.defenseLabel === 'MED' ? 'bg-blue-950 text-blue-300 border border-blue-800' :
-                      'bg-slate-900 text-slate-400'
-                    }`}>
-                      {s.defenseLabel}
-                    </span>
-                  </td>
-                ))}
-              </tr>
-              <tr>
-                <td className="p-3 font-semibold text-slate-300">Field Routes Used</td>
-                {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono font-semibold text-slate-200">
-                    {s.routeLabel}
+                  <td key={s.teamNum} className="p-3 text-center text-xs text-slate-300">
+                    {s.defenseLabel}
                   </td>
                 ))}
               </tr>
 
-              {/* SECTION: PIT DATA */}
-              <tr className="bg-slate-900/80">
-                <td colSpan={comparedStats.length + 1} className="p-2 px-3 font-mono font-bold text-[11px] text-emerald-400 uppercase tracking-wider">
-                  PIT SCOUT CLAIMS
-                </td>
-              </tr>
               <tr>
-                <td className="p-3 font-semibold text-slate-300">Drivetrain</td>
+                <td className="p-3 font-semibold text-slate-400">Drivetrain</td>
                 {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono text-slate-200">
+                  <td key={s.teamNum} className="p-3 text-center text-slate-300">
                     {s.drivetrain}
                   </td>
                 ))}
               </tr>
+
               <tr>
-                <td className="p-3 font-semibold text-slate-300">Shooter Type</td>
+                <td className="p-3 font-semibold text-slate-400">Shooter</td>
                 {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono text-slate-200">
+                  <td key={s.teamNum} className="p-3 text-center text-slate-300">
                     {s.shooter}
-                  </td>
-                ))}
-              </tr>
-              <tr>
-                <td className="p-3 font-semibold text-slate-300">Hopper Capacity</td>
-                {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono text-slate-200">
-                    {s.hopper}
-                  </td>
-                ))}
-              </tr>
-              <tr>
-                <td className="p-3 font-semibold text-slate-300">Shooting Accuracy</td>
-                {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono font-semibold text-emerald-300">
-                    {s.accuracy}
-                  </td>
-                ))}
-              </tr>
-              <tr>
-                <td className="p-3 font-semibold text-slate-300">Auto Routines Count</td>
-                {comparedStats.map((s) => (
-                  <td key={s.teamNum} className="p-3 text-center font-mono text-slate-200">
-                    {s.autoRoutines}
                   </td>
                 ))}
               </tr>

@@ -1,18 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { TeamProfile, MatchScoutingRecord, DrivetrainType, ShooterType, BumpTrenchCapability } from '../../types/scouting';
+import { TeamProfile, MatchScoutingRecord, ShooterType } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
 import { tbaApi } from '../../utils/tbaApi';
 import { 
-  Trophy, 
   ArrowUpDown, 
   Filter, 
-  Eye, 
-  Layers, 
   CheckSquare, 
   Square, 
   Edit3, 
   Check, 
-  X, 
   ChevronUp, 
   ChevronDown, 
   GripVertical, 
@@ -22,7 +18,6 @@ import {
   ChevronRight,
   Ban,
   SlidersHorizontal,
-  RotateCw,
   RefreshCw
 } from 'lucide-react';
 
@@ -80,7 +75,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
   const [filterDefense, setFilterDefense] = useState<string>('ALL');
   const [filterAuto, setFilterAuto] = useState<string>('ALL');
 
-  // Manual rank editing state (Event Rank or State Rank)
+  // Manual rank editing state
   const [editingRankTeamNum, setEditingRankTeamNum] = useState<number | null>(null);
   const [editingRankType, setEditingRankType] = useState<'official' | 'state' | 'preference' | null>(null);
   const [tempRankValue, setTempRankValue] = useState<string>('');
@@ -106,17 +101,15 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     setSyncStatusMsg(res.message);
     setIsSyncingRankings(false);
     await loadData();
-    setTimeout(() => setSyncStatusMsg(null), 5000);
+    setTimeout(() => setSyncStatusMsg(null), 4000);
   };
 
   const loadData = async () => {
     const allTeams = await scoutingDB.getAllTeams();
     const allMatches = await scoutingDB.getAllMatches();
 
-    // Check if teams need customPicklistRank initialization
     const needsInit = allTeams.some((t) => typeof t.customPicklistRank !== 'number');
     if (needsInit && allTeams.length > 0) {
-      // Sort initially by officialRank (if available) or avg fuel / teamNumber
       const sorted = [...allTeams].sort((a, b) => {
         const rA = a.officialRank ?? 9999;
         const rB = b.officialRank ?? 9999;
@@ -138,7 +131,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     setMatches(allMatches);
   };
 
-  // Toggle availability (crossed off / picked by other alliance)
   const handleToggleUnavailable = async (teamNum: number, currentStatus: boolean) => {
     const target = teams.find((t) => t.teamNumber === teamNum);
     if (!target) return;
@@ -153,7 +145,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     await scoutingDB.saveTeam(updated);
   };
 
-  // Clear all unavailable (reset alliance selection)
   const handleResetAllAvailability = async () => {
     const updated = teams.map((t) => ({
       ...t,
@@ -164,7 +155,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     await scoutingDB.saveTeamsBatch(updated);
   };
 
-  // Move a team up or down in custom preference ranking
   const handleMovePreference = async (teamNum: number, direction: 'UP' | 'DOWN') => {
     const activeTeams = [...teams].sort((a, b) => (a.customPicklistRank ?? 9999) - (b.customPicklistRank ?? 9999));
     const currentIndex = activeTeams.findIndex((t) => t.teamNumber === teamNum);
@@ -187,7 +177,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     await scoutingDB.saveTeamsBatch([currentTeam, targetTeam]);
   };
 
-  // Set specific custom rank directly
   const handleSetCustomRank = async (teamNum: number, newRankStr: string) => {
     const newRank = parseInt(newRankStr, 10);
     if (isNaN(newRank) || newRank <= 0) {
@@ -216,7 +205,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     await scoutingDB.saveTeamsBatch(reindexed);
   };
 
-  // Drag and drop reordering
   const handleDragStart = (e: React.DragEvent, teamNum: number) => {
     e.dataTransfer.setData('text/plain', teamNum.toString());
     setDraggedTeamNum(teamNum);
@@ -250,7 +238,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     await scoutingDB.saveTeamsBatch(reindexed);
   };
 
-  // Quick preset initialization
   const handleInitializeFrom = async (criterion: 'officialRank' | 'fuel' | 'stateRank') => {
     const sorted = [...teams].sort((a, b) => {
       if (criterion === 'officialRank') {
@@ -328,7 +315,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     (filterDefense !== 'ALL' ? 1 : 0) +
     (filterAuto !== 'ALL' ? 1 : 0);
 
-  // Enrich teams with match scouting statistics
   const enrichedTeams: EnrichedTeam[] = teams.map((team) => {
     const teamMatches = matches.filter((m) => m.teamNumber === team.teamNumber);
     const count = teamMatches.length;
@@ -347,7 +333,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
 
     const avgTotalFuel = avgAutoFuel + avgTeleopFuel;
 
-    // Reliability Rating based on pit scouting & match observation issues
     let reliabilityVal = 0;
     let reliabilityLabel = 'N/A';
 
@@ -377,7 +362,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
       }
     }
 
-    // Defense Effectiveness
     const defenseMatches = teamMatches.filter((m) => m.playedDefense);
     let defenseVal = 0;
     let defenseLabel = 'NONE';
@@ -417,7 +401,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     };
   });
 
-  // Sort function
   const sortFn = (a: EnrichedTeam, b: EnrichedTeam) => {
     switch (sortBy) {
       case 'preferenceRank': {
@@ -453,46 +436,38 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     }
   };
 
-  // Multi-variable filtering logic
   const filteredTeams = enrichedTeams.filter((item) => {
-    // 1. Text Query (Number or Name)
     if (filterQuery) {
       const q = filterQuery.toLowerCase();
       const matchQuery = item.teamNumber.toString().includes(q) || item.teamName.toLowerCase().includes(q);
       if (!matchQuery) return false;
     }
 
-    // 2. Drivetrain Filter
     if (filterDrivetrain !== 'ALL') {
       const dt = item.team.pit?.drivetrain || '';
       if (dt !== filterDrivetrain) return false;
     }
 
-    // 3. Shooter Type Filter
     if (filterShooter !== 'ALL') {
       const shooters = item.team.pit?.shooter || [];
       if (!shooters.includes(filterShooter as ShooterType)) return false;
     }
 
-    // 4. Bump/Trench Capability Filter
     if (filterCapability !== 'ALL') {
       const cap = item.team.pit?.bumpTrench || '';
       if (cap !== filterCapability) return false;
     }
 
-    // 5. Reliability Filter
     if (filterReliability !== 'ALL') {
       if (filterReliability === 'HIGH' && item.reliabilityLabel !== 'HIGH') return false;
       if (filterReliability === 'MED+' && item.reliabilityLabel === 'LOW') return false;
     }
 
-    // 6. Defense Filter
     if (filterDefense !== 'ALL') {
       if (filterDefense === 'HIGH' && item.defenseLabel !== 'HIGH') return false;
       if (filterDefense === 'ANY' && item.defenseLabel === 'NONE') return false;
     }
 
-    // 7. Auto Capability Filter
     if (filterAuto !== 'ALL') {
       if (filterAuto === 'HAS_AUTO' && item.team.pit?.hasAutonomous === 'NO') return false;
       if (filterAuto === 'CONSISTENT_AUTO' && item.autoSuccessRatio < 0.75) return false;
@@ -501,19 +476,9 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     return true;
   });
 
-  // Split into Available vs Unavailable
   const availableTeams = filteredTeams.filter((t) => !t.isUnavailable).sort(sortFn);
   const unavailableTeams = filteredTeams.filter((t) => t.isUnavailable).sort(sortFn);
   const unifiedTeams = [...filteredTeams].sort(sortFn);
-
-  const handleOpenCompare = () => {
-    if (selectedTeamNums.length > 0) {
-      onNavigate('compare', undefined, selectedTeamNums);
-    } else {
-      const topNums = availableTeams.slice(0, 3).map((t) => t.teamNumber);
-      onNavigate('compare', undefined, topNums);
-    }
-  };
 
   const renderTeamRow = (item: EnrichedTeam, displayIndex: number, isUnavailableSection: boolean = false) => {
     const isSelected = selectedTeamNums.includes(item.teamNumber);
@@ -534,11 +499,11 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
           rowUnavailable 
             ? 'bg-slate-950/40 opacity-55 hover:opacity-75' 
             : isSelected 
-              ? 'bg-amber-950/20 border-l-2 border-l-amber-400' 
+              ? 'bg-slate-850/60 border-l-2 border-l-slate-400' 
               : 'hover:bg-slate-900/60'
-        } ${draggedTeamNum === item.teamNumber ? 'opacity-30 border-2 border-dashed border-amber-400' : ''}`}
+        } ${draggedTeamNum === item.teamNumber ? 'opacity-30 border-2 border-dashed border-slate-500' : ''}`}
       >
-        {/* Availability Cross-off Box */}
+        {/* Availability Cross-off */}
         <td className="p-3 text-center">
           <button
             type="button"
@@ -548,12 +513,12 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                 ? 'bg-rose-950/80 border border-rose-700/80 text-rose-400 hover:bg-rose-900/80'
                 : 'bg-slate-900 border border-slate-750 text-slate-500 hover:border-rose-600 hover:text-rose-400'
             }`}
-            title={item.isUnavailable ? 'Team is Unavailable / Picked. Click to restore' : 'Click to Cross Off (Picked / Unavailable)'}
+            title={item.isUnavailable ? 'Restore team' : 'Cross off'}
           >
             {item.isUnavailable ? (
-              <Ban className="w-4 h-4 text-rose-400" />
+              <Ban className="w-3.5 h-3.5 text-rose-400" />
             ) : (
-              <UserCheck className="w-4 h-4 text-slate-400 hover:text-rose-400" />
+              <UserCheck className="w-3.5 h-3.5 text-slate-400 hover:text-rose-400" />
             )}
           </button>
         </td>
@@ -563,18 +528,18 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
           <button
             type="button"
             onClick={() => toggleSelectTeam(item.teamNumber)}
-            className="p-1 rounded text-slate-400 hover:text-amber-400 cursor-pointer"
+            className="p-1 rounded text-slate-400 hover:text-white cursor-pointer"
             title="Select for comparison"
           >
             {isSelected ? (
-              <CheckSquare className="w-4 h-4 text-amber-400" />
+              <CheckSquare className="w-4 h-4 text-slate-200" />
             ) : (
               <Square className="w-4 h-4 text-slate-600" />
             )}
           </button>
         </td>
 
-        {/* Custom Rank & Reorder Controls */}
+        {/* Custom Rank */}
         <td className="p-3 text-center">
           {isEditingPref ? (
             <div className="flex items-center justify-center gap-1">
@@ -584,7 +549,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                 onChange={(e) => setTempRankValue(e.target.value)}
                 placeholder="#"
                 autoFocus
-                className="w-12 bg-slate-900 border border-amber-500 rounded px-1 py-0.5 text-center font-mono text-xs text-amber-300 focus:outline-none"
+                className="w-12 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-center font-mono text-xs text-white focus:outline-none"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSetCustomRank(item.teamNumber, tempRankValue);
                   if (e.key === 'Escape') setEditingRankTeamNum(null);
@@ -593,7 +558,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
               <button
                 type="button"
                 onClick={() => handleSetCustomRank(item.teamNumber, tempRankValue)}
-                className="p-1 rounded bg-amber-500 text-slate-950 hover:bg-amber-400 cursor-pointer"
+                className="p-1 rounded bg-slate-800 text-white cursor-pointer"
               >
                 <Check className="w-3 h-3" />
               </button>
@@ -602,22 +567,20 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
             <div className="flex items-center justify-center gap-1">
               {sortBy === 'preferenceRank' && !rowUnavailable && (
                 <div className="flex items-center gap-0.5 text-slate-500 mr-0.5">
-                  <GripVertical className="w-3.5 h-3.5 text-slate-600 cursor-grab active:cursor-grabbing hidden sm:inline" />
+                  <GripVertical className="w-3.5 h-3.5 text-slate-600 cursor-grab hidden sm:inline" />
                   <div className="flex flex-col -space-y-1">
                     <button
                       type="button"
                       onClick={() => handleMovePreference(item.teamNumber, 'UP')}
                       disabled={displayIndex === 0}
-                      className="p-0.5 hover:text-amber-400 text-slate-500 disabled:opacity-20 cursor-pointer"
-                      title="Move up 1 position"
+                      className="p-0.5 hover:text-white text-slate-500 disabled:opacity-20 cursor-pointer"
                     >
                       <ChevronUp className="w-3 h-3" />
                     </button>
                     <button
                       type="button"
                       onClick={() => handleMovePreference(item.teamNumber, 'DOWN')}
-                      className="p-0.5 hover:text-amber-400 text-slate-500 cursor-pointer"
-                      title="Move down 1 position"
+                      className="p-0.5 hover:text-white text-slate-500 cursor-pointer"
                     >
                       <ChevronDown className="w-3 h-3" />
                     </button>
@@ -630,14 +593,11 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                   setEditingRankType('preference');
                   setTempRankValue(item.customPicklistRank ? item.customPicklistRank.toString() : '');
                 }}
-                className={`font-mono font-black text-xs px-2 py-0.5 rounded cursor-pointer transition-colors ${
+                className={`font-mono font-bold text-xs px-2 py-0.5 rounded cursor-pointer transition-colors ${
                   rowUnavailable
                     ? 'text-slate-500 bg-slate-900 line-through'
-                    : displayIndex === 0 && !isUnavailableSection
-                      ? 'text-amber-300 bg-amber-950/70 border border-amber-800'
-                      : 'text-slate-300 bg-slate-900/80 hover:bg-slate-800'
+                    : 'text-slate-300 bg-slate-900/80 hover:bg-slate-800'
                 }`}
-                title="Click to set rank number"
               >
                 #{item.customPicklistRank ?? displayIndex + 1}
               </span>
@@ -651,16 +611,16 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
             <div className="flex items-center gap-2">
               <span 
                 onClick={() => onNavigate('team-profile', item.teamNumber)}
-                className={`font-mono font-black text-sm sm:text-base cursor-pointer hover:underline ${
+                className={`font-mono font-bold text-sm cursor-pointer hover:underline ${
                   rowUnavailable 
-                    ? 'line-through decoration-rose-500/80 decoration-2 text-slate-500' 
-                    : 'text-amber-400'
+                    ? 'line-through text-slate-500' 
+                    : 'text-slate-100'
                 }`}
               >
                 #{item.teamNumber}
               </span>
               {rowUnavailable && (
-                <span className="px-1.5 py-0.2 rounded bg-rose-950 text-rose-400 border border-rose-800 text-[9px] font-mono font-bold uppercase tracking-wider">
+                <span className="px-1.5 py-0.2 rounded bg-rose-950 text-rose-400 border border-rose-800 text-[9px] font-mono font-bold uppercase">
                   PICKED
                 </span>
               )}
@@ -672,14 +632,14 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
         </td>
 
         {/* Auto Success */}
-        <td className="p-3 text-center font-mono font-bold text-blue-400">
+        <td className="p-3 text-center font-mono font-bold text-slate-300">
           <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
             {item.autoSuccessStr}
           </span>
         </td>
 
         {/* Total Fuel */}
-        <td className="p-3 text-center font-mono font-black text-emerald-400 text-sm">
+        <td className="p-3 text-center font-mono font-bold text-slate-200 text-sm">
           <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
             {item.avgTotalFuel.toFixed(1)}
           </span>
@@ -691,13 +651,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
             className={`px-2 py-0.5 rounded text-[10px] ${
               rowUnavailable
                 ? 'bg-slate-900 text-slate-600 border border-slate-800'
-                : item.reliabilityLabel === 'HIGH'
-                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
-                : item.reliabilityLabel === 'MED'
-                ? 'bg-amber-950 text-amber-300 border border-amber-800'
-                : item.reliabilityLabel === 'LOW'
-                ? 'bg-rose-950 text-rose-300 border border-rose-800'
-                : 'bg-slate-900 text-slate-500 border border-slate-800'
+                : 'bg-slate-900 text-slate-300 border border-slate-800'
             }`}
           >
             {item.reliabilityLabel}
@@ -706,17 +660,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
 
         {/* Defense */}
         <td className="p-3 text-center font-mono font-bold">
-          <span
-            className={`px-2 py-0.5 rounded text-[10px] ${
-              rowUnavailable
-                ? 'bg-slate-900 text-slate-600'
-                : item.defenseLabel === 'HIGH'
-                ? 'bg-purple-950 text-purple-300 border border-purple-800'
-                : item.defenseLabel === 'MED'
-                ? 'bg-blue-950 text-blue-300 border border-blue-800'
-                : 'bg-slate-900 text-slate-500'
-            }`}
-          >
+          <span className={`px-2 py-0.5 rounded text-[10px] ${rowUnavailable ? 'text-slate-600' : 'text-slate-300'}`}>
             {item.defenseLabel}
           </span>
         </td>
@@ -731,7 +675,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                 onChange={(e) => setTempRankValue(e.target.value)}
                 placeholder="Rank #"
                 autoFocus
-                className="w-14 bg-slate-900 border border-amber-500 rounded px-1 py-0.5 text-center font-mono text-xs text-amber-300 focus:outline-none"
+                className="w-14 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-center font-mono text-xs text-white focus:outline-none"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSaveManualRank(item.teamNumber, 'official');
                   if (e.key === 'Escape') setEditingRankTeamNum(null);
@@ -740,15 +684,15 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
               <button
                 type="button"
                 onClick={() => handleSaveManualRank(item.teamNumber, 'official')}
-                className="p-1 rounded bg-amber-500 text-slate-950 hover:bg-amber-400 cursor-pointer"
+                className="p-1 rounded bg-slate-800 text-white cursor-pointer"
               >
                 <Check className="w-3 h-3" />
               </button>
             </div>
           ) : (
             <div className="flex items-center justify-center gap-1.5 group">
-              <span className={item.officialRank ? 'text-amber-300 font-black' : 'text-slate-500 font-bold'}>
-                {item.officialRank ? `Rank ${item.officialRank}` : 'N/A'}
+              <span className={item.officialRank ? 'text-slate-200 font-bold' : 'text-slate-500 font-bold'}>
+                {item.officialRank ? `Rank ${item.officialRank}` : '—'}
               </span>
               <button
                 type="button"
@@ -757,7 +701,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                   setEditingRankType('official');
                   setTempRankValue(item.officialRank ? item.officialRank.toString() : '');
                 }}
-                className="opacity-40 group-hover:opacity-100 p-1 text-slate-400 hover:text-amber-400 transition-opacity cursor-pointer"
+                className="opacity-40 group-hover:opacity-100 p-1 text-slate-400 hover:text-white transition-opacity cursor-pointer"
                 title="Edit Event Rank"
               >
                 <Edit3 className="w-3 h-3" />
@@ -766,7 +710,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
           )}
         </td>
 
-        {/* State / District Rank */}
+        {/* State Rank */}
         <td className="p-3 text-center font-mono font-bold">
           {isEditingState ? (
             <div className="flex items-center justify-center gap-1">
@@ -776,7 +720,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                 onChange={(e) => setTempRankValue(e.target.value)}
                 placeholder="State #"
                 autoFocus
-                className="w-14 bg-slate-900 border border-blue-500 rounded px-1 py-0.5 text-center font-mono text-xs text-blue-300 focus:outline-none"
+                className="w-14 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-center font-mono text-xs text-white focus:outline-none"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') handleSaveManualRank(item.teamNumber, 'state');
                   if (e.key === 'Escape') setEditingRankTeamNum(null);
@@ -785,15 +729,15 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
               <button
                 type="button"
                 onClick={() => handleSaveManualRank(item.teamNumber, 'state')}
-                className="p-1 rounded bg-blue-500 text-slate-950 hover:bg-blue-400 cursor-pointer"
+                className="p-1 rounded bg-slate-800 text-white cursor-pointer"
               >
                 <Check className="w-3 h-3" />
               </button>
             </div>
           ) : (
             <div className="flex items-center justify-center gap-1.5 group">
-              <span className={item.stateRank ? 'text-blue-300 font-black' : 'text-slate-500 font-bold'}>
-                {item.stateRank ? `Rank ${item.stateRank}` : 'N/A'}
+              <span className={item.stateRank ? 'text-slate-300 font-bold' : 'text-slate-500 font-bold'}>
+                {item.stateRank ? `Rank ${item.stateRank}` : '—'}
               </span>
               <button
                 type="button"
@@ -802,7 +746,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                   setEditingRankType('state');
                   setTempRankValue(item.stateRank ? item.stateRank.toString() : '');
                 }}
-                className="opacity-40 group-hover:opacity-100 p-1 text-slate-400 hover:text-blue-400 transition-opacity cursor-pointer"
+                className="opacity-40 group-hover:opacity-100 p-1 text-slate-400 hover:text-white transition-opacity cursor-pointer"
                 title="Edit State Rank"
               >
                 <Edit3 className="w-3 h-3" />
@@ -811,12 +755,12 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
           )}
         </td>
 
-        {/* Action View */}
+        {/* Action */}
         <td className="p-3 text-right">
           <button
             type="button"
             onClick={() => onNavigate('team-profile', item.teamNumber)}
-            className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-750 font-mono text-xs font-bold transition-colors cursor-pointer"
+            className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 font-mono text-xs font-bold transition-colors cursor-pointer"
           >
             View
           </button>
@@ -826,42 +770,39 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-3.5 sm:px-5 py-5 pb-32 flex flex-col gap-5">
-      {/* Controls Bar: Rank by & Variable Filter */}
-      <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-sm">
-        {/* Rank By Dropdown */}
+    <div className="max-w-5xl mx-auto px-3.5 sm:px-5 py-4 pb-32 flex flex-col gap-4">
+      {/* Controls Bar */}
+      <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-sm">
         <div className="flex items-center gap-2">
           <label className="text-xs font-mono font-bold uppercase text-slate-400 flex items-center gap-1.5 shrink-0">
-            <ArrowUpDown className="w-3.5 h-3.5 text-amber-400" />
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
             <span>Rank by:</span>
           </label>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-amber-300 focus:outline-none focus:border-amber-500 cursor-pointer w-full sm:w-auto"
+            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-slate-200 focus:outline-none focus:border-slate-600 cursor-pointer w-full sm:w-auto"
           >
-            <option value="preferenceRank">⭐ Custom</option>
+            <option value="preferenceRank">Custom Rank</option>
             <option value="officialRank">Official Event Rank</option>
-            <option value="stateRank">State / District Rank</option>
+            <option value="stateRank">State Rank</option>
             <option value="totalFuel">Average Fuel (Total)</option>
             <option value="autoSuccess">Auto Success Rate</option>
             <option value="autoFuel">Auto Fuel</option>
-            <option value="reliability">Reliability Rating</option>
-            <option value="defense">Defense Effectiveness</option>
+            <option value="reliability">Reliability</option>
+            <option value="defense">Defense</option>
             <option value="matchesScouted">Matches Scouted</option>
           </select>
         </div>
 
-        {/* Filter Trigger Button & Tools */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Sync Live Rankings Button */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleSyncRankings}
             disabled={isSyncingRankings}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono text-xs font-black cursor-pointer shadow transition-transform active:scale-98 disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-100 font-mono text-xs font-bold cursor-pointer shadow transition-transform active:scale-98 disabled:opacity-50 border border-slate-700"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-slate-950 ${isSyncingRankings ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-slate-300 ${isSyncingRankings ? 'animate-spin' : ''}`} />
             <span>{isSyncingRankings ? 'Syncing...' : 'Sync Rankings'}</span>
           </button>
 
@@ -871,69 +812,65 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
               type="button"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 font-mono text-xs font-bold cursor-pointer"
             >
-              <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
-              <span>Reset Custom ▾</span>
+              <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+              <span>Reset ▾</span>
             </button>
-            <div className="absolute right-0 top-full mt-1.5 w-52 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-1 z-30 hidden group-hover:flex flex-col">
+            <div className="absolute right-0 top-full mt-1.5 w-48 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-1 z-30 hidden group-hover:flex flex-col">
               <button
                 type="button"
                 onClick={() => handleInitializeFrom('officialRank')}
-                className="w-full text-left px-3 py-2 text-xs font-mono text-slate-300 hover:bg-slate-900 rounded-lg"
+                className="w-full text-left px-3 py-1.5 text-xs font-mono text-slate-300 hover:bg-slate-900 rounded-lg cursor-pointer"
               >
-                Reset to Event Rank
+                By Event Rank
               </button>
               <button
                 type="button"
                 onClick={() => handleInitializeFrom('stateRank')}
-                className="w-full text-left px-3 py-2 text-xs font-mono text-slate-300 hover:bg-slate-900 rounded-lg"
+                className="w-full text-left px-3 py-1.5 text-xs font-mono text-slate-300 hover:bg-slate-900 rounded-lg cursor-pointer"
               >
-                Reset to State Rank
+                By State Rank
               </button>
               <button
                 type="button"
                 onClick={() => handleInitializeFrom('fuel')}
-                className="w-full text-left px-3 py-2 text-xs font-mono text-slate-300 hover:bg-slate-900 rounded-lg"
+                className="w-full text-left px-3 py-1.5 text-xs font-mono text-slate-300 hover:bg-slate-900 rounded-lg cursor-pointer"
               >
-                Reset to Avg Fuel Score
+                By Fuel Score
               </button>
             </div>
           </div>
 
-          {/* Variable Filter Button */}
           <button
             type="button"
             onClick={() => setShowFilterModal(true)}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border text-xs font-mono font-bold transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-colors cursor-pointer ${
               activeFilterCount > 0
-                ? 'bg-amber-950/60 border-amber-500/80 text-amber-300'
+                ? 'bg-slate-800 border-slate-600 text-white'
                 : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
             }`}
           >
-            <Filter className="w-3.5 h-3.5 text-amber-400" />
-            <span>Filter Variables</span>
+            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <span>Filters</span>
             {activeFilterCount > 0 && (
-              <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black flex items-center justify-center">
+              <span className="w-4 h-4 rounded-full bg-slate-700 text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
           </button>
 
-          {/* Quick Search */}
           <input
             type="text"
-            placeholder="Search team #..."
+            placeholder="Search team #"
             value={filterQuery}
             onChange={(e) => setFilterQuery(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-600 w-full sm:w-36"
+            className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-600 w-full sm:w-32"
           />
 
-          {/* Uncross All Button if teams are crossed off */}
           {unavailableTeams.length > 0 && (
             <button
               type="button"
               onClick={handleResetAllAvailability}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-rose-900/60 hover:bg-rose-950/40 text-rose-300 font-mono text-xs font-bold cursor-pointer"
-              title="Clear all crossed off teams"
             >
               <UserX className="w-3.5 h-3.5 text-rose-400" />
               <span>Uncross ({unavailableTeams.length})</span>
@@ -943,7 +880,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
       </div>
 
       {syncStatusMsg && (
-        <div className="p-3 rounded-xl bg-[#0F172A] border border-amber-500/50 text-amber-300 font-mono text-xs font-bold shadow flex items-center justify-between">
+        <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 font-mono text-xs font-bold flex items-center justify-between">
           <span>{syncStatusMsg}</span>
           <button type="button" onClick={() => setSyncStatusMsg(null)} className="text-slate-400 hover:text-white p-1">
             ✕
@@ -951,37 +888,32 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* SECTION 1: AVAILABLE FOR OUR ALLIANCE */}
+      {/* SECTION 1: AVAILABLE */}
       <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/80 shadow-2xl">
         {separateUnavailable && (
-          <div className="p-3 px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+          <div className="p-3 px-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-              <h2 className="font-mono font-black text-xs sm:text-sm text-slate-200 uppercase tracking-wider">
-                AVAILABLE TEAMS ({availableTeams.length})
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <h2 className="font-mono font-bold text-xs text-slate-200 uppercase tracking-wider">
+                Available Teams ({availableTeams.length})
               </h2>
             </div>
-            {sortBy === 'preferenceRank' && (
-              <span className="text-[11px] font-mono text-amber-400/80 hidden sm:inline">
-                Use ▲ / ▼ or drag to adjust custom priority
-              </span>
-            )}
           </div>
         )}
 
         <table className="w-full text-left border-collapse text-xs sm:text-sm">
           <thead>
             <tr className="bg-slate-900/90 border-b border-slate-800 font-mono font-bold text-slate-400 text-[11px] uppercase">
-              <th className="p-3 w-12 text-center" title="Mark as picked or unavailable">Cross Off</th>
+              <th className="p-3 w-12 text-center">Cross Off</th>
               <th className="p-3 w-10 text-center">Compare</th>
-              <th className="p-3 w-20 text-center">Custom #</th>
+              <th className="p-3 w-20 text-center">Rank #</th>
               <th className="p-3 min-w-[110px]">TEAM</th>
               <th className="p-3 text-center">AUTO</th>
               <th className="p-3 text-center">FUEL</th>
               <th className="p-3 text-center">REL.</th>
               <th className="p-3 text-center">DEF.</th>
-              <th className="p-3 text-center">EVENT RANK</th>
-              <th className="p-3 text-center">STATE RANK</th>
+              <th className="p-3 text-center">EVENT</th>
+              <th className="p-3 text-center">STATE</th>
               <th className="p-3 text-right">ACTION</th>
             </tr>
           </thead>
@@ -990,9 +922,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
             {(!separateUnavailable ? unifiedTeams : availableTeams).length === 0 ? (
               <tr>
                 <td colSpan={11} className="p-8 text-center text-slate-500 font-mono text-xs">
-                  {teams.length === 0 
-                    ? 'No teams registered yet. Import an event roster or perform scouting.' 
-                    : 'No teams match the current variable filters.'}
+                  No teams found.
                 </td>
               </tr>
             ) : (
@@ -1004,22 +934,22 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
         </table>
       </div>
 
-      {/* SECTION 2: NOT AVAILABLE / PICKED BY OTHER ALLIANCE (Crossed Off) */}
+      {/* SECTION 2: UNAVAILABLE / PICKED */}
       {separateUnavailable && unavailableTeams.length > 0 && (
         <div className="overflow-x-auto rounded-2xl border border-rose-950/60 bg-slate-950/90 shadow-2xl transition-all">
           <div 
             onClick={() => setIsUnavailableCollapsed(!isUnavailableCollapsed)}
-            className="p-3 px-4 bg-rose-950/30 border-b border-rose-900/40 flex items-center justify-between cursor-pointer hover:bg-rose-950/40 transition-colors"
+            className="p-3 px-4 bg-rose-950/20 border-b border-rose-900/40 flex items-center justify-between cursor-pointer hover:bg-rose-950/30 transition-colors"
           >
-            <div className="flex items-center gap-2.5">
-              <Ban className="w-4 h-4 text-rose-400" />
-              <h2 className="font-mono font-black text-xs sm:text-sm text-rose-300 uppercase tracking-wider">
-                UNAVAILABLE / PICKED TEAMS ({unavailableTeams.length})
+            <div className="flex items-center gap-2">
+              <Ban className="w-3.5 h-3.5 text-rose-400" />
+              <h2 className="font-mono font-bold text-xs text-rose-300 uppercase tracking-wider">
+                Crossed Off ({unavailableTeams.length})
               </h2>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-rose-400 font-mono font-bold">
+            <div className="flex items-center gap-1 text-xs text-rose-400 font-mono font-bold">
               <span>{isUnavailableCollapsed ? 'Show' : 'Hide'}</span>
-              <ChevronRight className={`w-4 h-4 transform transition-transform ${isUnavailableCollapsed ? '' : 'rotate-90'}`} />
+              <ChevronRight className={`w-3.5 h-3.5 transform transition-transform ${isUnavailableCollapsed ? '' : 'rotate-90'}`} />
             </div>
           </div>
 
@@ -1029,14 +959,14 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                 <tr className="bg-slate-900/70 border-b border-slate-800 font-mono font-bold text-slate-500 text-[11px] uppercase">
                   <th className="p-3 w-12 text-center">Restore</th>
                   <th className="p-3 w-10 text-center">Compare</th>
-                  <th className="p-3 w-20 text-center">Custom #</th>
+                  <th className="p-3 w-20 text-center">Rank #</th>
                   <th className="p-3 min-w-[110px]">TEAM</th>
                   <th className="p-3 text-center">AUTO</th>
                   <th className="p-3 text-center">FUEL</th>
                   <th className="p-3 text-center">REL.</th>
                   <th className="p-3 text-center">DEF.</th>
-                  <th className="p-3 text-center">EVENT RANK</th>
-                  <th className="p-3 text-center">STATE RANK</th>
+                  <th className="p-3 text-center">EVENT</th>
+                  <th className="p-3 text-center">STATE</th>
                   <th className="p-3 text-right">ACTION</th>
                 </tr>
               </thead>
@@ -1048,157 +978,111 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* INTERACTIVE VARIABLE FILTER MODAL */}
+      {/* FILTER MODAL */}
       {showFilterModal && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-lg w-full shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <SlidersHorizontal className="w-5 h-5 text-amber-400" />
-                <h3 className="font-mono font-black text-base text-white uppercase">Filter Scouting Variables</h3>
+                <SlidersHorizontal className="w-4 h-4 text-slate-400" />
+                <h3 className="font-mono font-bold text-sm text-white uppercase">Filter Variables</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowFilterModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
               >
-                <X className="w-5 h-5" />
+                ✕
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs font-mono">
-              {/* Drivetrain Variable */}
-              <div className="space-y-1">
-                <label className="text-slate-400 font-bold uppercase block">Drivetrain Type</label>
-                <select
-                  value={filterDrivetrain}
-                  onChange={(e) => setFilterDrivetrain(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="ALL">All Drivetrains</option>
-                  <option value="SWERVE">Swerve Only</option>
-                  <option value="TANK / WEST COAST">Tank / West Coast</option>
-                  <option value="MECANUM">Mecanum</option>
-                  <option value="OTHER">Other</option>
-                </select>
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-[11px] font-mono font-bold uppercase text-slate-400 block mb-1">
+                  Drivetrain
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['ALL', 'SWERVE', 'TANK / WEST COAST', 'MECANUM', 'OTHER'].map((dt) => (
+                    <button
+                      key={dt}
+                      type="button"
+                      onClick={() => setFilterDrivetrain(dt)}
+                      className={`px-3 py-1 rounded-xl font-semibold uppercase ${
+                        filterDrivetrain === dt
+                          ? 'bg-slate-800 text-white border border-slate-600'
+                          : 'bg-slate-950 text-slate-400 border border-slate-850'
+                      }`}
+                    >
+                      {dt}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Shooter Type Variable */}
-              <div className="space-y-1">
-                <label className="text-slate-400 font-bold uppercase block">Shooter Mechanism</label>
-                <select
-                  value={filterShooter}
-                  onChange={(e) => setFilterShooter(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="ALL">All Shooters</option>
-                  <option value="TURRET">Turret Shooter</option>
-                  <option value="PIVOTING">Pivoting Hood</option>
-                  <option value="FIXED">Fixed Shooter</option>
-                  <option value="DUMPER">Dumper</option>
-                </select>
+              <div>
+                <label className="text-[11px] font-mono font-bold uppercase text-slate-400 block mb-1">
+                  Shooter
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['ALL', 'TURRET', 'FIXED', 'PIVOTING', 'DUMPER'].map((sh) => (
+                    <button
+                      key={sh}
+                      type="button"
+                      onClick={() => setFilterShooter(sh)}
+                      className={`px-3 py-1 rounded-xl font-semibold uppercase ${
+                        filterShooter === sh
+                          ? 'bg-slate-800 text-white border border-slate-600'
+                          : 'bg-slate-950 text-slate-400 border border-slate-850'
+                      }`}
+                    >
+                      {sh}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Field Capability */}
-              <div className="space-y-1">
-                <label className="text-slate-400 font-bold uppercase block">Bump / Trench</label>
-                <select
-                  value={filterCapability}
-                  onChange={(e) => setFilterCapability(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="ALL">All Capabilities</option>
-                  <option value="BOTH">Both Bump & Trench</option>
-                  <option value="BUMP ONLY">Bump Only</option>
-                  <option value="TRENCH ONLY">Trench Only</option>
-                </select>
-              </div>
-
-              {/* Reliability Rating */}
-              <div className="space-y-1">
-                <label className="text-slate-400 font-bold uppercase block">Reliability Rating</label>
-                <select
-                  value={filterReliability}
-                  onChange={(e) => setFilterReliability(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="ALL">All Ratings</option>
-                  <option value="HIGH">High Reliability Only</option>
-                  <option value="MED+">Medium or High</option>
-                </select>
-              </div>
-
-              {/* Defense Effectiveness */}
-              <div className="space-y-1">
-                <label className="text-slate-400 font-bold uppercase block">Defense Effectiveness</label>
-                <select
-                  value={filterDefense}
-                  onChange={(e) => setFilterDefense(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="ALL">All Defense Levels</option>
-                  <option value="HIGH">High Defense Only</option>
-                  <option value="ANY">Any Defense Played</option>
-                </select>
-              </div>
-
-              {/* Autonomous Capability */}
-              <div className="space-y-1">
-                <label className="text-slate-400 font-bold uppercase block">Autonomous Routine</label>
-                <select
-                  value={filterAuto}
-                  onChange={(e) => setFilterAuto(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-200 focus:outline-none focus:border-amber-500"
-                >
-                  <option value="ALL">All Autonomous</option>
-                  <option value="HAS_AUTO">Has Autonomous</option>
-                  <option value="CONSISTENT_AUTO">Consistent Auto (&gt;75%)</option>
-                </select>
+              <div>
+                <label className="text-[11px] font-mono font-bold uppercase text-slate-400 block mb-1">
+                  Bump & Trench
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['ALL', 'BOTH', 'BUMP ONLY', 'TRENCH ONLY', 'NEITHER'].map((cap) => (
+                    <button
+                      key={cap}
+                      type="button"
+                      onClick={() => setFilterCapability(cap)}
+                      className={`px-3 py-1 rounded-xl font-semibold uppercase ${
+                        filterCapability === cap
+                          ? 'bg-slate-800 text-white border border-slate-600'
+                          : 'bg-slate-950 text-slate-400 border border-slate-850'
+                      }`}
+                    >
+                      {cap}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+            <div className="flex justify-between items-center pt-2 border-t border-slate-800">
               <button
                 type="button"
                 onClick={resetAllFilters}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-xs font-bold"
+                className="text-xs text-slate-400 hover:text-white"
               >
-                <RotateCw className="w-3.5 h-3.5" />
-                <span>Reset All Filters</span>
+                Reset Filters
               </button>
-
               <button
                 type="button"
                 onClick={() => setShowFilterModal(false)}
-                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono text-xs font-black uppercase tracking-wider shadow"
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-xs font-bold"
               >
-                Apply Filters ({filteredTeams.length} teams)
+                Apply
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Bottom Sticky Action Buttons */}
-      <div className="fixed bottom-14 sm:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-950/90 backdrop-blur-md border border-slate-800 rounded-2xl p-2.5 shadow-2xl flex items-center gap-3">
-        <button
-          type="button"
-          onClick={handleOpenCompare}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black font-mono text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer"
-        >
-          <Layers className="w-4 h-4" />
-          <span>COMPARE {selectedTeamNums.length > 0 ? `(${selectedTeamNums.length})` : ''}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onNavigate('teams')}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-750 font-mono font-bold text-xs uppercase cursor-pointer"
-        >
-          <Eye className="w-4 h-4" />
-          <span>VIEW TEAMS</span>
-        </button>
-      </div>
     </div>
   );
 };

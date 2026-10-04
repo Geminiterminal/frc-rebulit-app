@@ -4,7 +4,8 @@ import {
   MatchScoutingRecord, 
   FieldRouteType, 
   DefenseEffectivenessType, 
-  RobotIssuesType 
+  RobotIssuesType,
+  EventScheduleMatch 
 } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
 import { scoutingAssignments } from '../../db/scoutingAssignments';
@@ -21,7 +22,8 @@ import {
   Shield,
   MessageSquare,
   QrCode,
-  X
+  X,
+  Calendar
 } from 'lucide-react';
 
 interface MatchScoutFormProps {
@@ -40,22 +42,23 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
   const [teamNumber, setTeamNumber] = useState<string>(
     initialTeamNumber ? initialTeamNumber.toString() : ''
   );
+  const [teamSchedule, setTeamSchedule] = useState<EventScheduleMatch[]>([]);
 
-  // 1. AUTONOMOUS (Starts unselected / blank)
+  // 1. AUTONOMOUS
   const [autoWorked, setAutoWorked] = useState<boolean | null>(null);
   const [autoFuelScored, setAutoFuelScored] = useState<number>(0);
 
   // 2. SCORING
   const [teleopFuelScored, setTeleopFuelScored] = useState<number>(0);
 
-  // 3. FIELD ROUTE (Starts unselected / blank)
+  // 3. FIELD ROUTE
   const [fieldRoute, setFieldRoute] = useState<FieldRouteType | null>(null);
 
-  // 4. DEFENSE (Starts unselected / blank)
+  // 4. DEFENSE
   const [playedDefense, setPlayedDefense] = useState<boolean | null>(null);
   const [defenseEffectiveness, setDefenseEffectiveness] = useState<DefenseEffectivenessType | null>(null);
 
-  // 5. ROBOT RELIABILITY (Starts unselected / blank)
+  // 5. ROBOT RELIABILITY
   const [robotIssues, setRobotIssues] = useState<RobotIssuesType | null>(null);
   const [whatHappenedNote, setWhatHappenedNote] = useState<string>('');
 
@@ -79,7 +82,17 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
     }
   }, [initialMatchNumber]);
 
-  // Load existing match scout record if present in IndexedDB
+  useEffect(() => {
+    const teamNum = parseInt(teamNumber, 10);
+    if (!isNaN(teamNum) && teamNum > 0) {
+      scoutingDB.getScheduleForTeam(teamNum).then((sched) => {
+        setTeamSchedule(sched);
+      });
+    } else {
+      setTeamSchedule([]);
+    }
+  }, [teamNumber]);
+
   useEffect(() => {
     const teamNum = parseInt(teamNumber, 10);
     if (!isNaN(teamNum) && teamNum > 0 && matchNumber > 0) {
@@ -110,7 +123,6 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
     }
   }, [teamNumber, matchNumber]);
 
-  // Quick increment/decrement helper ensuring values never go below 0
   const adjustValue = (current: number, delta: number) => {
     return Math.max(0, current + delta);
   };
@@ -119,7 +131,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
     e.preventDefault();
     const teamNum = parseInt(teamNumber, 10);
     if (isNaN(teamNum) || teamNum <= 0) {
-      setToastMessage('Please enter a valid Team Number');
+      setToastMessage('Enter valid Team Number');
       setTimeout(() => setToastMessage(null), 2500);
       return;
     }
@@ -129,38 +141,22 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       teamNumber: teamNum,
       matchNumber,
       timestamp: Date.now(),
-
-      // 1. AUTONOMOUS
       autoWorked: autoWorked !== null ? autoWorked : false,
       autoFuelScored,
-
-      // 2. SCORING
       teleopFuelScored,
-
-      // 3. FIELD ROUTE
       fieldRoute: fieldRoute || 'NEITHER',
-
-      // 4. DEFENSE
       playedDefense: playedDefense === true,
       defenseEffectiveness: playedDefense === true ? (defenseEffectiveness || 'MEDIUM') : undefined,
-
-      // 5. ROBOT RELIABILITY
       robotIssues: robotIssues || 'NONE',
       whatHappenedNote: (robotIssues && robotIssues !== 'NONE') ? whatHappenedNote : undefined,
-
-      // 6. QUICK OBSERVATION
       quickNote: quickNote.trim() || undefined,
-
-      // Legacy field aliases for backward compatibility with existing profile aggregations
       autoHighScored: autoFuelScored,
       teleopHighScored: teleopFuelScored,
       notes: quickNote,
     };
 
-    // Save match observation
     await scoutingDB.saveMatch(record);
 
-    // Auto-associate observation with the selected team's existing profile or create new team profile
     const existingTeam = await scoutingDB.getTeam(teamNum);
     if (!existingTeam) {
       await scoutingDB.saveTeam({
@@ -178,7 +174,6 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
     setToastMessage(`Match ${matchNumber} saved for Team ${teamNum}`);
 
-    // Reset form for next fresh match (nothing pre-selected)
     setTimeout(() => {
       setToastMessage(null);
       setMatchNumber((prev) => prev + 1);
@@ -194,13 +189,13 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       setQuickNote('');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       onNavigate('home');
-    }, 1200);
+    }, 1000);
   };
 
   const handleGenerateSingleMatchQr = async () => {
     const teamNum = parseInt(teamNumber, 10);
     if (isNaN(teamNum) || teamNum <= 0) {
-      setToastMessage('Please enter a valid Team Number first');
+      setToastMessage('Enter valid Team Number first');
       setTimeout(() => setToastMessage(null), 2500);
       return;
     }
@@ -213,30 +208,16 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       teamNumber: teamNum,
       matchNumber,
       timestamp: Date.now(),
-
-      // 1. AUTONOMOUS
       autoWorked: autoWorked !== null ? autoWorked : false,
       autoFuelScored,
-
-      // 2. SCORING
       teleopFuelScored,
-
-      // 3. FIELD ROUTE
       fieldRoute: fieldRoute || 'NEITHER',
-
-      // 4. DEFENSE
       playedDefense: playedDefense === true,
       defenseEffectiveness: playedDefense === true ? (defenseEffectiveness || 'MEDIUM') : undefined,
-
-      // 5. ROBOT RELIABILITY
       robotIssues: robotIssues || 'NONE',
       whatHappenedNote: (robotIssues && robotIssues !== 'NONE') ? whatHappenedNote : undefined,
-
-      // 6. QUICK OBSERVATION
       quickNote: quickNote.trim() || undefined,
       impression: (impression as 1 | 2 | 3 | 4 | 5) || undefined,
-
-      // Legacy field aliases
     };
 
     const payloadStr = qrTransferEngine.generateSingleMatchQr(scoutName, record);
@@ -251,58 +232,56 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSaveMatch} className="max-w-xl mx-auto px-3.5 sm:px-5 py-5 pb-32 flex flex-col gap-6">
-      {/* Toast Notification */}
+    <form onSubmit={handleSaveMatch} className="max-w-xl mx-auto px-3.5 sm:px-5 py-4 pb-32 flex flex-col gap-4">
+      {/* Toast */}
       {toastMessage && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white font-mono font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl shadow-xl flex items-center gap-2 border border-emerald-400 animate-bounce">
-          <CheckCircle2 className="w-4 h-4" />
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-slate-100 font-mono font-bold text-xs px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 border border-slate-700 animate-bounce">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Top Bar Header */}
-      <div className="sticky top-13 z-30 bg-slate-950/95 backdrop-blur-md -mx-3.5 px-3.5 py-3 border-b border-slate-800 flex items-center justify-between shadow-md">
+      <div className="sticky top-13 z-30 bg-slate-950/95 backdrop-blur-md -mx-3.5 px-3.5 py-2.5 border-b border-slate-800 flex items-center justify-between shadow-md">
         <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => onNavigate('home')}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 cursor-pointer"
+            className="p-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <div>
-            <h1 className="text-base sm:text-lg font-black font-mono text-slate-100 tracking-tight uppercase">
-              MATCH SCOUT
-            </h1>
-          </div>
+          <h1 className="text-sm sm:text-base font-bold font-mono text-slate-100 tracking-tight uppercase">
+            MATCH SCOUT
+          </h1>
         </div>
 
         <button
           type="submit"
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black font-mono text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-100 font-bold font-mono text-xs uppercase shadow transition-all cursor-pointer border border-slate-700"
         >
           <Save className="w-4 h-4" />
-          <span>SAVE MATCH</span>
+          <span>SAVE</span>
         </button>
       </div>
 
       {/* MATCH IDENTIFICATION */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-4">
-        <div className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
-          <span>MATCH IDENTIFICATION</span>
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
+        <div className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
+          Match Setup
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Match Number Counter */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col justify-between gap-2">
-            <span className="text-xs font-mono font-bold uppercase text-slate-400">
+        <div className="grid grid-cols-2 gap-3">
+          {/* Match Counter */}
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between gap-1.5">
+            <span className="text-[11px] font-mono font-bold uppercase text-slate-400">
               Match #
             </span>
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-1">
               <button
                 type="button"
                 onClick={() => setMatchNumber((prev) => Math.max(1, prev - 1))}
-                className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-lg active:scale-90 cursor-pointer border border-slate-700"
+                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-sm cursor-pointer border border-slate-700"
               >
                 −
               </button>
@@ -312,21 +291,21 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
                 required
                 value={matchNumber}
                 onChange={(e) => setMatchNumber(parseInt(e.target.value, 10) || 1)}
-                className="w-16 text-center text-xl font-mono font-black bg-transparent text-amber-300 focus:outline-none"
+                className="w-12 text-center text-lg font-mono font-bold bg-transparent text-slate-200 focus:outline-none"
               />
               <button
                 type="button"
                 onClick={() => setMatchNumber((prev) => prev + 1)}
-                className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-lg active:scale-90 cursor-pointer border border-slate-700"
+                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-sm cursor-pointer border border-slate-700"
               >
                 +
               </button>
             </div>
           </div>
 
-          {/* Team Number Input */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col justify-between gap-2">
-            <span className="text-xs font-mono font-bold uppercase text-slate-400">
+          {/* Team Number */}
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between gap-1.5">
+            <span className="text-[11px] font-mono font-bold uppercase text-slate-400">
               Team Number
             </span>
             <input
@@ -335,109 +314,142 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
               placeholder="Team #"
               value={teamNumber}
               onChange={(e) => setTeamNumber(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-750 rounded-lg py-2 px-3 text-lg font-mono font-black text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/80"
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 px-2.5 text-base font-mono font-bold text-white placeholder-slate-600 focus:outline-none focus:border-slate-600"
             />
           </div>
         </div>
+
+        {/* Scheduled Matches Quick Selector */}
+        {teamSchedule.length > 0 && (
+          <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] font-mono font-bold uppercase text-slate-400">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                <span>Scheduled Matches for Team {teamNumber}</span>
+              </span>
+              <span className="text-[10px] text-slate-500">{teamSchedule.length} found</span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {teamSchedule.map((m) => {
+                const isSelected = matchNumber === m.matchNumber;
+                const isRed = m.redTeams.includes(parseInt(teamNumber, 10));
+                const allianceBadge = isRed ? 'border-rose-900/80 text-rose-300' : 'border-sky-900/80 text-sky-300';
+                return (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => setMatchNumber(m.matchNumber)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${
+                      isSelected
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                        : `bg-slate-950 hover:bg-slate-850 text-slate-300 ${allianceBadge}`
+                    }`}
+                  >
+                    <span>Qual {m.matchNumber}</span>
+                    <span className={`w-2 h-2 rounded-full ${isRed ? 'bg-rose-500' : 'bg-sky-500'}`} />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 1. AUTONOMOUS */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-4">
-        <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-blue-400">
-          <Zap className="w-4 h-4" />
-          <span>1. AUTONOMOUS</span>
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
+        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+          <Zap className="w-3.5 h-3.5 text-slate-400" />
+          <span>1. Autonomous</span>
         </div>
 
-        {/* Auto Worked? YES / NO */}
+        {/* Auto Worked */}
         <div>
-          <span className="block text-xs font-mono font-semibold uppercase text-slate-300 mb-2">
+          <span className="block text-[11px] font-mono font-semibold uppercase text-slate-400 mb-1.5">
             Auto Worked?
           </span>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setAutoWorked(true)}
-              className={`py-3 rounded-xl font-mono font-bold text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
+              className={`py-2 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 autoWorked === true
-                  ? 'bg-blue-600 text-white shadow-md border border-blue-400'
-                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
+                  ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
+                  : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
               }`}
             >
-              {autoWorked === true && <Check className="w-4 h-4" />}
+              {autoWorked === true && <Check className="w-3.5 h-3.5 text-emerald-400" />}
               <span>YES</span>
             </button>
 
             <button
               type="button"
               onClick={() => setAutoWorked(false)}
-              className={`py-3 rounded-xl font-mono font-bold text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
+              className={`py-2 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                 autoWorked === false
-                  ? 'bg-rose-600 text-white shadow-md border border-rose-400'
-                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
+                  ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
+                  : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
               }`}
             >
-              {autoWorked === false && <Check className="w-4 h-4" />}
+              {autoWorked === false && <Check className="w-3.5 h-3.5 text-rose-400" />}
               <span>NO</span>
             </button>
           </div>
         </div>
 
-        {/* Auto Fuel Scored Counter */}
-        <div className="space-y-2 pt-1 border-t border-slate-800/80">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-semibold uppercase text-slate-300">
-              Auto Fuel Scored
-            </span>
-            <span className="text-xl font-mono font-black text-blue-400 px-3 py-0.5 rounded-lg bg-slate-950 border border-slate-800">
+        {/* Auto Fuel Counter */}
+        <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
+          <div className="flex items-center justify-between text-xs font-mono text-slate-300">
+            <span>Auto Fuel Scored</span>
+            <span className="text-base font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-100">
               {autoFuelScored}
             </span>
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5 pt-1">
+          <div className="grid grid-cols-7 gap-1">
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, -20))}
-              className="py-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-rose-400 font-mono font-bold text-xs border border-slate-800 active:scale-95 cursor-pointer"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850"
             >
               −20
             </button>
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, -5))}
-              className="py-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-rose-400 font-mono font-bold text-xs border border-slate-800 active:scale-95 cursor-pointer"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850"
             >
               −5
             </button>
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, -1))}
-              className="py-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-rose-400 font-mono font-bold text-xs border border-slate-800 active:scale-95 cursor-pointer"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850"
             >
               −1
             </button>
 
-            <div className="py-2.5 rounded-lg bg-slate-900 text-slate-200 font-mono font-black text-sm border border-slate-750 flex items-center justify-center">
+            <div className="py-2 rounded-lg bg-slate-900 text-slate-100 font-mono font-bold text-xs border border-slate-800 flex items-center justify-center">
               {autoFuelScored}
             </div>
 
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, 1))}
-              className="py-2.5 rounded-lg bg-blue-950/80 hover:bg-blue-900 text-blue-300 font-mono font-bold text-xs border border-blue-800 active:scale-95 cursor-pointer"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850"
             >
               +1
             </button>
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, 5))}
-              className="py-2.5 rounded-lg bg-blue-950/80 hover:bg-blue-900 text-blue-300 font-mono font-bold text-xs border border-blue-800 active:scale-95 cursor-pointer"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850"
             >
               +5
             </button>
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, 20))}
-              className="py-2.5 rounded-lg bg-blue-950/80 hover:bg-blue-900 text-blue-300 font-mono font-bold text-xs border border-blue-800 active:scale-95 cursor-pointer"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850"
             >
               +20
             </button>
@@ -446,68 +458,65 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       </div>
 
       {/* 2. SCORING */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-4">
-        <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-emerald-400">
-          <Target className="w-4 h-4" />
-          <span>2. SCORING</span>
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
+        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+          <Target className="w-3.5 h-3.5 text-slate-400" />
+          <span>2. Teleop Scoring</span>
         </div>
 
-        {/* Teleop Fuel Scored Counter */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-semibold uppercase text-slate-300">
-              Teleop Fuel Scored
-            </span>
-            <span className="text-xl font-mono font-black text-emerald-400 px-3 py-0.5 rounded-lg bg-slate-950 border border-slate-800">
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs font-mono text-slate-300">
+            <span>Teleop Fuel Scored</span>
+            <span className="text-base font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-100">
               {teleopFuelScored}
             </span>
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5 pt-1">
+          <div className="grid grid-cols-7 gap-1">
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, -20))}
-              className="py-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-rose-400 font-mono font-bold text-xs border border-slate-800 active:scale-95 cursor-pointer"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850"
             >
               −20
             </button>
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, -5))}
-              className="py-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-rose-400 font-mono font-bold text-xs border border-slate-800 active:scale-95 cursor-pointer"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850"
             >
               −5
             </button>
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, -1))}
-              className="py-2.5 rounded-lg bg-slate-950 hover:bg-slate-800 text-rose-400 font-mono font-bold text-xs border border-slate-800 active:scale-95 cursor-pointer"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850"
             >
               −1
             </button>
 
-            <div className="py-2.5 rounded-lg bg-slate-900 text-slate-200 font-mono font-black text-sm border border-slate-750 flex items-center justify-center">
+            <div className="py-2 rounded-lg bg-slate-900 text-slate-100 font-mono font-bold text-xs border border-slate-800 flex items-center justify-center">
               {teleopFuelScored}
             </div>
 
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, 1))}
-              className="py-2.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-mono font-bold text-xs border border-emerald-800 active:scale-95 cursor-pointer"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850"
             >
               +1
             </button>
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, 5))}
-              className="py-2.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-mono font-bold text-xs border border-emerald-800 active:scale-95 cursor-pointer"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850"
             >
               +5
             </button>
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, 20))}
-              className="py-2.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 font-mono font-bold text-xs border border-emerald-800 active:scale-95 cursor-pointer"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850"
             >
               +20
             </button>
@@ -516,26 +525,22 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       </div>
 
       {/* 3. FIELD ROUTE */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-4">
-        <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-purple-400">
-          <Route className="w-4 h-4" />
-          <span>3. FIELD ROUTE</span>
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
+        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+          <Route className="w-3.5 h-3.5 text-slate-400" />
+          <span>3. Field Route</span>
         </div>
 
-        <span className="block text-xs font-mono font-semibold uppercase text-slate-300">
-          Field Route Used
-        </span>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {(['BUMP', 'TRENCH', 'BOTH', 'NEITHER'] as FieldRouteType[]).map((route) => (
             <button
               key={route}
               type="button"
               onClick={() => setFieldRoute(route)}
-              className={`py-3 rounded-xl font-mono font-bold text-xs sm:text-sm uppercase transition-all cursor-pointer ${
+              className={`py-2.5 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer ${
                 fieldRoute === route
-                  ? 'bg-purple-600 text-white shadow-md border border-purple-400'
-                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
+                  ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
+                  : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
               }`}
             >
               {route}
@@ -545,65 +550,58 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       </div>
 
       {/* 4. DEFENSE */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-4">
-        <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-amber-400">
-          <Shield className="w-4 h-4" />
-          <span>4. DEFENSE</span>
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2.5">
+        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+          <Shield className="w-3.5 h-3.5 text-slate-400" />
+          <span>4. Defense</span>
         </div>
 
-        {/* Played Defense? YES / NO */}
-        <div>
-          <span className="block text-xs font-mono font-semibold uppercase text-slate-300 mb-2">
-            Played Defense?
-          </span>
-          <div className="grid grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={() => setPlayedDefense(true)}
-              className={`py-3 rounded-xl font-mono font-bold text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                playedDefense === true
-                  ? 'bg-amber-500 text-slate-950 shadow-md border border-amber-300'
-                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
-              }`}
-            >
-              {playedDefense === true && <Check className="w-4 h-4" />}
-              <span>YES</span>
-            </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setPlayedDefense(true)}
+            className={`py-2 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              playedDefense === true
+                ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
+                : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
+            }`}
+          >
+            {playedDefense === true && <Check className="w-3.5 h-3.5 text-amber-400" />}
+            <span>YES</span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setPlayedDefense(false);
-                setDefenseEffectiveness(null);
-              }}
-              className={`py-3 rounded-xl font-mono font-bold text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                playedDefense === false
-                  ? 'bg-slate-800 text-slate-200 shadow-md border border-slate-700'
-                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
-              }`}
-            >
-              {playedDefense === false && <Check className="w-4 h-4" />}
-              <span>NO</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setPlayedDefense(false);
+              setDefenseEffectiveness(null);
+            }}
+            className={`py-2 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              playedDefense === false
+                ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
+                : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
+            }`}
+          >
+            {playedDefense === false && <Check className="w-3.5 h-3.5 text-slate-400" />}
+            <span>NO</span>
+          </button>
         </div>
 
-        {/* Reveal Defense Effectiveness only if YES */}
         {playedDefense === true && (
-          <div className="pt-2 border-t border-slate-800/80 animate-fadeIn space-y-2">
-            <span className="block text-xs font-mono font-semibold uppercase text-amber-300">
+          <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+            <span className="block text-[11px] font-mono font-semibold uppercase text-slate-400">
               Defense Effectiveness
             </span>
-            <div className="grid grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-3 gap-2">
               {(['LOW', 'MEDIUM', 'HIGH'] as DefenseEffectivenessType[]).map((eff) => (
                 <button
                   key={eff}
                   type="button"
                   onClick={() => setDefenseEffectiveness(eff)}
-                  className={`py-2.5 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer ${
+                  className={`py-2 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer ${
                     defenseEffectiveness === eff
-                      ? 'bg-slate-800 text-slate-100 shadow border border-slate-600'
-                      : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
+                      ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
+                      : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
                   }`}
                 >
                   {eff}
@@ -615,28 +613,22 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       </div>
 
       {/* 5. ROBOT RELIABILITY */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-4">
-        <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rose-400">
-          <AlertTriangle className="w-4 h-4" />
-          <span>5. ROBOT RELIABILITY</span>
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2.5">
+        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+          <AlertTriangle className="w-3.5 h-3.5 text-slate-400" />
+          <span>5. Issues</span>
         </div>
 
-        <span className="block text-xs font-mono font-semibold uppercase text-slate-300">
-          Robot Issues
-        </span>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {(['NONE', 'MINOR', 'MAJOR', 'DISABLED'] as RobotIssuesType[]).map((issue) => (
             <button
               key={issue}
               type="button"
               onClick={() => setRobotIssues(issue)}
-              className={`py-3 rounded-xl font-mono font-bold text-xs sm:text-sm uppercase transition-all cursor-pointer ${
+              className={`py-2.5 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer ${
                 robotIssues === issue
-                  ? issue === 'NONE'
-                    ? 'bg-emerald-600 text-white shadow-md border border-emerald-400'
-                    : 'bg-rose-600 text-white shadow-md border border-rose-400'
-                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-850'
+                  ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
+                  : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
               }`}
             >
               {issue}
@@ -644,71 +636,40 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           ))}
         </div>
 
-        {/* Reveal note if anything other than NONE */}
         {robotIssues && robotIssues !== 'NONE' && (
-          <div className="pt-2 border-t border-slate-800/80 animate-fadeIn space-y-2">
-            <span className="block text-xs font-mono font-semibold uppercase text-rose-300">
-              What happened?
-            </span>
+          <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
             <input
               type="text"
-              placeholder="Short note regarding the issue..."
+              placeholder="Issue details..."
               value={whatHappenedNote}
               onChange={(e) => setWhatHappenedNote(e.target.value)}
-              className="w-full bg-slate-950 border border-rose-900/60 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-rose-500"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600"
             />
           </div>
         )}
       </div>
 
       {/* 6. QUICK OBSERVATION */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-sm space-y-3">
-        <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-sky-400">
-          <MessageSquare className="w-4 h-4" />
-          <span>6. QUICK OBSERVATION</span>
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
+        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+          <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+          <span>6. Notes</span>
         </div>
-
-        <span className="block text-xs font-mono font-semibold uppercase text-slate-300">
-          Quick Note (Optional)
-        </span>
 
         <textarea
-          rows={3}
-          placeholder="Important observations about this robot..."
+          rows={2}
+          placeholder="Observations..."
           value={quickNote}
           onChange={(e) => setQuickNote(e.target.value)}
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-700 resize-none"
+          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600 resize-none"
         />
-
-        {/* Impression */}
-        <div className="space-y-2">
-          <span className="block text-xs font-mono font-semibold uppercase text-slate-300">
-            Impression (1-5)
-          </span>
-          <div className="flex gap-2">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                type="button"
-                onClick={() => setImpression(star)}
-                className={`p-3 rounded-xl transition-all ${
-                  impression && impression >= star
-                    ? 'bg-amber-500 text-slate-950'
-                    : 'bg-slate-950 text-slate-600'
-                }`}
-              >
-                ★
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
-      {/* BOTTOM SAVE & QR BUTTONS */}
-      <div className="grid grid-cols-2 gap-2 pt-2">
+      {/* BOTTOM ACTIONS */}
+      <div className="grid grid-cols-2 gap-2 pt-1">
         <button
           type="submit"
-          className="py-4 rounded-2xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-100 font-bold font-mono text-xs sm:text-sm uppercase tracking-wider shadow-xl transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-2"
+          className="py-3 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-100 font-bold font-mono text-xs uppercase tracking-wider shadow transition-all active:scale-[0.99] cursor-pointer flex items-center justify-center gap-1.5"
         >
           <Save className="w-4 h-4 text-slate-300" />
           <span>SAVE MATCH</span>
@@ -717,19 +678,19 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         <button
           type="button"
           onClick={handleGenerateSingleMatchQr}
-          className="py-4 rounded-2xl bg-[#0F172A]/85 hover:bg-slate-800 border border-slate-800 text-slate-200 font-bold font-mono text-xs sm:text-sm uppercase tracking-wider shadow-xl transition-all cursor-pointer active:scale-[0.99] flex items-center justify-center gap-2"
+          className="py-3 rounded-xl bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-200 font-bold font-mono text-xs uppercase tracking-wider shadow transition-all cursor-pointer active:scale-[0.99] flex items-center justify-center gap-1.5"
         >
           <QrCode className="w-4 h-4 text-slate-300" />
-          <span>Show QR Code</span>
+          <span>Show QR</span>
         </button>
       </div>
 
       {/* SINGLE QR DISPLAY MODAL */}
       {isSingleQrOpen && singleQrUrl && (
         <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-3 shadow-2xl text-center">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <span className="text-xs font-black text-slate-200 uppercase tracking-wider">
+              <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
                 Match QR: Team #{teamNumber}
               </span>
               <button
@@ -740,10 +701,6 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
-
-            <p className="text-xs text-slate-300 font-mono">
-              Have <strong>Captain</strong> scan this QR code with "Scan Scout Data QR" to import:
-            </p>
 
             <div className="p-3 bg-white rounded-2xl inline-block mx-auto shadow-lg">
               <img src={singleQrUrl} alt="Single Match Data QR" className="w-52 h-52 mx-auto" />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TeamProfile, MatchScoutingRecord, AutonomousDrawing } from '../../types/scouting';
+import { TeamProfile, MatchScoutingRecord, AutonomousDrawing, EventScheduleMatch } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
 import { ShootingAreaMapper } from '../common/ShootingAreaMapper';
 import { AutonomousDrawer } from '../common/AutonomousDrawer';
@@ -18,12 +18,13 @@ import {
   ChevronRight,
   Maximize2,
   X,
-  Target
+  Target,
+  Calendar
 } from 'lucide-react';
 
 interface TeamProfileViewProps {
   teamNumber: number;
-  onNavigate: (view: string, teamNumber?: number) => void;
+  onNavigate: (view: string, teamNumber?: number, extraParam?: any) => void;
 }
 
 export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
@@ -32,6 +33,8 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
 }) => {
   const [team, setTeam] = useState<TeamProfile | null>(null);
   const [matches, setMatches] = useState<MatchScoutingRecord[]>([]);
+  const [scheduledMatches, setScheduledMatches] = useState<EventScheduleMatch[]>([]);
+  const [showMatchPicker, setShowMatchPicker] = useState<boolean>(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'pit' | 'auto' | 'matches' | 'photos'>('overview');
   const [activeAutoRoutineIdx, setActiveAutoRoutineIdx] = useState<number>(0);
@@ -56,6 +59,19 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
 
     const teamMatches = await scoutingDB.getMatchesForTeam(teamNumber);
     setMatches(teamMatches);
+
+    const sched = await scoutingDB.getScheduleForTeam(teamNumber);
+    setScheduledMatches(sched);
+  };
+
+  const handleMatchScoutClick = async () => {
+    const sched = await scoutingDB.getScheduleForTeam(teamNumber);
+    if (sched && sched.length > 0) {
+      setScheduledMatches(sched);
+      setShowMatchPicker(true);
+    } else {
+      onNavigate('match-scout', teamNumber);
+    }
   };
 
   if (!team) {
@@ -98,7 +114,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => onNavigate('match-scout', teamNumber)}
+            onClick={handleMatchScoutClick}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-colors cursor-pointer"
           >
             <Gamepad2 className="w-3.5 h-3.5" />
@@ -502,6 +518,86 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Match Schedule Picker Modal */}
+      {showMatchPicker && (
+        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 backdrop-blur-md font-mono">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-md w-full space-y-4 shadow-2xl text-slate-100 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 shrink-0">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-bold text-white uppercase tracking-wider">
+                  Select Match for Team {teamNumber}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowMatchPicker(false)}
+                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400 shrink-0">
+              Pick a scheduled match to prefill and scout Team {teamNumber}:
+            </p>
+
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              {scheduledMatches.map((m) => {
+                const isRed = m.redTeams.includes(teamNumber);
+                const allianceColor = isRed ? 'text-rose-400' : 'text-sky-400';
+                const badgeBg = isRed ? 'bg-rose-950/70 border-rose-900/80 text-rose-300' : 'bg-sky-950/70 border-sky-900/80 text-sky-300';
+                const partnerTeams = (isRed ? m.redTeams : m.blueTeams).filter((t) => t !== teamNumber);
+                const opposingTeams = isRed ? m.blueTeams : m.redTeams;
+
+                return (
+                  <button
+                    key={m.key}
+                    type="button"
+                    onClick={() => {
+                      setShowMatchPicker(false);
+                      onNavigate('match-scout', teamNumber, m.matchNumber);
+                    }}
+                    className="w-full p-3 rounded-xl bg-slate-950 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 text-left transition-all cursor-pointer flex items-center justify-between group"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white uppercase">
+                          {m.compLevel === 'qm' ? `Qual ${m.matchNumber}` : `Match ${m.matchNumber}`}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${badgeBg}`}>
+                          {isRed ? 'Red Alliance' : 'Blue Alliance'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        <span>Partners: {partnerTeams.length ? partnerTeams.join(', ') : 'None'}</span>
+                        <span className="mx-1.5">•</span>
+                        <span>Opponents: {opposingTeams.join(', ')}</span>
+                      </div>
+                    </div>
+
+                    <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all shrink-0" />
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMatchPicker(false);
+                  onNavigate('match-scout', teamNumber);
+                }}
+                className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs uppercase cursor-pointer transition-colors border border-slate-750 text-center"
+              >
+                + Custom Match Number
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lightbox photo preview */}
       {selectedPhoto && (

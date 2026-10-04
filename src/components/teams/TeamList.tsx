@@ -6,13 +6,8 @@ import {
   Search, 
   Plus, 
   ChevronRight, 
-  Filter, 
   Target, 
   CheckCircle2, 
-  AlertTriangle,
-  Camera,
-  Layers,
-  Flame,
   ArrowUpDown
 } from 'lucide-react';
 
@@ -73,13 +68,11 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
     onNavigate('pit-scout', num);
   };
 
-  // Pre-calculate match counts
   const matchCountMap = new Map<number, number>();
   matches.forEach((m) => {
     matchCountMap.set(m.teamNumber, (matchCountMap.get(m.teamNumber) || 0) + 1);
   });
 
-  // Filter & Sort
   const filteredTeams = teams
     .filter((t) => {
       const matchSearch =
@@ -139,64 +132,60 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
     });
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 pb-28 flex flex-col gap-5">
+    <div className="max-w-4xl mx-auto px-4 py-5 pb-28 flex flex-col gap-4">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-800">
+      <div className="flex items-center justify-between pb-2 border-b border-slate-800">
         <div>
-          <h1 className="text-xl font-black text-slate-100 tracking-tight font-mono">
-            Teams Registry
+          <h1 className="text-xl font-black text-slate-100 tracking-tight font-mono uppercase">
+            Teams ({teams.length})
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {teams.length} registered teams • Fast search and filtering
-          </p>
         </div>
 
         <button
           type="button"
           onClick={() => setShowAddModal(true)}
-          className="flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs uppercase tracking-wider shadow transition-all cursor-pointer self-start sm:self-auto"
+          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3.5 h-3.5" />
           <span>Add Team</span>
         </button>
       </div>
 
-      {/* Search Input Bar */}
+      {/* Search Input */}
       <form onSubmit={handleSearchSubmit} className="relative">
-        <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+        <Search className="w-3.5 h-3.5 absolute left-3.5 top-3 text-slate-400" />
         <input
           type="text"
-          placeholder="Search team # (e.g. 9751) or name (Press Enter to open)"
+          placeholder="Search team number or name"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-20 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600 transition-colors font-mono"
+          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-16 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600 transition-colors font-mono"
         />
         {searchQuery && (
           <button
             type="submit"
-            className="absolute right-2 top-2 px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold"
+            className="absolute right-1.5 top-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold"
           >
             Open
           </button>
         )}
       </form>
 
-      {/* Filter & Sort Chips */}
+      {/* Filters */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-slate-400 font-medium">Filter:</span>
           {assignedTeams.length > 0 && (
             <button
               type="button"
               onClick={() => setFilterAssignedOnly(!filterAssignedOnly)}
               className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer flex items-center gap-1 ${
                 filterAssignedOnly
-                  ? 'bg-cyan-950 text-cyan-300 border border-cyan-600 shadow-sm'
+                  ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
                   : 'bg-slate-950 text-slate-400 hover:bg-slate-900 border border-slate-850'
               }`}
             >
-              <Target className="w-3.5 h-3.5 text-cyan-400" />
-              <span>My Assigned ({assignedTeams.length})</span>
+              <Target className="w-3 h-3 text-slate-400" />
+              <span>Assigned ({assignedTeams.length})</span>
             </button>
           )}
           {['ALL', 'SWERVE', 'TANK / WEST COAST'].map((dt) => (
@@ -225,31 +214,31 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
                   : 'bg-slate-950 text-slate-400 hover:bg-slate-900 border border-slate-850'
               }`}
             >
-              {cap === 'TRENCH' ? 'Trench Traversal' : 
-               cap === 'TURRET' ? 'Turret Shooter' : 
-               cap === 'MATCHES' ? 'Has Matches' :
+              {cap === 'TRENCH' ? 'Trench' : 
+               cap === 'TURRET' ? 'Turret' : 
+               cap === 'MATCHES' ? 'Matches' :
                cap === 'PIT' ? 'Pit Scouted' : 'Not Scouted'}
             </button>
           ))}
         </div>
 
         <div className="flex items-center gap-1.5">
-          <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
+          <ArrowUpDown className="w-3 h-3 text-slate-400" />
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-slate-300 text-xs focus:outline-none"
+            className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 text-xs focus:outline-none"
           >
-            <option value="number">Sort by Team #</option>
-            <option value="scouted">Sort by Scouted Status</option>
-            <option value="matches">Sort by Match Count</option>
-            <option value="reliability">Sort by Reliability</option>
+            <option value="number">Team #</option>
+            <option value="scouted">Scouted Status</option>
+            <option value="matches">Match Count</option>
+            <option value="reliability">Reliability</option>
           </select>
         </div>
       </div>
 
-      {/* Team Cards Scrollable List */}
-      <div className="space-y-2.5">
+      {/* Teams List */}
+      <div className="space-y-2">
         {filteredTeams.length > 0 ? (
           filteredTeams.map((t) => {
             const mCount = matchCountMap.get(t.teamNumber) || 0;
@@ -261,15 +250,15 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
               <div
                 key={t.teamNumber}
                 onClick={() => onNavigate('team-profile', t.teamNumber)}
-                className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                className="p-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
               >
                 <div className="flex items-start sm:items-center gap-3">
-                  <div className={`w-14 h-12 rounded-xl border flex items-center justify-center font-mono font-black text-lg group-hover:border-blue-500 transition-colors shrink-0 ${
+                  <div className={`w-12 h-11 rounded-xl border flex items-center justify-center font-mono font-black text-base shrink-0 ${
                     isFullyScouted 
-                      ? 'bg-emerald-950/30 border-emerald-500/50 text-emerald-400' 
+                      ? 'bg-slate-950 border-emerald-500/50 text-emerald-400' 
                       : hasPit 
-                      ? 'bg-blue-950/30 border-blue-500/50 text-blue-400'
-                      : 'bg-slate-950 border-slate-800 text-white'
+                      ? 'bg-slate-950 border-slate-600 text-slate-200'
+                      : 'bg-slate-950 border-slate-800 text-slate-400'
                   }`}>
                     {t.teamNumber}
                   </div>
@@ -280,64 +269,42 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
                         {t.teamName}
                       </span>
                       {isFullyScouted && (
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase tracking-tighter">
+                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 text-[9px] font-black uppercase">
                           <CheckCircle2 className="w-2.5 h-2.5" />
                           <span>Scouted</span>
                         </div>
                       )}
                       {pit?.reliability && (
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                            pit.reliability === 'VERY RELIABLE'
-                              ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                              : pit.reliability === 'MOSTLY RELIABLE'
-                              ? 'bg-blue-950 text-blue-400 border border-blue-800'
-                              : 'bg-amber-950 text-amber-400 border border-amber-800'
-                          }`}
-                        >
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
                           {pit.reliability}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 mt-1 font-mono">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-400 mt-0.5 font-mono">
                       <span>Drive: <strong className="text-slate-200">{pit?.drivetrain || '—'}</strong></span>
                       <span>Shooter: <strong className="text-slate-200">{pit?.shooter?.join('/') || '—'}</strong></span>
-                      <span>Hopper: <strong className="text-amber-400">{pit?.hopperCapacity ?? '—'}</strong></span>
-                      <span>Accuracy: <strong className="text-emerald-400">{pit?.shootingAccuracy || '—'}</strong></span>
+                      <span>Hopper: <strong className="text-slate-200">{pit?.hopperCapacity ?? '—'}</strong></span>
+                      <span>Accuracy: <strong className="text-slate-200">{pit?.shootingAccuracy || '—'}</strong></span>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 self-end sm:self-center">
                   <div className="text-right">
-                    <span className="text-[10px] uppercase font-mono text-slate-400 block">Matches</span>
-                    <span className="font-mono font-bold text-xs text-slate-200">
-                      {mCount} recorded
+                    <span className="font-mono font-bold text-xs text-slate-300">
+                      {mCount} match{mCount === 1 ? '' : 'es'}
                     </span>
                   </div>
 
-                  <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-blue-400 group-hover:translate-x-1 transition-all" />
+                  <ChevronRight className="w-4 h-4 text-slate-500 group-hover:translate-x-1 transition-all" />
                 </div>
               </div>
             );
           })
         ) : (
-          <div className="p-12 text-center text-slate-400 bg-slate-900 rounded-2xl border border-slate-800 space-y-3">
-            <p className="text-sm">No teams found matching query "{searchQuery}".</p>
-            {searchQuery && (
-              <button
-                onClick={() => {
-                  const num = parseInt(searchQuery, 10);
-                  if (!isNaN(num) && num > 0) {
-                    onNavigate('pit-scout', num);
-                  }
-                }}
-                className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs uppercase"
-              >
-                Create Team {searchQuery}
-              </button>
-            )}
+          <div className="p-8 text-center text-slate-500 bg-slate-900/60 rounded-2xl border border-slate-800">
+            <p className="text-xs">No teams found matching "{searchQuery}".</p>
           </div>
         )}
       </div>
@@ -345,12 +312,9 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
       {/* Add Team Modal */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <h3 className="font-black text-lg text-white mb-2">Register New Team</h3>
-            <p className="text-xs text-slate-400 mb-4">
-              Enter the FRC team number to begin pit scouting.
-            </p>
-            <form onSubmit={handleCreateTeam} className="space-y-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-3">
+            <h3 className="font-bold text-base text-white">Register Team</h3>
+            <form onSubmit={handleCreateTeam} className="space-y-3">
               <div>
                 <label className="block text-xs font-mono font-bold uppercase text-slate-400 mb-1">
                   Team Number
@@ -359,10 +323,10 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
                   type="number"
                   autoFocus
                   required
-                  placeholder="e.g. 9751"
+                  placeholder="Team number"
                   value={newTeamNumber}
                   onChange={(e) => setNewTeamNumber(e.target.value)}
-                  className="w-full text-center text-2xl font-mono font-bold bg-slate-950 border border-slate-700 rounded-xl py-2 px-3 text-white focus:outline-none focus:border-blue-500"
+                  className="w-full text-center text-2xl font-mono font-bold bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-white focus:outline-none focus:border-slate-600"
                 />
               </div>
 
@@ -370,13 +334,13 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+                  className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase"
+                  className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-white border border-slate-700 font-bold text-xs uppercase cursor-pointer"
                 >
                   Continue
                 </button>

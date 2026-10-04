@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { 
   Trophy, 
-  ClipboardList, 
-  Gamepad2, 
   Map, 
   ChevronRight, 
+  ChevronDown,
+  ChevronUp,
   Users, 
   TrendingUp, 
   FolderDown, 
@@ -18,14 +18,15 @@ import {
   Download, 
   RefreshCw, 
   CheckCircle2, 
-  X 
+  X,
+  Check
 } from 'lucide-react';
 import { scoutingDB } from '../../db/indexedDB';
-import { scoutingAssignments, ScoutAssignment } from '../../db/scoutingAssignments';
+import { scoutingAssignments, ScoutAssignment, MatchTarget } from '../../db/scoutingAssignments';
 import { tbaApi } from '../../utils/tbaApi';
 import { qrTransferEngine } from '../../utils/qrTransferEngine';
 import { QrScannerModal } from '../common/QrScannerModal';
-import { TeamProfile } from '../../types/scouting';
+import { TeamProfile, EventScheduleMatch } from '../../types/scouting';
 
 interface CaptainDashboardProps {
   onNavigate: (view: string, teamNumber?: number) => void;
@@ -35,18 +36,20 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
   const [allTeams, setAllTeams] = useState<TeamProfile[]>([]);
   const [scoutedTeams, setScoutedTeams] = useState<TeamProfile[]>([]);
   const [assignments, setAssignments] = useState<ScoutAssignment[]>([]);
+  const [teamSchedulesMap, setTeamSchedulesMap] = useState<Record<number, EventScheduleMatch[]>>({});
 
   // TBA Setup
   const [eventCode, setEventCode] = useState<string>(() => localStorage.getItem('frc_active_event_code') || '');
-  const [tbaAuthKey, setTbaAuthKey] = useState<string>(() => localStorage.getItem('frc_tba_auth_key') || '');
   const [isFetchingTba, setIsFetchingTba] = useState<boolean>(false);
   const [tbaStatusMsg, setTbaStatusMsg] = useState<string | null>(null);
 
   // New Assignment Modal
   const [isAddAssignmentOpen, setIsAddAssignmentOpen] = useState(false);
   const [newScoutName, setNewScoutName] = useState('');
-  const [newScoutRole, setNewScoutRole] = useState<'PIT_SCOUT' | 'MATCH_SCOUT'>('PIT_SCOUT');
+  const [newScoutRole, setNewScoutRole] = useState<'PIT_SCOUT' | 'MATCH_SCOUT'>('MATCH_SCOUT');
   const [selectedTeamNums, setSelectedTeamNums] = useState<number[]>([]);
+  const [selectedMatchTargets, setSelectedMatchTargets] = useState<MatchTarget[]>([]);
+  const [expandedAssignmentTeams, setExpandedAssignmentTeams] = useState<Set<number>>(new Set());
   const [manualTeamInput, setManualTeamInput] = useState('');
 
   // Assignment QR Modal
@@ -72,13 +75,18 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
         t.pit.lastUpdated || 
         t.pit.drivetrain || 
         t.pit.reliability || 
-        t.pit.scoutName || 
         (t.pit.photos && t.pit.photos.length > 0)
       );
       const hasMatch = teamNumsWithMatches.has(t.teamNumber);
       return hasPit || hasMatch;
     });
     setScoutedTeams(filtered);
+
+    const schedMap: Record<number, EventScheduleMatch[]> = {};
+    for (const t of teams) {
+      schedMap[t.teamNumber] = await scoutingDB.getScheduleForTeam(t.teamNumber);
+    }
+    setTeamSchedulesMap(schedMap);
 
     const list = scoutingAssignments.getAllAssignments();
     setAssignments(list);
@@ -94,17 +102,50 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
     if (res.success) {
       loadData();
     }
-    // Auto-dismiss after 3 seconds
     setTimeout(() => {
       setTbaStatusMsg(null);
     }, 3000);
+  };
+
+  const handleToggleMatchTarget = (teamNumber: number, matchNumber: number) => {
+    setSelectedMatchTargets((prev) => {
+      const exists = prev.some((mt) => mt.teamNumber === teamNumber && mt.matchNumber === matchNumber);
+      if (exists) {
+        return prev.filter((mt) => !(mt.teamNumber === teamNumber && mt.matchNumber === matchNumber));
+      } else {
+        return [...prev, { teamNumber, matchNumber }];
+      }
+    });
+  };
+
+  const handleToggleAssignmentTeamExpand = (teamNumber: number) => {
+    setExpandedAssignmentTeams((prev) => {
+      const next = new Set(prev);
+      if (next.has(teamNumber)) {
+        next.delete(teamNumber);
+      } else {
+        next.add(teamNumber);
+      }
+      return next;
+    });
   };
 
   const handleCreateAssignment = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newScoutName.trim()) return;
 
-    let finalTeams = [...selectedTeamNums];
+    let finalTeams: number[] = [];
+    let finalTargets: MatchTarget[] = [];
+
+    if (newScoutRole === 'PIT_SCOUT') {
+      finalTeams = [...selectedTeamNums];
+    } else {
+      // Match Scout
+      const targetTeams = selectedMatchTargets.map((mt) => mt.teamNumber);
+      finalTeams = Array.from(new Set([...selectedTeamNums, ...targetTeams]));
+      finalTargets = [...selectedMatchTargets];
+    }
+
     if (manualTeamInput.trim()) {
       const parsedNums = manualTeamInput
         .split(',')
@@ -113,9 +154,18 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
       finalTeams = Array.from(new Set([...finalTeams, ...parsedNums]));
     }
 
-    scoutingAssignments.assignTeamsToScout(newScoutName.trim(), finalTeams, newScoutRole);
+    scoutingAssignments.assignTeamsToScout(
+      newScoutName.trim(), 
+      finalTeams, 
+      newScoutRole,
+      undefined,
+      finalTargets.length > 0 ? finalTargets : undefined
+    );
+
     setNewScoutName('');
     setSelectedTeamNums([]);
+    setSelectedMatchTargets([]);
+    setExpandedAssignmentTeams(new Set());
     setManualTeamInput('');
     setIsAddAssignmentOpen(false);
     loadData();
@@ -132,7 +182,9 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
     const payloadStr = qrTransferEngine.generateAssignmentPayload(
       assignment.scoutName,
       roleType,
-      assignment.assignedTeams
+      assignment.assignedTeams,
+      assignment.matchNumber,
+      assignment.matchTargets
     );
 
     try {
@@ -161,190 +213,182 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
 
   return (
     <div className="max-w-md mx-auto px-2 sm:px-3 py-2 pb-24 flex flex-col gap-3 font-mono">
-      {/* 1. PRIMARY ACTION BAR: SCAN SCOUT DATA */}
+      {/* 1. PRIMARY TOP ACTIONS */}
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => setIsScanDataOpen(true)}
-          className="flex-1 py-3 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-100 font-bold border border-slate-700 text-xs uppercase tracking-wider cursor-pointer shadow transition-all active:scale-98 flex items-center justify-center gap-2"
+          className="flex-1 py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-850 text-white font-bold border border-slate-800 text-xs uppercase tracking-wider cursor-pointer shadow-sm transition-all active:scale-98 flex items-center justify-center gap-2"
         >
           <Camera className="w-4 h-4 text-slate-300" />
-          <span>Scan Scout Data QR</span>
+          <span>SCAN DATA QR</span>
         </button>
 
         <button
           type="button"
           onClick={() => setIsAddAssignmentOpen(true)}
-          className="py-3 px-3 rounded-xl bg-slate-800/40 hover:bg-slate-700 text-slate-200 border border-slate-700/80 font-bold text-xs uppercase cursor-pointer flex items-center justify-center gap-1 shrink-0"
+          className="py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-850 text-white font-bold border border-slate-800 text-xs uppercase tracking-wider cursor-pointer shadow-sm transition-all active:scale-98 flex items-center justify-center gap-1.5 shrink-0"
         >
           <Plus className="w-4 h-4 text-slate-300" />
-          <span>Assign</span>
+          <span>ASSIGN</span>
         </button>
       </div>
 
       {scanResultMsg && (
-        <div className="p-2.5 rounded-xl bg-slate-900 border border-emerald-600/60 text-emerald-300 text-xs font-bold flex items-center gap-2 shadow">
+        <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 text-xs font-bold flex items-center gap-2 shadow">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>{scanResultMsg}</span>
         </div>
       )}
 
-      {/* 2. MAIN NAVIGATION CARDS */}
+      {/* 2. MAIN CARDS: RANKING & STRATEGY */}
       <div className="flex flex-col gap-2.5">
-        {/* RANKING */}
         <button
           type="button"
           onClick={() => onNavigate('picklist')}
-          className="p-4 rounded-2xl bg-[#0F172A]/85 border border-slate-800 hover:border-slate-700 hover:shadow-[0_0_20px_rgba(148,163,184,0.1)] text-left cursor-pointer flex items-center justify-between shadow-sm transition-all group duration-200"
+          className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-left cursor-pointer flex items-center justify-between shadow-sm transition-all group"
         >
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-slate-800/60 border border-slate-700/80 text-slate-200 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-slate-850 border border-slate-800 text-slate-200 flex items-center justify-center shrink-0">
               <Trophy className="w-5 h-5 text-slate-200" />
             </div>
-            <span className="text-base font-black text-slate-100 tracking-wider">
+            <span className="text-sm font-bold text-white uppercase tracking-wider">
               RANKING
             </span>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-500 group-hover:translate-x-1 transition-transform" />
         </button>
 
-        {/* STRATEGY & WHITEBOARD */}
         <button
           type="button"
           onClick={() => onNavigate('strategy-field')}
-          className="p-4 rounded-2xl bg-[#0F172A]/85 border border-slate-800 hover:border-slate-700 hover:shadow-[0_0_20px_rgba(148,163,184,0.1)] text-left cursor-pointer flex items-center justify-between shadow-sm transition-all group duration-200"
+          className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-left cursor-pointer flex items-center justify-between shadow-sm transition-all group"
         >
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-slate-800/60 border border-slate-700/80 text-slate-200 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-slate-850 border border-slate-800 text-slate-200 flex items-center justify-center shrink-0">
               <Map className="w-5 h-5 text-slate-200" />
             </div>
-            <span className="text-base font-black text-slate-100 tracking-wider">
-              STRATEGY & WHITEBOARD
+            <span className="text-sm font-bold text-white uppercase tracking-wider">
+              STRATEGY
             </span>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-500 group-hover:translate-x-1 transition-transform" />
         </button>
       </div>
 
-      {/* 5. TBA EVENT SETUP CARD */}
-      <div className="p-4 rounded-2xl bg-[#0F172A]/85 border border-slate-800 space-y-3">
+      {/* 3. EVENT SETUP CARD */}
+      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-          <span className="text-xs font-bold text-slate-100 uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
             <Database className="w-4 h-4 text-slate-300" />
-            <span>TBA Event Setup</span>
+            <span>EVENT SETUP</span>
           </span>
-          <span className="text-[10px] text-slate-400">{allTeams.length} Loaded</span>
+          <span className="text-[11px] text-slate-400 font-medium">{allTeams.length} Loaded</span>
         </div>
 
-        <form onSubmit={handleFetchTba} className="space-y-2">
+        <form onSubmit={handleFetchTba} className="space-y-2 pt-1">
           <input
             type="text"
-            placeholder="Event Code (e.g. 2026mifli1)"
+            placeholder="Event code"
             value={eventCode}
             onChange={(e) => setEventCode(e.target.value)}
-            className="w-full bg-[#0B132B] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono"
             required
           />
 
           <button
             type="submit"
             disabled={isFetchingTba}
-            className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700/60 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+            className="w-full py-2.5 px-3 rounded-xl bg-slate-850 hover:bg-slate-800 text-white font-bold text-xs border border-slate-800 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 transition-colors"
           >
             {isFetchingTba ? (
               <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-300" />
             ) : (
               <Download className="w-3.5 h-3.5 text-slate-300" />
             )}
-            <span>{isFetchingTba ? 'Fetching...' : 'Fetch Teams from TBA'}</span>
+            <span>{isFetchingTba ? 'Fetching...' : 'Fetch Teams'}</span>
           </button>
         </form>
 
         {tbaStatusMsg && (
-          <div className="p-2 rounded-xl bg-[#0B132B] text-xs text-slate-300">
+          <div className="p-2 rounded-xl bg-slate-950 text-xs text-slate-300 border border-slate-800">
             {tbaStatusMsg}
           </div>
         )}
       </div>
 
-      {/* 4. DYNAMIC SCOUT ASSIGNMENTS CARD */}
-      <div className="p-4 rounded-2xl bg-[#0F172A] border border-slate-800 space-y-3">
+      {/* 4. ASSIGNMENTS CARD */}
+      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-          <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
             <Users className="w-4 h-4 text-slate-300" />
-            <span>Scout Assignments ({assignments.length})</span>
+            <span>ASSIGNMENTS ({assignments.length})</span>
           </span>
           <button
             type="button"
             onClick={() => setIsAddAssignmentOpen(true)}
-            className="text-xs text-slate-300 hover:text-slate-100 hover:underline font-bold cursor-pointer"
+            className="text-xs text-slate-300 hover:text-white font-bold cursor-pointer"
           >
-            + Create New
+            + New
           </button>
         </div>
 
         {assignments.length > 0 ? (
-          <div className="space-y-2">
-            {assignments.map((a) => (
-              <div
-                key={a.scoutName}
-                className="p-3 rounded-xl bg-[#0B132B] border border-slate-800 flex items-center justify-between text-xs"
-              >
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-slate-100">{a.scoutName}</span>
-                    {a.role ? (
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider ${
-                        a.role === 'PIT_SCOUT' 
-                          ? 'bg-slate-800 text-slate-300 border border-slate-750' 
-                          : 'bg-slate-800/60 text-slate-400 border border-slate-750/50'
-                      }`}>
-                        {a.role === 'PIT_SCOUT' ? 'Pit' : 'Match'}
+          <div className="space-y-1.5 pt-1">
+            {assignments.map((a) => {
+              const targetCount = a.matchTargets?.length || 0;
+              return (
+                <div
+                  key={a.scoutName}
+                  className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white">{a.scoutName}</span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-slate-850 text-slate-300 border border-slate-800">
+                        {a.role === 'PIT_SCOUT' ? 'PIT' : 'MATCH'}
                       </span>
-                    ) : (
-                      // Guess/fallback badge if role isn't explicitly set
-                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider ${
-                        a.scoutName.toLowerCase().includes('pit')
-                          ? 'bg-slate-800 text-slate-300 border border-slate-750'
-                          : 'bg-slate-800/60 text-slate-400 border border-slate-750/50'
-                      }`}>
-                        {a.scoutName.toLowerCase().includes('pit') ? 'Pit' : 'Match'}
-                      </span>
-                    )}
+                    </div>
+                    <div className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                      {targetCount > 0 ? (
+                        <span>
+                          Targets: {a.matchTargets?.map((mt) => `T${mt.teamNumber}(Q${mt.matchNumber})`).join(', ')}
+                        </span>
+                      ) : (
+                        <span>Teams: {a.assignedTeams.length > 0 ? a.assignedTeams.join(', ') : 'All'}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-400 truncate max-w-[180px] mt-0.5">
-                    Teams: {a.assignedTeams.length > 0 ? a.assignedTeams.join(', ') : 'All'}
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleShowAssignmentQr(a)}
+                      className="py-1 px-2.5 rounded-lg bg-slate-850 border border-slate-800 text-slate-200 hover:bg-slate-800 text-[11px] font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                    >
+                      <QrCode className="w-3.5 h-3.5 text-slate-300" />
+                      <span>QR</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAssignment(a.scoutName)}
+                      className="p-1 rounded-lg text-slate-500 hover:text-red-400 cursor-pointer transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleShowAssignmentQr(a)}
-                    className="py-1 px-2.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-200 hover:bg-slate-700 text-[11px] font-bold cursor-pointer flex items-center gap-1"
-                  >
-                    <QrCode className="w-3 h-3 text-slate-300" />
-                    <span>QR</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteAssignment(a.scoutName)}
-                    className="p-1 rounded-lg text-slate-500 hover:text-red-400 cursor-pointer"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
-          <p className="text-xs text-slate-500">No scout assignments created yet. Tap + Create New above.</p>
+          <p className="text-xs text-slate-500 pt-1">No scout assignments yet.</p>
         )}
       </div>
 
-      {/* 3. RECENTLY SCOUTED TEAMS SECTION (EXACT MATCHING ATTACHED IMAGE) */}
-      <div className="p-4 rounded-2xl bg-[#0F172A] border border-slate-800 space-y-3">
+      {/* 5. RECENTLY SCOUTED TEAMS */}
+      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
         <div className="flex items-center justify-between text-xs">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
             RECENTLY SCOUTED TEAMS ({scoutedTeams.length})
@@ -352,113 +396,101 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
           <button
             type="button"
             onClick={() => onNavigate('teams')}
-            className="text-slate-300 hover:text-slate-100 font-bold text-xs cursor-pointer"
+            className="text-slate-300 hover:text-white font-bold text-xs cursor-pointer"
           >
             View All →
           </button>
         </div>
 
         {scoutedTeams.length > 0 ? (
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap pt-1">
             {scoutedTeams.slice(0, 10).map((t) => (
               <button
                 key={t.teamNumber}
                 type="button"
                 onClick={() => onNavigate('team-profile', t.teamNumber)}
-                className="px-3 py-1.5 rounded-xl bg-[#0B132B] border border-slate-800 text-slate-200 font-bold text-xs hover:border-slate-500 hover:text-slate-100 transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-bold text-xs hover:border-slate-700 transition-colors cursor-pointer"
               >
                 {t.teamNumber}
               </button>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-slate-500">No teams scouted yet. Fill match or pit data to see recently scouted teams.</p>
+          <p className="text-xs text-slate-500 pt-1">No scouted teams yet</p>
         )}
       </div>
 
-      {/* 6. BOTTOM TOOLBAR (EXACT MATCHING ATTACHED IMAGE) */}
+      {/* 6. BOTTOM 4 SHORTCUTS */}
       <div className="grid grid-cols-4 gap-2 pt-1">
         <button
           type="button"
           onClick={() => onNavigate('teams')}
-          className="p-3 rounded-xl bg-[#0F172A] border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+          className="p-3 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
         >
-          <Users className="w-4 h-4 text-slate-300" />
+          <Users className="w-4 h-4 text-slate-400" />
           <span>Teams</span>
         </button>
 
         <button
           type="button"
           onClick={() => onNavigate('event-data')}
-          className="p-3 rounded-xl bg-[#0F172A] border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+          className="p-3 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
         >
-          <TrendingUp className="w-4 h-4 text-slate-300" />
+          <TrendingUp className="w-4 h-4 text-slate-400" />
           <span>Matches</span>
         </button>
 
         <button
           type="button"
           onClick={() => onNavigate('import-export')}
-          className="p-3 rounded-xl bg-[#0F172A] border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+          className="p-3 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
         >
-          <FolderDown className="w-4 h-4 text-slate-300" />
-          <span className="text-[10px] truncate max-w-full">Export/Sync</span>
+          <FolderDown className="w-4 h-4 text-slate-400" />
+          <span className="text-[10px] truncate max-w-full">Export/Sy_</span>
         </button>
 
         <button
           type="button"
           onClick={() => onNavigate('settings')}
-          className="p-3 rounded-xl bg-[#0F172A] border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+          className="p-3 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
         >
-          <Sliders className="w-4 h-4 text-slate-300" />
+          <Sliders className="w-4 h-4 text-slate-400" />
           <span>Settings</span>
         </button>
       </div>
 
-      {/* CREATE SCOUT ASSIGNMENT MODAL */}
+      {/* CREATE ASSIGNMENT MODAL */}
       {isAddAssignmentOpen && (
-        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 backdrop-blur-md">
-          <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-4 max-w-sm w-full space-y-3.5 shadow-2xl text-slate-100 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <span className="text-xs font-black text-slate-200 uppercase">
-                Create Scout Assignment
+        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md font-mono">
+          <div className="bg-[#0e1422] border border-[#1a2438] rounded-2xl p-5 sm:p-6 max-w-md sm:max-w-lg w-full space-y-4 shadow-2xl text-slate-100 max-h-[88vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#1a2438] pb-3 shrink-0">
+              <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
+                CREATE SCOUT ASSIGNMENT
               </span>
               <button
                 type="button"
                 onClick={() => setIsAddAssignmentOpen(false)}
-                className="text-slate-400 hover:text-white p-1 cursor-pointer"
+                className="text-slate-400 hover:text-white p-1 cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateAssignment} className="space-y-3">
+            <form onSubmit={handleCreateAssignment} className="space-y-3.5 flex-1 overflow-y-auto pr-1">
+              {/* ASSIGNMENT TYPE */}
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                  Scout Name / Role Title:
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Sarah, Pit Scout A, Match Scout 3"
-                  value={newScoutName}
-                  onChange={(e) => setNewScoutName(e.target.value)}
-                  className="w-full bg-[#0B132B] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                  Scouting Role:
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                  ASSIGNMENT TYPE
                 </label>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <button
                     type="button"
                     onClick={() => setNewScoutRole('PIT_SCOUT')}
-                    className={`py-2 rounded-xl font-bold border transition-colors cursor-pointer ${
+                    className={`py-2.5 rounded-xl font-bold border transition-all cursor-pointer ${
                       newScoutRole === 'PIT_SCOUT'
-                        ? 'bg-slate-800 border-slate-600 text-slate-100'
-                        : 'bg-[#0B132B] border-slate-800 text-slate-400'
+                        ? 'bg-[#141d2f] text-white border-[#1a2438] shadow-sm font-black'
+                        : 'bg-[#080d16] text-slate-400 border-[#1a2438]'
                     }`}
                   >
                     Pit Scout
@@ -466,10 +498,10 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
                   <button
                     type="button"
                     onClick={() => setNewScoutRole('MATCH_SCOUT')}
-                    className={`py-2 rounded-xl font-bold border transition-colors cursor-pointer ${
+                    className={`py-2.5 rounded-xl font-bold border transition-all cursor-pointer ${
                       newScoutRole === 'MATCH_SCOUT'
-                        ? 'bg-slate-800/50 border-slate-700/60 text-slate-300'
-                        : 'bg-[#0B132B] border-slate-800 text-slate-400'
+                        ? 'bg-[#141d2f] text-white border-[#1a2438] shadow-sm font-black'
+                        : 'bg-[#080d16] text-slate-400 border-[#1a2438]'
                     }`}
                   >
                     Match Scout
@@ -477,51 +509,142 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
                 </div>
               </div>
 
-              {allTeams.length > 0 && (
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                    Select Assigned Teams ({selectedTeamNums.length} selected):
-                  </label>
-                  <div className="max-h-32 overflow-y-auto bg-[#0B132B] border border-slate-800 rounded-xl p-2 flex flex-wrap gap-1.5">
-                    {allTeams.map((t) => {
-                      const isSel = selectedTeamNums.includes(t.teamNumber);
-                      return (
-                        <button
-                          key={t.teamNumber}
-                          type="button"
-                          onClick={() => handleToggleTeamSelect(t.teamNumber)}
-                          className={`px-2 py-1 rounded-lg text-xs font-bold border cursor-pointer ${
-                            isSel
-                              ? 'bg-slate-800 border-slate-600 text-slate-100'
-                              : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                          }`}
-                        >
-                          #{t.teamNumber}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
+              {/* SCOUT NAME */}
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
-                  Manual Team Numbers (comma separated):
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                  SCOUT NAME
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. 27, 66, 1684"
-                  value={manualTeamInput}
-                  onChange={(e) => setManualTeamInput(e.target.value)}
-                  className="w-full bg-[#0B132B] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono"
+                  placeholder="Scout name"
+                  value={newScoutName}
+                  onChange={(e) => setNewScoutName(e.target.value)}
+                  className="w-full bg-[#080d16] border border-[#1a2438] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-slate-500 font-mono"
+                  required
                 />
               </div>
 
+              {/* SELECT FROM EVENT */}
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                  SELECT TEAMS FROM EVENT ({newScoutRole === 'MATCH_SCOUT' ? (selectedMatchTargets.length > 0 ? `${selectedMatchTargets.length} MATCHES` : `${selectedTeamNums.length} TEAMS`) : `${selectedTeamNums.length} TEAMS`} SELECTED)
+                </label>
+
+                <div className="max-h-60 overflow-y-auto p-2 bg-[#080d16] border border-[#1a2438] rounded-xl">
+                  {allTeams.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {allTeams.map((t) => {
+                          const teamNum = t.teamNumber;
+                          const isTeamSelected = selectedTeamNums.includes(teamNum);
+                          const isTargeted = selectedMatchTargets.some((mt) => mt.teamNumber === teamNum);
+                          const isSelected = isTeamSelected || isTargeted;
+
+                          return (
+                            <button
+                              key={teamNum}
+                              type="button"
+                              onClick={() => {
+                                handleToggleTeamSelect(teamNum);
+                                if (newScoutRole === 'MATCH_SCOUT') {
+                                  handleToggleAssignmentTeamExpand(teamNum);
+                                }
+                              }}
+                              className={`py-2 px-1 rounded-xl border text-center font-mono font-bold text-xs cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'bg-[#1a253d] border-slate-500 text-white font-black shadow-sm'
+                                  : 'bg-[#141d2f] border-[#1a2438] text-slate-200 hover:text-white'
+                              }`}
+                            >
+                              {teamNum}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Dropdown panels for match selection when Match Scout is active */}
+                      {newScoutRole === 'MATCH_SCOUT' && expandedAssignmentTeams.size > 0 && (
+                        <div className="pt-2 border-t border-[#1a2438] space-y-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block">
+                            SELECT MATCH NUMBERS FOR EXPANDED TEAMS:
+                          </span>
+                          {Array.from(expandedAssignmentTeams).map((teamNum) => {
+                            const sched = teamSchedulesMap[teamNum] || [];
+                            return (
+                              <div key={`exp-${teamNum}`} className="p-2.5 bg-[#0e1422] border border-[#1a2438] rounded-xl space-y-1.5">
+                                <div className="flex items-center justify-between text-[10px] font-bold text-white">
+                                  <span>Team #{teamNum}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleAssignmentTeamExpand(teamNum)}
+                                    className="text-slate-400 hover:text-white text-[9px] uppercase cursor-pointer"
+                                  >
+                                    Close
+                                  </button>
+                                </div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {sched.length > 0 ? (
+                                    sched.map((m) => {
+                                      const isTargeted = selectedMatchTargets.some(
+                                        (mt) => mt.teamNumber === teamNum && mt.matchNumber === m.matchNumber
+                                      );
+                                      return (
+                                        <button
+                                          key={m.key}
+                                          type="button"
+                                          onClick={() => handleToggleMatchTarget(teamNum, m.matchNumber)}
+                                          className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold border transition-all cursor-pointer ${
+                                            isTargeted
+                                              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                                              : 'bg-[#080d16] text-slate-300 border-[#1a2438] hover:border-slate-600'
+                                          }`}
+                                        >
+                                          Qual {m.matchNumber}
+                                        </button>
+                                      );
+                                    })
+                                  ) : (
+                                    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((mn) => {
+                                      const isTargeted = selectedMatchTargets.some(
+                                        (mt) => mt.teamNumber === teamNum && mt.matchNumber === mn
+                                      );
+                                      return (
+                                        <button
+                                          key={mn}
+                                          type="button"
+                                          onClick={() => handleToggleMatchTarget(teamNum, mn)}
+                                          className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold border transition-all cursor-pointer ${
+                                            isTargeted
+                                              ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                                              : 'bg-[#080d16] text-slate-300 border-[#1a2438] hover:border-slate-600'
+                                          }`}
+                                        >
+                                          Match {mn}
+                                        </button>
+                                      );
+                                    })
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-3 text-center text-xs text-slate-500 font-mono">
+                      No event teams loaded yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* SAVE ASSIGNMENT */}
               <button
                 type="submit"
-                className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold border border-slate-600 text-xs uppercase cursor-pointer transition-transform active:scale-98 shadow"
+                className="w-full py-3 rounded-xl bg-[#141d2f] hover:bg-[#1a253d] border border-[#1a2438] text-white font-mono font-bold text-xs uppercase tracking-wider cursor-pointer shadow transition-all active:scale-98 mt-1"
               >
-                Save & Create QR
+                SAVE ASSIGNMENT
               </button>
             </form>
           </div>
@@ -530,11 +653,11 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
 
       {/* ASSIGNMENT QR DISPLAY MODAL */}
       {activeAssignmentQr && (
-        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-[#0F172A] border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
+        <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 backdrop-blur-md">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-xs w-full text-center space-y-3.5 shadow-2xl text-slate-100">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <span className="text-xs font-black text-slate-200 uppercase">
-                Assignment QR: {activeAssignmentQr.scoutName}
+              <span className="text-xs font-bold text-slate-200 uppercase">
+                {activeAssignmentQr.scoutName}'s QR
               </span>
               <button
                 type="button"
@@ -545,31 +668,23 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
               </button>
             </div>
 
-            <p className="text-xs text-slate-300 font-mono">
-              Have <strong>{activeAssignmentQr.scoutName}</strong> scan this QR code on their device:
-            </p>
-
-            <div className="p-3 bg-white rounded-2xl inline-block mx-auto shadow-lg">
-              <img src={activeAssignmentQr.qrUrl} alt="Assignment QR" className="w-52 h-52 mx-auto" />
+            <div className="p-3 bg-white rounded-xl inline-block shadow-inner mx-auto">
+              <img src={activeAssignmentQr.qrUrl} alt="Assignment QR" className="w-48 h-48 mx-auto" />
             </div>
 
-            <button
-              type="button"
-              onClick={() => setActiveAssignmentQr(null)}
-              className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs cursor-pointer"
-            >
-              Done
-            </button>
+            <p className="text-[11px] text-slate-400">
+              Have the scout scan this code on their device to load assignments.
+            </p>
           </div>
         </div>
       )}
 
-      {/* CAMERA SCANNER MODAL */}
+      {/* SCAN SCOUT DATA MODAL */}
       <QrScannerModal
         isOpen={isScanDataOpen}
-        title="Scan Scout Data QR"
-        onScanResult={handleScoutDataScanResult}
         onClose={() => setIsScanDataOpen(false)}
+        onScanResult={handleScoutDataScanResult}
+        title="Scan Scout Data QR"
       />
     </div>
   );

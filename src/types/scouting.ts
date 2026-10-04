@@ -171,6 +171,19 @@ export interface StrategyPlan {
   updatedAt: number;
 }
 
+export interface EventScheduleMatch {
+  key: string;
+  matchNumber: number;
+  compLevel: string; // 'qm', 'sf', 'f', etc.
+  setNumber?: number;
+  redTeams: number[];
+  blueTeams: number[];
+  redScore?: number;
+  blueScore?: number;
+  time?: number;
+  predictedTime?: number;
+}
+
 export interface ScoutingDatabaseExport {
   version: number;
   exportedAt: number;
@@ -178,4 +191,5 @@ export interface ScoutingDatabaseExport {
   matchRecords: MatchScoutingRecord[];
   strategyPlans: StrategyPlan[];
   eventCode: string;
+  schedule?: EventScheduleMatch[];
 }

@@ -1,6 +1,6 @@
 /**
  * Scouting Hierarchy, Roles & Target List Management
- * Role-based permissions: Lead Scout can assign teams to scouts and create rooms.
+ * Pure offline role-based assignments for Pit Scouts and Match Scouts.
  */
 
 import { scoutingDB } from './indexedDB';
@@ -22,7 +22,7 @@ export const SCOUT_POSITIONS: PositionMeta[] = [
     label: 'Lead Scout / Admin',
     badge: '👑 Lead Scout',
     icon: 'Crown',
-    description: 'Assigns team numbers to scouts, creates sync rooms, and coordinates scouting operations.',
+    description: 'Assigns team and match numbers to scouts, creates sync rooms, and coordinates scouting operations.',
     isPrivileged: true,
   },
   {
@@ -62,9 +62,19 @@ export interface ScoutProfile {
   teamNumber?: number;
 }
 
+export interface MatchScoutTask {
+  matchNumber: number;
+  teamNumber: number;
+}
+export type MatchTarget = MatchScoutTask;
+
 export interface ScoutAssignment {
   scoutName: string;
   assignedTeams: number[];
+  assignedMatches?: number[];
+  matchNumber?: number;
+  matchTargets?: MatchTarget[];
+  matchTasks?: MatchScoutTask[];
   role?: 'PIT_SCOUT' | 'MATCH_SCOUT';
   notes?: string;
   updatedAt: number;
@@ -72,55 +82,47 @@ export interface ScoutAssignment {
 
 const STORAGE_KEY = 'frc_scout_assignments';
 const MY_TEAMS_KEY = 'frc_my_target_teams';
+const MY_MATCH_TASKS_KEY = 'frc_my_match_tasks';
 const PROFILE_KEY = 'frc_scout_profile';
 
 export const scoutingAssignments = {
   // Get current active profile
   getProfile(): ScoutProfile {
     if (typeof localStorage === 'undefined') {
-      return { name: 'Scout', position: 'PIT_SCOUT', isSetupComplete: false };
+      return { name: '', position: 'PIT_SCOUT', isSetupComplete: false };
     }
     try {
       const raw = localStorage.getItem(PROFILE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         return {
-          name: parsed.name || localStorage.getItem('frc_scout_name') || 'Scout',
+          name: parsed.name || '',
           position: parsed.position || 'PIT_SCOUT',
           isSetupComplete: Boolean(parsed.isSetupComplete),
-          teamNumber: parsed.teamNumber || 9751,
+          teamNumber: parsed.teamNumber || undefined,
         };
       }
-      // Fallback
-      const legacyName = localStorage.getItem('frc_scout_name');
-      const isKawser = legacyName && legacyName.trim().toLowerCase() === 'kawser';
-      return {
-        name: legacyName && legacyName.trim() ? legacyName.trim() : 'Scout',
-        position: isKawser ? 'LEAD_SCOUT' : 'PIT_SCOUT',
-        isSetupComplete: Boolean(legacyName),
-        teamNumber: 9751,
-      };
+      return { name: '', position: 'PIT_SCOUT', isSetupComplete: false };
     } catch {
-      return { name: 'Scout', position: 'PIT_SCOUT', isSetupComplete: false };
+      return { name: '', position: 'PIT_SCOUT', isSetupComplete: false };
     }
   },
 
   // Save active profile
   setProfile(profile: Partial<ScoutProfile>): ScoutProfile {
     if (typeof localStorage === 'undefined') {
-      return { name: 'Scout', position: 'PIT_SCOUT', isSetupComplete: false };
+      return { name: '', position: 'PIT_SCOUT', isSetupComplete: false };
     }
     try {
       const current = this.getProfile();
       const updated: ScoutProfile = {
         ...current,
         ...profile,
-        name: (profile.name !== undefined ? profile.name : current.name).trim() || 'Scout',
+        name: profile.name !== undefined ? profile.name.trim() : current.name,
         position: profile.position || current.position || 'PIT_SCOUT',
         isSetupComplete: profile.isSetupComplete !== undefined ? profile.isSetupComplete : true,
       };
       localStorage.setItem(PROFILE_KEY, JSON.stringify(updated));
-      localStorage.setItem('frc_scout_name', updated.name);
       return updated;
     } catch (e) {
       console.error('Failed to set profile:', e);
@@ -134,18 +136,7 @@ export const scoutingAssignments = {
     return profile.position === 'LEAD_SCOUT';
   },
 
-  // Get current active scout name
-  getScoutName(): string {
-    return this.getProfile().name;
-  },
-
-  // Get current position metadata
-  getPositionMeta(): PositionMeta {
-    const pos = this.getProfile().position;
-    return SCOUT_POSITIONS.find((p) => p.id === pos) || SCOUT_POSITIONS[1];
-  },
-
-  // Get all scout assignments
+  // Get all scout assignments (created by Captain)
   getAllAssignments(): ScoutAssignment[] {
     if (typeof localStorage === 'undefined') return [];
     try {
@@ -156,14 +147,7 @@ export const scoutingAssignments = {
     }
   },
 
-  // Get assigned teams for a specific scout ID (e.g. PIT-1, PIT-2, MATCH-1, MATCH-2)
-  getAssignedTeamsForScout(scoutName: string): number[] {
-    const assignments = this.getAllAssignments();
-    const found = assignments.find((a) => a.scoutName.toLowerCase() === scoutName.toLowerCase());
-    return found ? found.assignedTeams : [];
-  },
-
-  // Set all scout assignments (from Cloud / P2P sync)
+  // Set all scout assignments
   setAllAssignments(list: ScoutAssignment[]): void {
     if (typeof localStorage === 'undefined' || !Array.isArray(list)) return;
     try {
@@ -173,62 +157,47 @@ export const scoutingAssignments = {
     }
   },
 
-  // Get target team numbers for the current scout
-  getMyTargetTeams(): number[] {
-    if (typeof localStorage === 'undefined') return [];
-    try {
-      const myScout = this.getScoutName().trim().toLowerCase();
-      // First check specific assignment
-      const all = this.getAllAssignments();
-      const matched = all.find((a) => a.scoutName.trim().toLowerCase() === myScout);
-      if (matched && matched.assignedTeams.length > 0) {
-        return matched.assignedTeams;
-      }
-      // Fallback to local custom target list
-      const raw = localStorage.getItem(MY_TEAMS_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  },
-
-  // Set target team numbers for the current scout
-  setMyTargetTeams(teams: number[]): void {
+  // Assign teams & match tasks to a specific scout
+  assignScout(
+    scoutName: string,
+    role: 'PIT_SCOUT' | 'MATCH_SCOUT',
+    assignedTeams: number[],
+    matchTasks: MatchScoutTask[] = [],
+    notes: string = ''
+  ): void {
     if (typeof localStorage === 'undefined') return;
     try {
-      const clean = Array.from(new Set(teams.filter((t) => Number.isInteger(t) && t > 0)));
-      localStorage.setItem(MY_TEAMS_KEY, JSON.stringify(clean));
-
-      // Also sync to all assignments list
-      const scoutName = this.getScoutName();
-      const profile = this.getProfile();
-      const role = (profile.position === 'PIT_SCOUT' || profile.position === 'MATCH_SCOUT') ? profile.position : undefined;
-      this.assignTeamsToScout(scoutName, clean, role);
-    } catch (e) {
-      console.error('Failed to set target teams:', e);
-    }
-  },
-
-  // Assign team numbers to a specific scout (Lead Scout or custom)
-  assignTeamsToScout(scoutName: string, teams: number[], role?: 'PIT_SCOUT' | 'MATCH_SCOUT', notes?: string): void {
-    if (typeof localStorage === 'undefined') return;
-    try {
-      const clean = Array.from(new Set(teams.filter((t) => Number.isInteger(t) && t > 0))).sort((a, b) => a - b);
       const all = this.getAllAssignments();
       const filtered = all.filter((a) => a.scoutName.trim().toLowerCase() !== scoutName.trim().toLowerCase());
-      
+
+      const cleanTeams = Array.from(new Set(assignedTeams.filter((t) => Number.isInteger(t) && t > 0))).sort((a, b) => a - b);
+      const cleanTasks = matchTasks.filter((t) => t.matchNumber > 0 && t.teamNumber > 0);
+
       filtered.push({
         scoutName: scoutName.trim(),
-        assignedTeams: clean,
-        role: role,
-        notes: notes || '',
+        role,
+        assignedTeams: role === 'MATCH_SCOUT' && cleanTasks.length > 0 ? Array.from(new Set(cleanTasks.map((t) => t.teamNumber))) : cleanTeams,
+        matchTasks: role === 'MATCH_SCOUT' ? cleanTasks : undefined,
+        notes,
         updatedAt: Date.now(),
       });
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     } catch (e) {
-      console.error('Failed to assign teams:', e);
+      console.error('Failed to assign scout:', e);
     }
+  },
+
+  // Legacy helper
+  assignTeamsToScout(
+    scoutName: string, 
+    teams: number[], 
+    role: 'PIT_SCOUT' | 'MATCH_SCOUT' = 'PIT_SCOUT', 
+    notes: string = '',
+    matchTargets?: MatchTarget[]
+  ): void {
+    const matchTasks = matchTargets && matchTargets.length > 0 ? matchTargets : [];
+    this.assignScout(scoutName, role, teams, matchTasks, notes);
   },
 
   // Delete assignment for a scout
@@ -240,6 +209,71 @@ export const scoutingAssignments = {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     } catch (e) {
       console.error('Failed to delete assignment:', e);
+    }
+  },
+
+  // Get active scout's match tasks
+  getMyMatchTasks(): MatchScoutTask[] {
+    if (typeof localStorage === 'undefined') return [];
+    try {
+      const myScout = this.getProfile().name.trim().toLowerCase();
+      const all = this.getAllAssignments();
+      const matched = all.find((a) => a.scoutName.trim().toLowerCase() === myScout);
+      if (matched && matched.matchTasks && matched.matchTasks.length > 0) {
+        return matched.matchTasks;
+      }
+      if (matched && matched.matchTargets && matched.matchTargets.length > 0) {
+        return matched.matchTargets;
+      }
+      const raw = localStorage.getItem(MY_MATCH_TASKS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  getMyMatchTargets(): MatchTarget[] {
+    return this.getMyMatchTasks();
+  },
+
+  setMyMatchTasks(tasks: MatchScoutTask[]): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(MY_MATCH_TASKS_KEY, JSON.stringify(tasks));
+    } catch (e) {
+      console.error('Failed to set my match tasks:', e);
+    }
+  },
+
+  setMyMatchTargets(targets: MatchTarget[]): void {
+    this.setMyMatchTasks(targets);
+  },
+
+  // Get target team numbers for the current scout
+  getMyTargetTeams(): number[] {
+    if (typeof localStorage === 'undefined') return [];
+    try {
+      const myScout = this.getProfile().name.trim().toLowerCase();
+      const all = this.getAllAssignments();
+      const matched = all.find((a) => a.scoutName.trim().toLowerCase() === myScout);
+      if (matched && matched.assignedTeams && matched.assignedTeams.length > 0) {
+        return matched.assignedTeams;
+      }
+      const raw = localStorage.getItem(MY_TEAMS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  },
+
+  // Set target team numbers for current scout
+  setMyTargetTeams(teams: number[]): void {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      const clean = Array.from(new Set(teams.filter((t) => Number.isInteger(t) && t > 0)));
+      localStorage.setItem(MY_TEAMS_KEY, JSON.stringify(clean));
+    } catch (e) {
+      console.error('Failed to set target teams:', e);
     }
   },
 
@@ -263,7 +297,16 @@ export const scoutingAssignments = {
     }
   },
 
-  // Quick helper to add a team to target list
+  // Check completion status for a specific match + team
+  async getMatchTaskStatus(matchNumber: number, teamNumber: number): Promise<boolean> {
+    try {
+      const matches = await scoutingDB.getMatchesForTeam(teamNumber);
+      return matches.some((m) => m.matchNumber === matchNumber);
+    } catch {
+      return false;
+    }
+  },
+
   addTeamToTarget(teamNumber: number): void {
     const current = this.getMyTargetTeams();
     if (!current.includes(teamNumber)) {
@@ -271,9 +314,17 @@ export const scoutingAssignments = {
     }
   },
 
-  // Quick helper to remove a team from target list
   removeTeamFromTarget(teamNumber: number): void {
     const current = this.getMyTargetTeams();
     this.setMyTargetTeams(current.filter((t) => t !== teamNumber));
-  }
+  },
+
+  addMatchTask(matchNumber: number, teamNumber: number): void {
+    const current = this.getMyMatchTasks();
+    const exists = current.some((t) => t.matchNumber === matchNumber && t.teamNumber === teamNumber);
+    if (!exists) {
+      this.setMyMatchTasks([...current, { matchNumber, teamNumber }]);
+      this.addTeamToTarget(teamNumber);
+    }
+  },
 };

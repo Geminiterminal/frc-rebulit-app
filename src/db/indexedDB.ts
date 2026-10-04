@@ -3,7 +3,7 @@
  * Fully offline-first, zero cloud dependencies.
  */
 
-import { TeamProfile, MatchScoutingRecord, StrategyPlan, ScoutingDatabaseExport } from '../types/scouting';
+import { TeamProfile, MatchScoutingRecord, StrategyPlan, ScoutingDatabaseExport, EventScheduleMatch } from '../types/scouting';
 
 let onSaveHook: ((type: 'team' | 'match' | 'strategy', data: any) => void) | null = null;
 export function registerDBSaveHook(fn: (type: 'team' | 'match' | 'strategy', data: any) => void) {
@@ -11,7 +11,7 @@ export function registerDBSaveHook(fn: (type: 'team' | 'match' | 'strategy', dat
 }
 
 const DB_NAME = 'frc_rebuilt_scouting_db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 class ScoutingDB {
   private db: IDBDatabase | null = null;
@@ -56,6 +56,12 @@ class ScoutingDB {
         // Settings store
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'key' });
+        }
+
+        // Schedule store
+        if (!db.objectStoreNames.contains('schedule')) {
+          const schedStore = db.createObjectStore('schedule', { keyPath: 'key' });
+          schedStore.createIndex('matchNumber', 'matchNumber', { unique: false });
         }
       };
 
@@ -310,6 +316,80 @@ class ScoutingDB {
     });
   }
 
+  // --- EVENT SCHEDULE ---
+  async saveSchedule(scheduleList: EventScheduleMatch[]): Promise<void> {
+    await this.init();
+    if (!this.db) {
+      try {
+        localStorage.setItem('frc_event_schedule', JSON.stringify(scheduleList));
+      } catch {}
+      return;
+    }
+
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db!.transaction('schedule', 'readwrite');
+        const store = tx.objectStore('schedule');
+        store.clear();
+        scheduleList.forEach((m) => store.put(m));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  }
+
+  async getSchedule(): Promise<EventScheduleMatch[]> {
+    await this.init();
+    if (!this.db) {
+      const raw = localStorage.getItem('frc_event_schedule');
+      return raw ? JSON.parse(raw) : [];
+    }
+
+    return new Promise((resolve) => {
+      try {
+        const tx = this.db!.transaction('schedule', 'readonly');
+        const store = tx.objectStore('schedule');
+        const req = store.getAll();
+        req.onsuccess = () => {
+          const list: EventScheduleMatch[] = req.result || [];
+          resolve(list.sort((a, b) => a.matchNumber - b.matchNumber));
+        };
+        req.onerror = () => resolve([]);
+      } catch {
+        resolve([]);
+      }
+    });
+  }
+
+  async getScheduleForTeam(teamNumber: number): Promise<EventScheduleMatch[]> {
+    const all = await this.getSchedule();
+    const teamMatches = all.filter((m) => m.redTeams.includes(teamNumber) || m.blueTeams.includes(teamNumber));
+    
+    // Deduplicate by matchNumber, preferring 'qm' qualification matches
+    const map = new Map<number, EventScheduleMatch>();
+    for (const m of teamMatches) {
+      if (!map.has(m.matchNumber) || m.compLevel === 'qm') {
+        map.set(m.matchNumber, m);
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.matchNumber - b.matchNumber);
+  }
+
+  async clearSchedule(): Promise<void> {
+    await this.init();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('frc_event_schedule');
+    }
+    if (this.db && this.db.objectStoreNames.contains('schedule')) {
+      try {
+        const tx = this.db.transaction('schedule', 'readwrite');
+        tx.objectStore('schedule').clear();
+      } catch {}
+    }
+  }
+
   // --- STRATEGY PLANS ---
   async saveStrategy(plan: StrategyPlan): Promise<void> {
     await this.init();
@@ -505,17 +585,15 @@ class ScoutingDB {
     // 2. Clear all object stores if DB is open
     if (this.db) {
       try {
-        const tx = this.db.transaction(['teams', 'matches', 'strategies', 'settings'], 'readwrite');
-        tx.objectStore('teams').clear();
-        tx.objectStore('matches').clear();
-        tx.objectStore('strategies').clear();
-        if (this.db.objectStoreNames.contains('settings')) {
-          tx.objectStore('settings').clear();
+        const storeNames = ['teams', 'matches', 'strategies', 'settings', 'schedule'].filter((s) => this.db!.objectStoreNames.contains(s));
+        if (storeNames.length > 0) {
+          const tx = this.db.transaction(storeNames, 'readwrite');
+          storeNames.forEach((name) => tx.objectStore(name).clear());
+          await new Promise<void>((resolve) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => resolve();
+          });
         }
-        await new Promise<void>((resolve) => {
-          tx.oncomplete = () => resolve();
-          tx.onerror = () => resolve();
-        });
       } catch (e) {
         console.warn('Object store clear warning:', e);
       }

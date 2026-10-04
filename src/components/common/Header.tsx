@@ -2,22 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { PWAInstallButton } from './PWAInstallButton';
 import { DistributeModal } from './DistributeModal';
 import { TeamRoomSyncModal } from '../sync/TeamRoomSyncModal';
-import { scoutingAssignments, ScoutProfile } from '../../db/scoutingAssignments';
-import { cloudSync, SyncStatus } from '../../db/cloudSync';
-import { p2pSync, P2PStatus } from '../../db/p2pSync';
 import { PantherLogo } from './PantherLogo';
 import { 
   Menu, 
   X, 
   Search, 
   WifiOff, 
-  Cloud,
-  Crown,
-  Target,
-  Zap,
-  BarChart3,
-  Wrench,
-  UserCheck
 } from 'lucide-react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
@@ -39,29 +29,8 @@ export const Header: React.FC<HeaderProps> = ({
   const [menuOpen, setMenuOpen] = useState(false);
   const [showDistributeModal, setShowDistributeModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [profile, setProfile] = useState<ScoutProfile>(scoutingAssignments.getProfile());
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>(cloudSync.getStatus());
-  const [p2pStatus, setP2pStatus] = useState<P2PStatus>(p2pSync.getStatus());
   const isOnline = useOnlineStatus();
   const [searchInput, setSearchInput] = useState('');
-
-  useEffect(() => {
-    const unsubCloud = cloudSync.subscribe((status) => {
-      setSyncStatus(status);
-    });
-    const unsubP2P = p2pSync.subscribe((status) => {
-      setP2pStatus(status);
-    });
-    const interval = setInterval(() => {
-      setProfile(scoutingAssignments.getProfile());
-    }, 2500);
-    return () => {
-      unsubCloud();
-      unsubP2P();
-      clearInterval(interval);
-    };
-  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,36 +48,35 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'compare', label: 'Compare' },
     { id: 'teams', label: 'Teams' },
     { id: 'event-data', label: 'Matches' },
-    { id: 'import-export', label: 'Import / Export' },
+    { id: 'import-export', label: 'Backup / Sync' },
     { id: 'settings', label: 'Settings' },
-    { id: 'toggle-map', label: localStorage.getItem('hide_map') === 'false' ? 'Hide Map' : 'Show Map' },
   ];
 
   return (
     <>
       <header className="sticky top-0 z-40 bg-slate-950/95 border-b border-slate-800/80 backdrop-blur-md">
         <div className="max-w-4xl mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-2">
-          {/* Brand */}
+          {/* Brand matching exact image */}
           <div 
             onClick={() => {
               onNavigate('home');
               setMenuOpen(false);
             }}
-            className="flex items-center gap-2 cursor-pointer select-none group shrink-0"
+            className="flex items-center gap-2.5 cursor-pointer select-none group shrink-0"
           >
             <PantherLogo size="sm" className="group-hover:scale-105 transition-transform" />
             <div className="flex flex-col">
               <span className="font-black text-xs sm:text-sm tracking-tight text-white font-mono uppercase leading-tight">
                 PANTHER SCOUTS
               </span>
-              <span className="text-[9px] text-amber-400 font-mono tracking-wider font-semibold">
+              <span className="text-[10px] text-amber-500 font-mono tracking-wider font-bold">
                 TEAM 9751
               </span>
             </div>
           </div>
 
-          {/* Right Actions */}
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Right Actions matching exact image */}
+          <div className="flex items-center gap-2">
             <PWAInstallButton />
 
             {!isOnline && (
@@ -118,16 +86,16 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
-            {/* Global Mode Switcher */}
+            {/* Mode Switcher pill matching exact image */}
             {appMode && onAppModeChange && (
-              <div className="p-0.5 bg-slate-900 border border-slate-800/80 rounded-xl flex items-center text-[10px] sm:text-xs shrink-0">
+              <div className="p-0.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center text-xs shrink-0">
                 <button
                   type="button"
                   onClick={() => onAppModeChange('captain')}
-                  className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg font-black transition-all cursor-pointer ${
                     appMode === 'captain'
-                      ? 'bg-amber-500 text-slate-950 shadow font-extrabold'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 font-bold'
                   }`}
                 >
                   Captain
@@ -135,10 +103,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="button"
                   onClick={() => onAppModeChange('scout')}
-                  className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg font-black transition-all cursor-pointer ${
                     appMode === 'scout'
-                      ? 'bg-cyan-500 text-slate-950 shadow font-extrabold'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-amber-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 font-bold'
                   }`}
                 >
                   Scout
@@ -146,9 +114,10 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
+            {/* Menu Hamburger */}
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors cursor-pointer"
+              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800 transition-colors cursor-pointer"
               aria-label="Navigation Menu"
             >
               {menuOpen ? <X className="w-4 h-4 text-white" /> : <Menu className="w-4 h-4 text-slate-300" />}
@@ -158,21 +127,21 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Dropdown Menu */}
         {menuOpen && (
-          <div className="absolute top-13 left-0 right-0 bg-slate-950 border-b border-slate-800 shadow-2xl p-4 transition-all duration-150">
-            <div className="max-w-md mx-auto space-y-3">
-              {/* Mobile team search */}
-              <form onSubmit={handleSearchSubmit} className="sm:hidden flex items-center relative w-full">
-                <Search className="w-4 h-4 absolute left-3 text-slate-400" />
+          <div className="absolute top-14 left-0 right-0 bg-slate-950/95 border-b border-slate-800 shadow-2xl p-3.5 backdrop-blur-md transition-all">
+            <div className="max-w-md mx-auto space-y-2.5">
+              {/* Team Jump Input */}
+              <form onSubmit={handleSearchSubmit} className="flex items-center relative w-full">
+                <Search className="w-3.5 h-3.5 absolute left-3 text-slate-400" />
                 <input
                   type="number"
-                  placeholder="Jump to Team #"
+                  placeholder="Team number"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-16 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 font-mono"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-14 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono"
                 />
                 <button
                   type="submit"
-                  className="absolute right-1 px-3 py-1 bg-blue-600 text-white rounded text-xs font-bold"
+                  className="absolute right-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-750 text-slate-200 rounded-lg text-xs font-bold"
                 >
                   Go
                 </button>
@@ -183,16 +152,10 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     key={item.id}
                     onClick={() => {
-                      if (item.id === 'toggle-map') {
-                        const currentShow = localStorage.getItem('hide_map') === 'false';
-                        localStorage.setItem('hide_map', currentShow ? 'true' : 'false');
-                        window.location.reload();
-                      } else {
-                        onNavigate(item.id);
-                        setMenuOpen(false);
-                      }
+                      onNavigate(item.id);
+                      setMenuOpen(false);
                     }}
-                    className={`p-2.5 rounded-lg text-xs font-bold text-left transition-colors ${
+                    className={`p-2.5 rounded-xl text-xs font-bold text-left transition-colors cursor-pointer ${
                       currentView === item.id
                         ? 'bg-slate-800 text-white border border-slate-700'
                         : 'bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800/80'
@@ -207,13 +170,11 @@ export const Header: React.FC<HeaderProps> = ({
         )}
       </header>
 
-      {/* Distribute & Install Modal */}
       <DistributeModal
         isOpen={showDistributeModal}
         onClose={() => setShowDistributeModal(false)}
       />
 
-      {/* Team Room Cloud Sync Modal */}
       <TeamRoomSyncModal
         isOpen={showSyncModal}
         onClose={() => setShowSyncModal(false)}

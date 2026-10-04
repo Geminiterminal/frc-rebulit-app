@@ -162,10 +162,64 @@ export const tbaApi = {
         savedCount++;
       }
 
+      // 5. Fetch Event Match Schedule
+      let scheduleCount = 0;
+      try {
+        const matchesUrl = `https://www.thebluealliance.com/api/v3/event/${cleanEventCode}/matches/simple`;
+        const tbaMatches = await fetchWithProxyFallback(matchesUrl);
+
+        if (tbaMatches && Array.isArray(tbaMatches) && tbaMatches.length > 0) {
+          const uniqueScheduleMap = new Map<string, any>();
+          
+          tbaMatches.forEach((m: any) => {
+            const compLevel = m.comp_level || 'qm';
+            const matchNum = m.match_number || 1;
+            const key = m.key || `${cleanEventCode}_${compLevel}${matchNum}`;
+
+            const redTeams = (m.alliances?.red?.team_keys || [])
+              .map((k: string) => parseInt(k.replace('frc', ''), 10))
+              .filter((n: number) => !isNaN(n));
+            const blueTeams = (m.alliances?.blue?.team_keys || [])
+              .map((k: string) => parseInt(k.replace('frc', ''), 10))
+              .filter((n: number) => !isNaN(n));
+
+            if (!uniqueScheduleMap.has(key)) {
+              uniqueScheduleMap.set(key, {
+                key,
+                matchNumber: matchNum,
+                compLevel,
+                setNumber: m.set_number || 1,
+                redTeams,
+                blueTeams,
+                redScore: m.alliances?.red?.score,
+                blueScore: m.alliances?.blue?.score,
+                time: m.time,
+                predictedTime: m.predicted_time,
+              });
+            }
+          });
+
+          const parsedSchedule = Array.from(uniqueScheduleMap.values());
+
+          parsedSchedule.sort((a: any, b: any) => {
+            if (a.compLevel === b.compLevel) return a.matchNumber - b.matchNumber;
+            if (a.compLevel === 'qm') return -1;
+            if (b.compLevel === 'qm') return 1;
+            return a.matchNumber - b.matchNumber;
+          });
+
+          await scoutingDB.saveSchedule(parsedSchedule);
+          scheduleCount = parsedSchedule.length;
+        }
+      } catch (err) {
+        console.warn('Could not fetch match schedule:', err);
+      }
+
+      const scheduleNotice = scheduleCount > 0 ? ` & ${scheduleCount} matches` : '';
       return {
         success: true,
         count: savedCount,
-        message: `Loaded ${savedCount} teams for event "${cleanEventCode.toUpperCase()}"!`,
+        message: `Loaded ${savedCount} teams${scheduleNotice} for event "${cleanEventCode.toUpperCase()}"!`,
       };
     } catch (err: any) {
       return {
