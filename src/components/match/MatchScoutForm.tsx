@@ -717,7 +717,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         <button
           type="button"
           onClick={handleGenerateSingleMatchQr}
-          className="py-4 rounded-2xl bg-[#141a23]/85 hover:bg-slate-800 border border-slate-800 text-slate-200 font-bold font-mono text-xs sm:text-sm uppercase tracking-wider shadow-xl transition-all cursor-pointer active:scale-[0.99] flex items-center justify-center gap-2"
+          className="py-4 rounded-2xl bg-slate-900/85 hover:bg-slate-800 border border-slate-800 text-slate-200 font-bold font-mono text-xs sm:text-sm uppercase tracking-wider shadow-xl transition-all cursor-pointer active:scale-[0.99] flex items-center justify-center gap-2"
         >
           <QrCode className="w-4 h-4 text-slate-300" />
           <span>Show QR Code</span>
@@ -727,7 +727,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       {/* SINGLE QR DISPLAY MODAL */}
       {isSingleQrOpen && singleQrUrl && (
         <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-[#141a23] border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-xs font-black text-slate-200 uppercase tracking-wider">
                 Match QR: Team #{teamNumber}

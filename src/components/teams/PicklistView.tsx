@@ -943,7 +943,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
       </div>
 
       {syncStatusMsg && (
-        <div className="p-3 rounded-xl bg-[#141a23] border border-amber-500/50 text-amber-300 font-mono text-xs font-bold shadow flex items-center justify-between">
+        <div className="p-3 rounded-xl bg-slate-900 border border-amber-500/50 text-amber-300 font-mono text-xs font-bold shadow flex items-center justify-between">
           <span>{syncStatusMsg}</span>
           <button type="button" onClick={() => setSyncStatusMsg(null)} className="text-slate-400 hover:text-white p-1">
             ✕

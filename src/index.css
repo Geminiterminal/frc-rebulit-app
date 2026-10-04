@@ -1,8 +1,181 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Theme system — each theme re-tints the Tailwind palette vars.
+   The app's UI classes (slate-* surfaces, amber-* accent) then
+   resolve to the active theme automatically.
+   ============================================================ */
+
+:root,
+[data-theme="slate"] {
+  --color-slate-50: #f6f8fa;
+  --color-slate-100: #e9edf2;
+  --color-slate-200: #d3dbe4;
+  --color-slate-300: #b6c1cd;
+  --color-slate-400: #94a3b6;
+  --color-slate-500: #6b7a8f;
+  --color-slate-600: #525f70;
+  --color-slate-700: #3b4757;
+  --color-slate-800: #242c38;
+  --color-slate-900: #141922;
+  --color-slate-950: #0b0e13;
+  /* Accent (used via amber-* classes) */
+  --color-amber-200: #b8d3e6;
+  --color-amber-300: #93bad7;
+  --color-amber-400: #6e9ec0;
+  --color-amber-500: #5487ab;
+  --color-amber-600: #477391;
+  --color-amber-700: #3c5f77;
+  --color-amber-800: #32505f;
+  --color-amber-900: #29404d;
+  --color-amber-950: #1c2b33;
+}
+
+[data-theme="amber"] {
+  --color-slate-50: #f7f6f4;
+  --color-slate-100: #eeebe7;
+  --color-slate-200: #dbd6cf;
+  --color-slate-300: #c2bab0;
+  --color-slate-400: #a39889;
+  --color-slate-500: #7d7364;
+  --color-slate-600: #5f574c;
+  --color-slate-700: #46403a;
+  --color-slate-800: #2b2622;
+  --color-slate-900: #191612;
+  --color-slate-950: #100e0b;
+  --color-amber-200: #fcd9a8;
+  --color-amber-300: #f6bf6f;
+  --color-amber-400: #f0a83e;
+  --color-amber-500: #e29220;
+  --color-amber-600: #c67a17;
+  --color-amber-700: #a36314;
+  --color-amber-800: #7d4d12;
+  --color-amber-900: #5c390f;
+  --color-amber-950: #3d270b;
+}
+
+[data-theme="green"] {
+  --color-slate-50: #f4f8f5;
+  --color-slate-100: #e6efe8;
+  --color-slate-200: #cfe0d2;
+  --color-slate-300: #aec9b4;
+  --color-slate-400: #8aab95;
+  --color-slate-500: #648571;
+  --color-slate-600: #4c6a58;
+  --color-slate-700: #375042;
+  --color-slate-800: #22332a;
+  --color-slate-900: #141d18;
+  --color-slate-950: #0c110e;
+  --color-amber-200: #b4e6c3;
+  --color-amber-300: #86d4a0;
+  --color-amber-400: #57bd7f;
+  --color-amber-500: #3aa567;
+  --color-amber-600: #2e8a55;
+  --color-amber-700: #267046;
+  --color-amber-800: #1e5737;
+  --color-amber-900: #18412a;
+  --color-amber-950: #102c1d;
+}
+
+[data-theme="blue"] {
+  --color-slate-50: #f4f7fa;
+  --color-slate-100: #e7eef5;
+  --color-slate-200: #d0deec;
+  --color-slate-300: #aec5dd;
+  --color-slate-400: #89a7c8;
+  --color-slate-500: #6383ab;
+  --color-slate-600: #4b6690;
+  --color-slate-700: #374e70;
+  --color-slate-800: #233349;
+  --color-slate-900: #151d29;
+  --color-slate-950: #0c1017;
+  --color-amber-200: #b3d2f5;
+  --color-amber-300: #84b4ee;
+  --color-amber-400: #5493e4;
+  --color-amber-500: #3a78cf;
+  --color-amber-600: #2f62ad;
+  --color-amber-700: #27508c;
+  --color-amber-800: #1f406e;
+  --color-amber-900: #193155;
+  --color-amber-950: #112038;
+}
+
+[data-theme="red"] {
+  --color-slate-50: #f9f5f5;
+  --color-slate-100: #f1e9ea;
+  --color-slate-200: #e6d7d9;
+  --color-slate-300: #d5bcc0;
+  --color-slate-400: #bd989e;
+  --color-slate-500: #996f77;
+  --color-slate-600: #77555d;
+  --color-slate-700: #594045;
+  --color-slate-800: #39282c;
+  --color-slate-900: #221719;
+  --color-slate-950: #140d0e;
+  --color-amber-200: #f6b3b8;
+  --color-amber-300: #f08890;
+  --color-amber-400: #e75f6b;
+  --color-amber-500: #d64552;
+  --color-amber-600: #b83a45;
+  --color-amber-700: #97303a;
+  --color-amber-800: #77272f;
+  --color-amber-900: #591e24;
+  --color-amber-950: #3a1418;
+}
+
+/* Light mode — inverted ramp, ink text on paper surfaces */
+[data-theme="light"] {
+  --color-slate-950: #f4f6f8;
+  --color-slate-900: #ffffff;
+  --color-slate-800: #e4e9ee;
+  --color-slate-700: #cfd6de;
+  --color-slate-600: #b9c2cd;
+  --color-slate-500: #64748b;
+  --color-slate-400: #4a5866;
+  --color-slate-300: #3a4551;
+  --color-slate-200: #2b343e;
+  --color-slate-100: #1e262f;
+  --color-slate-50: #141a21;
+  --color-amber-200: #93b4d6;
+  --color-amber-300: #4478ab;
+  --color-amber-400: #336394;
+  --color-amber-500: #336394;
+  --color-amber-600: #2b547e;
+  --color-amber-700: #244567;
+  --color-amber-800: #1d3750;
+  --color-amber-900: #172b3f;
+  --color-amber-950: #eef4fa;
+  /* Semantic colors need darker text variants for light surfaces */
+  --color-cyan-400: #155e75;
+  --color-cyan-500: #155e75;
+  --color-emerald-200: #047857;
+  --color-emerald-300: #047857;
+  --color-emerald-400: #059669;
+  --color-emerald-500: #059669;
+  --color-emerald-600: #047857;
+  --color-emerald-800: #d1fae5;
+  --color-emerald-900: #ecfdf5;
+  --color-emerald-950: #f0fdf4;
+  --color-rose-300: #be123c;
+  --color-rose-400: #e11d48;
+  --color-rose-500: #e11d48;
+  --color-rose-600: #be123c;
+  --color-rose-800: #fecdd3;
+  --color-rose-900: #ffe4e6;
+  --color-rose-950: #fff1f2;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #1d4ed8;
+  --color-blue-400: #2563eb;
+  --color-blue-500: #2563eb;
+  --color-blue-600: #1d4ed8;
+  --color-blue-800: #dbeafe;
+  --color-blue-900: #e0eaff;
+  --color-blue-950: #eff6ff;
+}
+
 body {
-  background-color: #0d1117 !important;
-  color: #e2e8f0;
+  background-color: var(--color-slate-950) !important;
+  color: var(--color-slate-100);
 }
 
 /* Custom modern scrollbar styling */
@@ -11,19 +184,19 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #050814;
+  background: var(--color-slate-950);
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: var(--color-slate-800);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--color-slate-700);
 }
 
 /* Crisp focus styles without overly bright glow */
 input:focus, textarea:focus, select:focus {
   outline: none !important;
-  border-color: #64748b !important; /* slate-500 */
-  box-shadow: 0 0 0 1px rgba(100, 116, 139, 0.5) !important;
+  border-color: var(--color-slate-500) !important;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-slate-500) 50%, transparent) !important;
 }

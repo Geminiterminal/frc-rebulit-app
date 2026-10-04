@@ -1099,7 +1099,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
         <button
           type="button"
           onClick={handleGenerateSinglePitQr}
-          className="py-3.5 px-4 rounded-xl bg-[#141a23]/85 hover:bg-slate-800 border border-slate-800 text-slate-200 font-bold text-xs uppercase tracking-wider shadow transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
+          className="py-3.5 px-4 rounded-xl bg-slate-900/85 hover:bg-slate-800 border border-slate-800 text-slate-200 font-bold text-xs uppercase tracking-wider shadow transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
         >
           <QrCode className="w-4 h-4 text-slate-300" />
           <span>Show QR Code</span>
@@ -1109,7 +1109,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       {/* SINGLE QR DISPLAY MODAL */}
       {isSingleQrOpen && singleQrUrl && (
         <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-[#141a23] border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-xs font-black text-slate-200 uppercase tracking-wider">
                 Pit Data QR: Team #{teamNumberInput}

@@ -195,7 +195,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
         <button
           type="button"
           onClick={() => onNavigate('picklist')}
-          className="p-4 rounded-2xl bg-[#141a23]/85 border border-slate-800 hover:border-slate-700 hover:shadow-[0_0_20px_rgba(148,163,184,0.1)] text-left cursor-pointer flex items-center justify-between shadow-sm transition-all group duration-200"
+          className="p-4 rounded-2xl bg-slate-900/85 border border-slate-800 hover:border-slate-700 hover:shadow-[0_0_20px_rgba(148,163,184,0.1)] text-left cursor-pointer flex items-center justify-between shadow-sm transition-all group duration-200"
         >
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-xl bg-slate-800/60 border border-slate-700/80 text-slate-200 flex items-center justify-center shrink-0">
@@ -212,7 +212,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
         <button
           type="button"
           onClick={() => onNavigate('strategy-field')}
-          className="p-4 rounded-2xl bg-[#141a23]/85 border border-slate-800 hover:border-slate-700 hover:shadow-[0_0_20px_rgba(148,163,184,0.1)] text-left cursor-pointer flex items-center justify-between shadow-sm transition-all group duration-200"
+          className="p-4 rounded-2xl bg-slate-900/85 border border-slate-800 hover:border-slate-700 hover:shadow-[0_0_20px_rgba(148,163,184,0.1)] text-left cursor-pointer flex items-center justify-between shadow-sm transition-all group duration-200"
         >
           <div className="flex items-center gap-3.5">
             <div className="w-10 h-10 rounded-xl bg-slate-800/60 border border-slate-700/80 text-slate-200 flex items-center justify-center shrink-0">
@@ -227,7 +227,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
       </div>
 
       {/* 5. TBA EVENT SETUP CARD */}
-      <div className="p-4 rounded-2xl bg-[#141a23]/85 border border-slate-800 space-y-3">
+      <div className="p-4 rounded-2xl bg-slate-900/85 border border-slate-800 space-y-3">
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
           <span className="text-xs font-bold text-slate-100 uppercase tracking-wider flex items-center gap-1.5">
             <Database className="w-4 h-4 text-slate-300" />
@@ -242,7 +242,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
             placeholder="Event Code"
             value={eventCode}
             onChange={(e) => setEventCode(e.target.value)}
-            className="w-full bg-[#0f141c] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono"
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono"
             required
           />
 
@@ -261,14 +261,14 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
         </form>
 
         {tbaStatusMsg && (
-          <div className="p-2 rounded-xl bg-[#0f141c] text-xs text-slate-300">
+          <div className="p-2 rounded-xl bg-slate-950 text-xs text-slate-300">
             {tbaStatusMsg}
           </div>
         )}
       </div>
 
       {/* 4. DYNAMIC SCOUT ASSIGNMENTS CARD */}
-      <div className="p-4 rounded-2xl bg-[#141a23] border border-slate-800 space-y-3">
+      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
         <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
           <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
             <Users className="w-4 h-4 text-slate-300" />
@@ -288,7 +288,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
             {assignments.map((a) => (
               <div
                 key={a.scoutName}
-                className="p-3 rounded-xl bg-[#0f141c] border border-slate-800 flex items-center justify-between text-xs"
+                className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs"
               >
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
@@ -344,7 +344,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
       </div>
 
       {/* 3. RECENTLY SCOUTED TEAMS SECTION (EXACT MATCHING ATTACHED IMAGE) */}
-      <div className="p-4 rounded-2xl bg-[#141a23] border border-slate-800 space-y-3">
+      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
         <div className="flex items-center justify-between text-xs">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
             RECENTLY SCOUTED ({scoutedTeams.length})
@@ -365,7 +365,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
                 key={t.teamNumber}
                 type="button"
                 onClick={() => onNavigate('team-profile', t.teamNumber)}
-                className="px-3 py-1.5 rounded-xl bg-[#0f141c] border border-slate-800 text-slate-200 font-bold text-xs hover:border-slate-500 hover:text-slate-100 transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 font-bold text-xs hover:border-slate-500 hover:text-slate-100 transition-colors cursor-pointer"
               >
                 {t.teamNumber}
               </button>
@@ -381,7 +381,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
         <button
           type="button"
           onClick={() => onNavigate('teams')}
-          className="p-3 rounded-xl bg-[#141a23] border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+          className="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
         >
           <Users className="w-4 h-4 text-slate-300" />
           <span>Teams</span>
@@ -390,7 +390,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
         <button
           type="button"
           onClick={() => onNavigate('event-data')}
-          className="p-3 rounded-xl bg-[#141a23] border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+          className="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
         >
           <TrendingUp className="w-4 h-4 text-slate-300" />
           <span>Matches</span>
@@ -399,7 +399,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
         <button
           type="button"
           onClick={() => onNavigate('import-export')}
-          className="p-3 rounded-xl bg-[#141a23] border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+          className="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
         >
           <FolderDown className="w-4 h-4 text-slate-300" />
           <span className="text-[10px] truncate max-w-full">Export/Sync</span>
@@ -408,7 +408,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
         <button
           type="button"
           onClick={() => onNavigate('settings')}
-          className="p-3 rounded-xl bg-[#141a23] border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+          className="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
         >
           <Sliders className="w-4 h-4 text-slate-300" />
           <span>Settings</span>
@@ -418,7 +418,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
       {/* CREATE SCOUT ASSIGNMENT MODAL */}
       {isAddAssignmentOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 backdrop-blur-md">
-          <div className="bg-[#141a23] border border-slate-800 rounded-2xl p-4 max-w-sm w-full space-y-3.5 shadow-2xl text-slate-100 max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 max-w-sm w-full space-y-3.5 shadow-2xl text-slate-100 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-xs font-black text-slate-200 uppercase">
                 Create Scout Assignment
@@ -442,7 +442,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
                   placeholder="Scout name"
                   value={newScoutName}
                   onChange={(e) => setNewScoutName(e.target.value)}
-                  className="w-full bg-[#0f141c] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono"
                   required
                 />
               </div>
@@ -458,7 +458,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
                     className={`py-2 rounded-xl font-bold border transition-colors cursor-pointer ${
                       newScoutRole === 'PIT_SCOUT'
                         ? 'bg-slate-800 border-slate-600 text-slate-100'
-                        : 'bg-[#0f141c] border-slate-800 text-slate-400'
+                        : 'bg-slate-950 border-slate-800 text-slate-400'
                     }`}
                   >
                     Pit Scout
@@ -469,7 +469,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
                     className={`py-2 rounded-xl font-bold border transition-colors cursor-pointer ${
                       newScoutRole === 'MATCH_SCOUT'
                         ? 'bg-slate-800/50 border-slate-700/60 text-slate-300'
-                        : 'bg-[#0f141c] border-slate-800 text-slate-400'
+                        : 'bg-slate-950 border-slate-800 text-slate-400'
                     }`}
                   >
                     Match Scout
@@ -482,7 +482,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
                   <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
                     Select Assigned Teams ({selectedTeamNums.length} selected):
                   </label>
-                  <div className="max-h-32 overflow-y-auto bg-[#0f141c] border border-slate-800 rounded-xl p-2 flex flex-wrap gap-1.5">
+                  <div className="max-h-32 overflow-y-auto bg-slate-950 border border-slate-800 rounded-xl p-2 flex flex-wrap gap-1.5">
                     {allTeams.map((t) => {
                       const isSel = selectedTeamNums.includes(t.teamNumber);
                       return (
@@ -513,7 +513,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
                   placeholder="27, 66, 1684"
                   value={manualTeamInput}
                   onChange={(e) => setManualTeamInput(e.target.value)}
-                  className="w-full bg-[#0f141c] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500 font-mono"
                 />
               </div>
 
@@ -531,7 +531,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
       {/* ASSIGNMENT QR DISPLAY MODAL */}
       {activeAssignmentQr && (
         <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-[#141a23] border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-xs font-black text-slate-200 uppercase">
                 Assignment QR: {activeAssignmentQr.scoutName}

@@ -17,9 +17,12 @@ import {
   Zap,
   BarChart3,
   Wrench,
-  UserCheck
+  UserCheck,
+  Palette,
+  Check
 } from 'lucide-react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
+import { THEMES, getTheme, saveTheme } from '../../theme';
 
 interface HeaderProps {
   currentView: string;
@@ -37,6 +40,8 @@ export const Header: React.FC<HeaderProps> = ({
   onAppModeChange,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState(getTheme());
   const [showDistributeModal, setShowDistributeModal] = useState(false);
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
@@ -145,6 +150,45 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               </div>
             )}
+
+            {/* Theme Picker */}
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setThemeMenuOpen(!themeMenuOpen)}
+                className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-colors cursor-pointer"
+                aria-label="Theme"
+              >
+                <Palette className="w-4 h-4 text-slate-300" />
+              </button>
+
+              {themeMenuOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-36 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-1.5 z-50">
+                  {THEMES.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        saveTheme(t.id);
+                        setCurrentTheme(t.id);
+                        setThemeMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                        currentTheme === t.id
+                          ? 'bg-slate-800 text-white'
+                          : 'text-slate-300 hover:bg-slate-900'
+                      }`}
+                    >
+                      <span
+                        className="w-3.5 h-3.5 rounded-full shrink-0 border border-slate-700"
+                        style={{ background: `linear-gradient(135deg, ${t.accent} 50%, ${t.page} 50%)` }}
+                      />
+                      <span className="flex-1 text-left">{t.label}</span>
+                      {currentTheme === t.id && <Check className="w-3 h-3 text-slate-300" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <button
               onClick={() => setMenuOpen(!menuOpen)}

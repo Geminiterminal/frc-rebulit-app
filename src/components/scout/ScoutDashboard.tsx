@@ -147,14 +147,14 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
       </div>
 
       {scanAssignmentMsg && (
-        <div className="p-2.5 rounded-xl bg-[#141a23] border border-slate-700/80 text-slate-200 text-xs font-bold flex items-center gap-2 shadow">
+        <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 text-slate-200 text-xs font-bold flex items-center gap-2 shadow">
           <CheckCircle2 className="w-4 h-4 text-slate-300 shrink-0" />
           <span>{scanAssignmentMsg}</span>
         </div>
       )}
 
       {/* MY ASSIGNMENTS */}
-      <div className="p-4 rounded-2xl bg-[#141a23] border border-slate-800 space-y-3">
+      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
         <div className="border-b border-slate-800/80 pb-2">
           <div className="text-xs font-bold text-white uppercase tracking-wider">
             MY ASSIGNMENTS ({myTargetTeams.length})
@@ -173,8 +173,8 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
                   key={teamNum}
                   className={`p-3.5 rounded-xl border text-xs cursor-pointer flex items-center justify-between transition-colors ${
                     isDone
-                      ? 'bg-[#0f141c] border-emerald-600/60 text-emerald-200'
-                      : 'bg-[#0f141c] border-slate-800 text-slate-200 hover:border-slate-700'
+                      ? 'bg-slate-950 border-emerald-600/60 text-emerald-200'
+                      : 'bg-slate-950 border-slate-800 text-slate-200 hover:border-slate-700'
                   }`}
                 >
                   <div
@@ -228,7 +228,7 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
             })}
           </div>
         ) : (
-          <div className="p-5 text-center rounded-xl bg-[#0f141c] text-xs text-slate-400">
+          <div className="p-5 text-center rounded-xl bg-slate-950 text-xs text-slate-400">
             No assignments yet
           </div>
         )}
@@ -240,7 +240,7 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
             placeholder="+ Team #"
             value={manualTeamInput}
             onChange={(e) => setManualTeamInput(e.target.value)}
-            className="flex-1 bg-[#0f141c] border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500"
+            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-500"
             min={1}
           />
           <button
@@ -263,7 +263,7 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
       {/* PUSH DATA QR GENERATOR MODAL */}
       {isPushDataOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-[#141a23] border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-xs font-black text-slate-200 font-mono uppercase tracking-wider">
                 COMPLETED TASKS ({completedTasks.length})
@@ -337,7 +337,7 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
       {/* INDIVIDUAL TASK QR OVERLAY MODAL */}
       {activeTaskQrUrl && activeTaskTitle && (
         <div className="fixed inset-0 z-55 bg-black/90 flex items-center justify-center p-4 backdrop-blur-md">
-          <div className="bg-[#141a23] border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl text-center">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <span className="text-xs font-black text-slate-200 font-mono uppercase tracking-wider">
                 Sync QR: {activeTaskTitle}
