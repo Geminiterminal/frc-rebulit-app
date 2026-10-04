@@ -212,6 +212,15 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
               </span>
             </div>
 
+            {pit.canShootAnywhere && (
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
+                <span className="text-slate-400 uppercase font-mono block text-[10px]">Shoot From Turret/Fixed</span>
+                <span className="font-bold text-sm text-sky-400 mt-0.5 block">
+                  {pit.canShootAnywhere}
+                </span>
+              </div>
+            )}
+
             <div className="p-3 rounded-xl bg-slate-950 border border-slate-800/80">
               <span className="text-slate-400 uppercase font-mono block text-[10px]">Bump / Trench</span>
               <span className="font-bold text-sm text-white mt-0.5 block">
@@ -292,7 +301,14 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
             />
           ) : (
             <div className="p-8 text-center text-slate-500 text-xs bg-slate-950 rounded-xl border border-slate-800/60">
-              No shooting area marked yet in pit scouting.
+              {pit?.canShootAnywhere ? (
+                <div className="space-y-1">
+                  <span className="text-slate-400 font-mono block uppercase text-[10px]">Shooting Position (No Map):</span>
+                  <span className="font-bold text-sm text-sky-400">{pit.canShootAnywhere}</span>
+                </div>
+              ) : (
+                "No shooting area marked yet in pit scouting."
+              )}
             </div>
           )}
         </div>

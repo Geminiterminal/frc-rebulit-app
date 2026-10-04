@@ -80,6 +80,7 @@ export interface PitData {
   hopperCapacity?: number;
   shootingAccuracy?: ShootingAccuracy;
   shootingAreas?: ShootingZonePoint[];
+  canShootAnywhere?: string;
   bumpTrench?: BumpTrenchCapability;
   hasAutonomous?: 'YES' | 'NO' | 'STILL DEVELOPING';
   autoRoutinesCount?: '1' | '2' | '3' | '4+';

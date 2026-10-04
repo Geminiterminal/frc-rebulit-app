@@ -31,7 +31,10 @@ export const tbaApi = {
       const k = String(key).trim();
       return k !== '' && k !== 'null' && k !== 'undefined';
     };
-    const cleanAuthKey = isValidKey(authKey) ? String(authKey).trim() : decodedDefaultKey;
+    const envKey = import.meta.env.VITE_TBA_AUTH_KEY;
+    const cleanAuthKey = isValidKey(authKey) 
+      ? String(authKey).trim() 
+      : (isValidKey(envKey) ? String(envKey).trim() : decodedDefaultKey);
 
     if (!cleanEventCode) {
       return { success: false, count: 0, message: 'Please enter an event code (e.g. 2025mcmp).' };

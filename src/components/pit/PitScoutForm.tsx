@@ -117,6 +117,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
   const [hopperCapacity, setHopperCapacity] = useState<number | ''>('');
   const [shootingAccuracy, setShootingAccuracy] = useState<ShootingAccuracy | null>(null);
   const [shootingAreas, setShootingAreas] = useState<ShootingZonePoint[]>([]);
+  const [canShootAnywhere, setCanShootAnywhere] = useState<string>('');
 
   const [bumpTrench, setBumpTrench] = useState<BumpTrenchCapability | null>(null);
 
@@ -153,6 +154,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
     setHopperCapacity('');
     setShootingAccuracy(null);
     setShootingAreas([]);
+    setCanShootAnywhere('');
     setBumpTrench(null);
     setHasAutonomous(null);
     setAutoRoutinesCount(null);
@@ -200,6 +202,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       setHopperCapacity(t.pit.hopperCapacity !== undefined ? t.pit.hopperCapacity : '');
       setShootingAccuracy(t.pit.shootingAccuracy || null);
       setShootingAreas(t.pit.shootingAreas || []);
+      setCanShootAnywhere(t.pit.canShootAnywhere || '');
       setBumpTrench(t.pit.bumpTrench || null);
       setHasAutonomous(t.pit.hasAutonomous || null);
       setAutoRoutinesCount(t.pit.autoRoutinesCount || null);
@@ -280,6 +283,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       hopperCapacity: typeof hopperCapacity === 'number' ? hopperCapacity : undefined,
       shootingAccuracy: shootingAccuracy || undefined,
       shootingAreas,
+      canShootAnywhere: canShootAnywhere || undefined,
       bumpTrench: bumpTrench || undefined,
       hasAutonomous: hasAutonomous || undefined,
       autoRoutinesCount: hasAutonomous === 'YES' ? (autoRoutinesCount || undefined) : undefined,
@@ -326,6 +330,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       hopperCapacity: typeof hopperCapacity === 'number' ? hopperCapacity : undefined,
       shootingAccuracy: shootingAccuracy || undefined,
       shootingAreas,
+      canShootAnywhere: canShootAnywhere || undefined,
       bumpTrench: bumpTrench || undefined,
       hasAutonomous: hasAutonomous || undefined,
       autoRoutinesCount: hasAutonomous === 'YES' ? (autoRoutinesCount || undefined) : undefined,
@@ -438,6 +443,8 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
     );
   }
 
+  const isMapHidden = localStorage.getItem('hide_map') !== 'false';
+
   // QUESTIONNAIRE: Calm dark-mode pills and inputs
   return (
     <div className="max-w-xl mx-auto px-3.5 sm:px-5 py-5 pb-32 flex flex-col gap-7 sm:gap-8">
@@ -478,7 +485,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       {/* QUESTION 1: Drivetrain */}
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
         <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
-          1. What is your drivetrain?
+          What is your drivetrain?
         </label>
         <div className="flex flex-wrap gap-2">
           {DRIVETRAIN_OPTIONS.map((opt) => {
@@ -514,7 +521,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       {/* QUESTION 2: Shooter */}
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
         <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
-          2. Which is true about your shooter?
+          Which is true about your shooter?
         </label>
         <div className="flex flex-wrap gap-2">
           {SHOOTER_OPTIONS.map((opt) => {
@@ -551,7 +558,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       {/* QUESTION 3: Hopper Capacity */}
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
         <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
-          3. What is your hopper capacity?
+          What is your hopper capacity?
         </label>
         <div className="flex items-center gap-2">
           <button
@@ -602,7 +609,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       {/* QUESTION 4: Shooting Accuracy */}
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
         <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
-          4. What is your shooting accuracy?
+          What is your shooting accuracy?
         </label>
         <div className="flex flex-wrap gap-2">
           {ACCURACY_OPTIONS.map((opt) => {
@@ -626,21 +633,55 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       </div>
 
       {/* QUESTION 5: Shooting Area */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
-        <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
-          5. What is your shooting area?
-        </label>
-        <ShootingAreaMapper
-          zones={shootingAreas}
-          onChange={setShootingAreas}
-          isHidden={localStorage.getItem('hide_map') === 'true'}
-        />
-      </div>
+      {isMapHidden ? (
+        <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
+          <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
+            Can you shoot from anywhere near the turrent or fixxed position
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {['YES', 'NO', 'FIXED POSITION ONLY', 'TURRET ONLY', 'STILL TUNING'].map((opt) => {
+              const isSelected = canShootAnywhere === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setCanShootAnywhere(canShootAnywhere === opt ? '' : opt)}
+                  className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold uppercase transition-colors active:scale-95 cursor-pointer ${
+                    isSelected
+                      ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
+                      : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900 hover:text-slate-300'
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+          <input
+            type="text"
+            value={canShootAnywhere}
+            onChange={(e) => setCanShootAnywhere(e.target.value)}
+            placeholder="Or describe shooting positions..."
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600"
+          />
+        </div>
+      ) : (
+        <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
+          <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
+            What is your shooting area?
+          </label>
+          <ShootingAreaMapper
+            zones={shootingAreas}
+            onChange={setShootingAreas}
+            isHidden={false}
+          />
+        </div>
+      )}
 
       {/* QUESTION 6: Bump and Trench */}
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
         <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
-          6. Can you use both Bump and Trench?
+          Can you use both Bump and Trench?
         </label>
         <div className="flex flex-wrap gap-2">
           {BUMP_TRENCH_OPTIONS.map((opt) => {
@@ -666,7 +707,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       {/* QUESTION 7: Autonomous */}
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
         <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
-          7. Do you have autonomous?
+          Do you have autonomous?
         </label>
         <div className="flex flex-wrap gap-2">
           {(['YES', 'NO', 'STILL DEVELOPING'] as const).map((opt) => {
@@ -714,11 +755,11 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       </div>
 
       {/* QUESTION 8: Autonomous Drawing (Multi-Routine Support) */}
-      {hasAutonomous !== 'NO' && (
+      {!isMapHidden && hasAutonomous !== 'NO' && (
         <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3.5">
           <div className="flex items-center justify-between">
             <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
-              8. Autonomous Routines & Paths
+              Autonomous Routines & Paths
             </label>
             <span className="text-xs font-mono text-purple-400 font-bold">
               {autoDrawings.length} Routine{autoDrawings.length === 1 ? '' : 's'}
@@ -875,7 +916,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       {/* QUESTION 9: Autonomous Consistency */}
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
         <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
-          9. How consistent is your autonomous?
+          How consistent is your autonomous?
         </label>
         <div className="flex flex-wrap gap-2">
           {AUTO_CONSISTENCY_OPTIONS.map((opt) => {
@@ -901,7 +942,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       {/* QUESTION 10: Biggest Issue */}
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
         <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
-          10. What has been your biggest issue?
+          What has been your biggest issue?
         </label>
         <div className="flex flex-wrap gap-2">
           {BIGGEST_ISSUES_OPTIONS.map((opt) => {
@@ -938,7 +979,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       {/* QUESTION 11: Reliability */}
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-3">
         <label className="text-sm sm:text-[15px] font-bold text-slate-100 block tracking-tight">
-          11. How reliable is the robot now?
+          How reliable is the robot now?
         </label>
         <div className="flex flex-wrap gap-2">
           {RELIABILITY_OPTIONS.map((opt) => {

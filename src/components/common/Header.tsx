@@ -81,7 +81,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'event-data', label: 'Matches' },
     { id: 'import-export', label: 'Import / Export' },
     { id: 'settings', label: 'Settings' },
-    { id: 'toggle-map', label: localStorage.getItem('hide_map') === 'true' ? 'Show Map' : 'Hide Map' },
+    { id: 'toggle-map', label: localStorage.getItem('hide_map') === 'false' ? 'Hide Map' : 'Show Map' },
   ];
 
   return (
@@ -184,8 +184,8 @@ export const Header: React.FC<HeaderProps> = ({
                     key={item.id}
                     onClick={() => {
                       if (item.id === 'toggle-map') {
-                        const current = localStorage.getItem('hide_map') === 'true';
-                        localStorage.setItem('hide_map', (!current).toString());
+                        const currentShow = localStorage.getItem('hide_map') === 'false';
+                        localStorage.setItem('hide_map', currentShow ? 'true' : 'false');
                         window.location.reload();
                       } else {
                         onNavigate(item.id);
