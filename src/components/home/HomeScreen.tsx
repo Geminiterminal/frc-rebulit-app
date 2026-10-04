@@ -3,7 +3,7 @@ import { CaptainDashboard } from '../captain/CaptainDashboard';
 import { ScoutDashboard } from '../scout/ScoutDashboard';
 
 interface HomeScreenProps {
-  onNavigate: (view: string, teamNumber?: number, extraParam?: any) => void;
+  onNavigate: (view: string, teamNumber?: number, extraParam?: any, allianceParam?: 'red' | 'blue') => void;
   appMode: 'captain' | 'scout';
 }
 

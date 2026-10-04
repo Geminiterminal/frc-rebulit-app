@@ -4,8 +4,6 @@ import {
   Trophy, 
   Map, 
   ChevronRight, 
-  ChevronDown,
-  ChevronUp,
   Users, 
   TrendingUp, 
   FolderDown, 
@@ -18,8 +16,7 @@ import {
   Download, 
   RefreshCw, 
   CheckCircle2, 
-  X,
-  Check
+  X
 } from 'lucide-react';
 import { scoutingDB } from '../../db/indexedDB';
 import { scoutingAssignments, ScoutAssignment, MatchTarget } from '../../db/scoutingAssignments';
@@ -107,13 +104,22 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
     }, 3000);
   };
 
-  const handleToggleMatchTarget = (teamNumber: number, matchNumber: number) => {
+  const handleToggleMatchTarget = (teamNumber: number, matchNumber: number, forcedAlliance?: 'red' | 'blue') => {
     setSelectedMatchTargets((prev) => {
       const exists = prev.some((mt) => mt.teamNumber === teamNumber && mt.matchNumber === matchNumber);
       if (exists) {
         return prev.filter((mt) => !(mt.teamNumber === teamNumber && mt.matchNumber === matchNumber));
       } else {
-        return [...prev, { teamNumber, matchNumber }];
+        let alliance = forcedAlliance;
+        if (!alliance) {
+          const sched = teamSchedulesMap[teamNumber] || [];
+          const m = sched.find((s) => s.matchNumber === matchNumber);
+          if (m) {
+            if (m.redTeams.includes(teamNumber)) alliance = 'red';
+            else if (m.blueTeams.includes(teamNumber)) alliance = 'blue';
+          }
+        }
+        return [...prev, { teamNumber, matchNumber, alliance }];
       }
     });
   };
@@ -141,9 +147,9 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
       finalTeams = [...selectedTeamNums];
     } else {
       // Match Scout
-      const targetTeams = selectedMatchTargets.map((mt) => mt.teamNumber);
-      finalTeams = Array.from(new Set([...selectedTeamNums, ...targetTeams]));
       finalTargets = [...selectedMatchTargets];
+      const targetTeamNums = selectedMatchTargets.map((mt) => mt.teamNumber);
+      finalTeams = Array.from(new Set([...selectedTeamNums, ...targetTeamNums]));
     }
 
     if (manualTeamInput.trim()) {
@@ -334,50 +340,96 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
         </div>
 
         {assignments.length > 0 ? (
-          <div className="space-y-1.5 pt-1">
+          <div className="space-y-2 pt-1">
             {assignments.map((a) => {
-              const targetCount = a.matchTargets?.length || 0;
+              const targetsList = (a.matchTargets && a.matchTargets.length > 0)
+                ? a.matchTargets
+                : (a.matchTasks && a.matchTasks.length > 0 ? a.matchTasks : []);
+
+              const allAssignedTeamNums = Array.from(
+                new Set([
+                  ...(a.assignedTeams || []),
+                  ...targetsList.map((mt) => mt.teamNumber),
+                ])
+              )
+                .filter((t) => Number.isInteger(t) && t > 0)
+                .sort((x, y) => Number(x) - Number(y));
+
+              const teamMatchRows = allAssignedTeamNums.map((teamNum) => {
+                const targets = targetsList.filter((mt) => mt.teamNumber === teamNum);
+                const uniqueMatches = Array.from(
+                  new Set(targets.map((mt) => mt.matchNumber))
+                )
+                  .filter((m) => Boolean(m) && m > 0)
+                  .sort((x, y) => Number(x) - Number(y));
+                return { teamNum, matches: uniqueMatches, targets };
+              });
+
               return (
                 <div
                   key={a.scoutName}
-                  className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs"
+                  className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5 text-xs"
                 >
-                  <div>
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-white">{a.scoutName}</span>
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-slate-850 text-slate-300 border border-slate-800">
                         {a.role === 'PIT_SCOUT' ? 'PIT' : 'MATCH'}
                       </span>
                     </div>
-                    <div className="text-[11px] text-slate-400 mt-0.5 font-mono">
-                      {targetCount > 0 ? (
-                        <span>
-                          Targets: {a.matchTargets?.map((mt) => `T${mt.teamNumber}(Q${mt.matchNumber})`).join(', ')}
-                        </span>
-                      ) : (
-                        <span>Teams: {a.assignedTeams.length > 0 ? a.assignedTeams.join(', ') : 'All'}</span>
-                      )}
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleShowAssignmentQr(a)}
+                        className="py-1 px-2 rounded-lg bg-slate-850 border border-slate-800 text-slate-200 hover:bg-slate-800 text-[11px] font-bold cursor-pointer flex items-center gap-1 transition-colors"
+                      >
+                        <QrCode className="w-3 h-3 text-slate-300" />
+                        <span>QR</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAssignment(a.scoutName)}
+                        className="p-1 rounded-lg text-slate-500 hover:text-red-400 cursor-pointer transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleShowAssignmentQr(a)}
-                      className="py-1 px-2.5 rounded-lg bg-slate-850 border border-slate-800 text-slate-200 hover:bg-slate-800 text-[11px] font-bold cursor-pointer flex items-center gap-1 transition-colors"
-                    >
-                      <QrCode className="w-3.5 h-3.5 text-slate-300" />
-                      <span>QR</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteAssignment(a.scoutName)}
-                      className="p-1 rounded-lg text-slate-500 hover:text-red-400 cursor-pointer transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  {a.role === 'MATCH_SCOUT' && teamMatchRows.length > 0 ? (
+                    <div className="rounded-lg border border-slate-850 bg-[#0a0f1d] overflow-hidden">
+                      <div className="grid grid-cols-[80px_1fr] bg-[#101728] px-2.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                        <span>Team</span>
+                        <span>Matches</span>
+                      </div>
+                      <div className="divide-y divide-slate-850/60 font-mono text-[11px]">
+                        {teamMatchRows.map(({ teamNum, matches, targets }) => (
+                          <div key={teamNum} className="grid grid-cols-[80px_1fr] px-2.5 py-1.5 items-center">
+                            <span className="font-bold text-slate-200">#{teamNum}</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {matches.map((mn, idx) => (
+                                <span key={mn} className="inline-flex items-center gap-1">
+                                  <span className="text-white font-bold">Qual {mn}</span>
+                                  {idx < matches.length - 1 && <span className="text-slate-500">,</span>}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-slate-400 font-mono">
+                      <span className="text-slate-400 font-bold">Teams: </span>
+                      <span className="text-slate-200">
+                        {a.assignedTeams && a.assignedTeams.length > 0
+                          ? a.assignedTeams.join(', ')
+                          : ''}
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -463,7 +515,6 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
       {isAddAssignmentOpen && (
         <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-3 sm:p-4 backdrop-blur-md font-mono">
           <div className="bg-[#0e1422] border border-[#1a2438] rounded-2xl p-5 sm:p-6 max-w-md sm:max-w-lg w-full space-y-4 shadow-2xl text-slate-100 max-h-[88vh] flex flex-col">
-            {/* Header */}
             <div className="flex items-center justify-between border-b border-[#1a2438] pb-3 shrink-0">
               <span className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider">
                 CREATE SCOUT ASSIGNMENT
@@ -478,7 +529,6 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
             </div>
 
             <form onSubmit={handleCreateAssignment} className="space-y-3.5 flex-1 overflow-y-auto pr-1">
-              {/* ASSIGNMENT TYPE */}
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
                   ASSIGNMENT TYPE
@@ -509,7 +559,6 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
                 </div>
               </div>
 
-              {/* SCOUT NAME */}
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
                   SCOUT NAME
@@ -524,7 +573,6 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
                 />
               </div>
 
-              {/* SELECT FROM EVENT */}
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
                   SELECT TEAMS FROM EVENT ({newScoutRole === 'MATCH_SCOUT' ? (selectedMatchTargets.length > 0 ? `${selectedMatchTargets.length} MATCHES` : `${selectedTeamNums.length} TEAMS`) : `${selectedTeamNums.length} TEAMS`} SELECTED)
@@ -562,7 +610,6 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
                         })}
                       </div>
 
-                      {/* Dropdown panels for match selection when Match Scout is active */}
                       {newScoutRole === 'MATCH_SCOUT' && expandedAssignmentTeams.size > 0 && (
                         <div className="pt-2 border-t border-[#1a2438] space-y-2">
                           <span className="text-[10px] font-bold text-slate-400 uppercase block">
@@ -639,7 +686,6 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
                 </div>
               </div>
 
-              {/* SAVE ASSIGNMENT */}
               <button
                 type="submit"
                 className="w-full py-3 rounded-xl bg-[#141d2f] hover:bg-[#1a253d] border border-[#1a2438] text-white font-mono font-bold text-xs uppercase tracking-wider cursor-pointer shadow transition-all active:scale-98 mt-1"

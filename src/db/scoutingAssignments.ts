@@ -65,6 +65,7 @@ export interface ScoutProfile {
 export interface MatchScoutTask {
   matchNumber: number;
   teamNumber: number;
+  alliance?: 'red' | 'blue';
 }
 export type MatchTarget = MatchScoutTask;
 
@@ -141,7 +142,13 @@ export const scoutingAssignments = {
     if (typeof localStorage === 'undefined') return [];
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
+      if (!raw) return [];
+      const parsed: ScoutAssignment[] = JSON.parse(raw);
+      return parsed.map((a) => ({
+        ...a,
+        matchTargets: a.matchTargets || a.matchTasks || [],
+        matchTasks: a.matchTasks || a.matchTargets || [],
+      }));
     } catch {
       return [];
     }
@@ -177,7 +184,8 @@ export const scoutingAssignments = {
         scoutName: scoutName.trim(),
         role,
         assignedTeams: role === 'MATCH_SCOUT' && cleanTasks.length > 0 ? Array.from(new Set(cleanTasks.map((t) => t.teamNumber))) : cleanTeams,
-        matchTasks: role === 'MATCH_SCOUT' ? cleanTasks : undefined,
+        matchTasks: role === 'MATCH_SCOUT' ? cleanTasks : [],
+        matchTargets: role === 'MATCH_SCOUT' ? cleanTasks : [],
         notes,
         updatedAt: Date.now(),
       });
@@ -219,14 +227,29 @@ export const scoutingAssignments = {
       const myScout = this.getProfile().name.trim().toLowerCase();
       const all = this.getAllAssignments();
       const matched = all.find((a) => a.scoutName.trim().toLowerCase() === myScout);
+
+      let recordTasks: MatchScoutTask[] = [];
       if (matched && matched.matchTasks && matched.matchTasks.length > 0) {
-        return matched.matchTasks;
+        recordTasks = matched.matchTasks;
+      } else if (matched && matched.matchTargets && matched.matchTargets.length > 0) {
+        recordTasks = matched.matchTargets;
       }
-      if (matched && matched.matchTargets && matched.matchTargets.length > 0) {
-        return matched.matchTargets;
-      }
+
       const raw = localStorage.getItem(MY_MATCH_TASKS_KEY);
-      return raw ? JSON.parse(raw) : [];
+      const localTasks: MatchScoutTask[] = raw ? JSON.parse(raw) : [];
+
+      const map = new Map<string, MatchScoutTask>();
+      for (const t of [...localTasks, ...recordTasks]) {
+        if (!t || !t.matchNumber || !t.teamNumber) continue;
+        const key = `${t.matchNumber}-${t.teamNumber}`;
+        const existing = map.get(key);
+        if (!existing) {
+          map.set(key, t);
+        } else if (t.alliance && !existing.alliance) {
+          map.set(key, { ...existing, alliance: t.alliance });
+        }
+      }
+      return Array.from(map.values());
     } catch {
       return [];
     }
@@ -256,11 +279,14 @@ export const scoutingAssignments = {
       const myScout = this.getProfile().name.trim().toLowerCase();
       const all = this.getAllAssignments();
       const matched = all.find((a) => a.scoutName.trim().toLowerCase() === myScout);
-      if (matched && matched.assignedTeams && matched.assignedTeams.length > 0) {
-        return matched.assignedTeams;
-      }
+      const recordTeams = matched?.assignedTeams || [];
+
       const raw = localStorage.getItem(MY_TEAMS_KEY);
-      return raw ? JSON.parse(raw) : [];
+      const localTeams: number[] = raw ? JSON.parse(raw) : [];
+
+      const combined = Array.from(new Set([...localTeams, ...recordTeams]))
+        .filter((t) => Number.isInteger(t) && t > 0);
+      return combined;
     } catch {
       return [];
     }
@@ -319,11 +345,11 @@ export const scoutingAssignments = {
     this.setMyTargetTeams(current.filter((t) => t !== teamNumber));
   },
 
-  addMatchTask(matchNumber: number, teamNumber: number): void {
+  addMatchTask(matchNumber: number, teamNumber: number, alliance?: 'red' | 'blue'): void {
     const current = this.getMyMatchTasks();
     const exists = current.some((t) => t.matchNumber === matchNumber && t.teamNumber === teamNumber);
     if (!exists) {
-      this.setMyMatchTasks([...current, { matchNumber, teamNumber }]);
+      this.setMyMatchTasks([...current, { matchNumber, teamNumber, alliance }]);
       this.addTeamToTarget(teamNumber);
     }
   },

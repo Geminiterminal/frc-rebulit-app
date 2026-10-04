@@ -18,7 +18,7 @@ import { QrScannerModal } from '../common/QrScannerModal';
 import { EventScheduleMatch, MatchScoutingRecord } from '../../types/scouting';
 
 interface ScoutDashboardProps {
-  onNavigate: (view: string, teamNumber?: number, extraParam?: any) => void;
+  onNavigate: (view: string, teamNumber?: number, extraParam?: any, allianceParam?: 'red' | 'blue') => void;
 }
 
 export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) => {
@@ -177,6 +177,79 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
             {isPitMode ? 'Pit Mode' : 'Match Mode'}
           </span>
         </div>
+
+        {/* MATCH SCOUT SPECIFIC TASKS LIST */}
+        {myMatchTargets.length > 0 && (
+          <div className="space-y-2 mb-3">
+            <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider font-mono flex items-center justify-between">
+              <span>Match Scouting Assignments ({myMatchTargets.length})</span>
+            </div>
+
+            <div className="space-y-1.5">
+              {myMatchTargets.map((task) => {
+                const scoutedMatches = teamScoutedMatchesMap[task.teamNumber] || [];
+                const isMatchDone = scoutedMatches.includes(task.matchNumber);
+
+                // Determine alliance
+                let taskAlliance = task.alliance;
+                if (!taskAlliance) {
+                  const sched = teamSchedulesMap[task.teamNumber] || [];
+                  const m = sched.find((s) => s.matchNumber === task.matchNumber);
+                  if (m) {
+                    if (m.redTeams.includes(task.teamNumber)) taskAlliance = 'red';
+                    else if (m.blueTeams.includes(task.teamNumber)) taskAlliance = 'blue';
+                  }
+                }
+
+                return (
+                  <div
+                    key={`task-m${task.matchNumber}-t${task.teamNumber}`}
+                    className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all ${
+                      isMatchDone
+                        ? 'bg-slate-950 border-emerald-600/40 text-emerald-200'
+                        : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 flex-wrap font-mono font-bold text-xs sm:text-sm">
+                      <span className="text-white">Team #{task.teamNumber},</span>
+                      <span className="text-slate-200">Match #{task.matchNumber}</span>
+                      {taskAlliance === 'red' ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-950 text-rose-300 border border-rose-600 shadow-sm">
+                          Red
+                        </span>
+                      ) : taskAlliance === 'blue' ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-sky-950 text-sky-300 border border-sky-600 shadow-sm">
+                          Blue
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {isMatchDone && (
+                        <span className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Done</span>
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => onNavigate('match-scout', task.teamNumber, task.matchNumber, taskAlliance)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors font-mono shrink-0 ${
+                          isMatchDone
+                            ? 'bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-750'
+                            : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow font-black'
+                        }`}
+                      >
+                        {isMatchDone ? 'Review Match' : 'Scout Match'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Queue Items */}
         {myTargetTeams.length > 0 ? (

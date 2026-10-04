@@ -107,7 +107,13 @@ export const qrTransferEngine = {
       r: scoutRole === 'PIT_SCOUT' ? 'P' : 'M',
       tm: assignedTeams,
       mn: matchNumber,
-      mt: matchTargets && matchTargets.length > 0 ? matchTargets.map((task) => [task.matchNumber, task.teamNumber]) : undefined,
+      mt: matchTargets && matchTargets.length > 0 
+        ? matchTargets.map((task) => [
+            task.matchNumber, 
+            task.teamNumber, 
+            task.alliance === 'red' ? 'R' : task.alliance === 'blue' ? 'B' : ''
+          ]) 
+        : undefined,
       ts: Date.now(),
     };
     return JSON.stringify(payload);
@@ -132,39 +138,69 @@ export const qrTransferEngine = {
 
       let matchTasks: MatchScoutTask[] = [];
       if (isCompact && Array.isArray(parsed.mt)) {
-        matchTasks = parsed.mt.map((pair: [number, number]) => ({
-          matchNumber: pair[0],
-          teamNumber: pair[1],
+        matchTasks = parsed.mt.map((pair: any[]) => ({
+          matchNumber: Number(pair[0]),
+          teamNumber: Number(pair[1]),
+          alliance: pair[2] === 'R' ? 'red' : pair[2] === 'B' ? 'blue' : undefined,
         }));
       } else if (Array.isArray(parsed.matchTasks)) {
         matchTasks = parsed.matchTasks;
       }
 
+      // Update scout profile
+      const currentProfile = scoutingAssignments.getProfile();
       scoutingAssignments.setProfile({
-        name: scoutId,
+        name: scoutId || currentProfile.name || 'Scout',
         position: scoutRole,
         isSetupComplete: true,
       });
 
-      if (scoutRole === 'MATCH_SCOUT' && matchTasks.length > 0) {
-        scoutingAssignments.setMyMatchTasks(matchTasks);
-        const teamNums = Array.from(new Set(matchTasks.map((t) => t.teamNumber)));
-        scoutingAssignments.setMyTargetTeams(teamNums);
-        scoutingAssignments.assignScout(scoutId, 'MATCH_SCOUT', teamNums, matchTasks);
-      } else {
-        scoutingAssignments.setMyTargetTeams(assignedTeams);
-        scoutingAssignments.assignScout(scoutId, 'PIT_SCOUT', assignedTeams, []);
+      // Get existing tasks and teams to preserve them
+      const existingMatchTasks = scoutingAssignments.getMyMatchTasks();
+      const existingTargetTeams = scoutingAssignments.getMyTargetTeams();
+
+      // Merge match tasks without losing previous ones
+      const mergedMatchTasks = [...existingMatchTasks];
+      for (const mt of matchTasks) {
+        const idx = mergedMatchTasks.findIndex(
+          (e) => e.matchNumber === mt.matchNumber && e.teamNumber === mt.teamNumber
+        );
+        if (idx >= 0) {
+          mergedMatchTasks[idx] = { ...mergedMatchTasks[idx], ...mt };
+        } else {
+          mergedMatchTasks.push(mt);
+        }
       }
 
-      const summaryText = scoutRole === 'MATCH_SCOUT' && matchTasks.length > 0
-        ? `${matchTasks.length} match task(s)`
-        : `${assignedTeams.length} pit team(s)`;
+      // Merge pit target teams without losing previous ones
+      const newTeamNums = matchTasks.map((t) => t.teamNumber);
+      const mergedTargetTeams = Array.from(
+        new Set([...existingTargetTeams, ...assignedTeams, ...newTeamNums])
+      ).filter((t) => Number.isInteger(t) && t > 0);
+
+      scoutingAssignments.setMyMatchTasks(mergedMatchTasks);
+      scoutingAssignments.setMyTargetTeams(mergedTargetTeams);
+      scoutingAssignments.assignScout(scoutId, scoutRole, mergedTargetTeams, mergedMatchTasks);
+
+      const newMatchCount = matchTasks.length;
+      const newPitCount = assignedTeams.length;
+      const totalMatchTasks = mergedMatchTasks.length;
+      const totalPitTeams = mergedTargetTeams.length;
+
+      let summaryText = '';
+      if (newMatchCount > 0 && newPitCount > 0) {
+        summaryText = `Added ${newMatchCount} match task(s) & ${newPitCount} pit team(s) (Total: ${totalMatchTasks} match, ${totalPitTeams} pit)`;
+      } else if (newMatchCount > 0) {
+        summaryText = `Added ${newMatchCount} match task(s) (Total: ${totalMatchTasks} match tasks)`;
+      } else {
+        summaryText = `Added ${newPitCount} pit team(s) (Total: ${totalPitTeams} pit teams)`;
+      }
 
       return {
         success: true,
         scoutId,
         role: scoutRole,
-        message: `Assigned ${summaryText} to ${scoutId}`,
+        message: `Updated assignments for ${scoutId}: ${summaryText}`,
       };
     } catch (err: any) {
       return {

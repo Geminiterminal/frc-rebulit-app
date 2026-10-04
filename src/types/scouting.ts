@@ -103,6 +103,7 @@ export interface MatchScoutingRecord {
   id: string;
   teamNumber: number;
   matchNumber: number;
+  alliance?: 'red' | 'blue';
   timestamp: number;
 
   // 1. AUTONOMOUS

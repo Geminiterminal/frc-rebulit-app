@@ -29,12 +29,14 @@ import {
 interface MatchScoutFormProps {
   initialTeamNumber?: number;
   initialMatchNumber?: number;
-  onNavigate: (view: string, teamNumber?: number) => void;
+  initialAlliance?: 'red' | 'blue';
+  onNavigate: (view: string, teamNumber?: number, extraParam?: any, allianceParam?: 'red' | 'blue') => void;
 }
 
 export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
   initialTeamNumber,
   initialMatchNumber = 1,
+  initialAlliance,
   onNavigate,
 }) => {
   // MATCH IDENTIFICATION
@@ -42,6 +44,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
   const [teamNumber, setTeamNumber] = useState<string>(
     initialTeamNumber ? initialTeamNumber.toString() : ''
   );
+  const [alliance, setAlliance] = useState<'red' | 'blue' | null>(initialAlliance || null);
   const [teamSchedule, setTeamSchedule] = useState<EventScheduleMatch[]>([]);
 
   // 1. AUTONOMOUS
@@ -83,15 +86,28 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
   }, [initialMatchNumber]);
 
   useEffect(() => {
+    if (initialAlliance) {
+      setAlliance(initialAlliance);
+    }
+  }, [initialAlliance]);
+
+  useEffect(() => {
     const teamNum = parseInt(teamNumber, 10);
     if (!isNaN(teamNum) && teamNum > 0) {
       scoutingDB.getScheduleForTeam(teamNum).then((sched) => {
         setTeamSchedule(sched);
+        if (matchNumber > 0 && sched.length > 0) {
+          const m = sched.find((s) => s.matchNumber === matchNumber);
+          if (m) {
+            if (m.redTeams.includes(teamNum)) setAlliance('red');
+            else if (m.blueTeams.includes(teamNum)) setAlliance('blue');
+          }
+        }
       });
     } else {
       setTeamSchedule([]);
     }
-  }, [teamNumber]);
+  }, [teamNumber, matchNumber]);
 
   useEffect(() => {
     const teamNum = parseInt(teamNumber, 10);
@@ -99,6 +115,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       scoutingDB.getMatchesForTeam(teamNum).then((records) => {
         const existing = records.find((r) => r.matchNumber === matchNumber);
         if (existing) {
+          if (existing.alliance) setAlliance(existing.alliance);
           setAutoWorked(existing.autoWorked);
           setAutoFuelScored(existing.autoFuelScored || existing.autoHighScored || 0);
           setTeleopFuelScored(existing.teleopFuelScored || existing.teleopHighScored || 0);
@@ -140,6 +157,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       id: `match-m${matchNumber}-t${teamNum}-${Date.now()}`,
       teamNumber: teamNum,
       matchNumber,
+      alliance: alliance || undefined,
       timestamp: Date.now(),
       autoWorked: autoWorked !== null ? autoWorked : false,
       autoFuelScored,
@@ -207,6 +225,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       id: `match-m${matchNumber}-t${teamNum}-${Date.now()}`,
       teamNumber: teamNum,
       matchNumber,
+      alliance: alliance || undefined,
       timestamp: Date.now(),
       autoWorked: autoWorked !== null ? autoWorked : false,
       autoFuelScored,
@@ -251,8 +270,17 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <h1 className="text-sm sm:text-base font-bold font-mono text-slate-100 tracking-tight uppercase">
-            MATCH SCOUT
+          <h1 className="text-sm sm:text-base font-bold font-mono text-slate-100 tracking-tight uppercase flex items-center gap-2">
+            <span>MATCH SCOUT</span>
+            {alliance && (
+              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${
+                alliance === 'red'
+                  ? 'bg-rose-950 text-rose-300 border-rose-600'
+                  : 'bg-sky-950 text-sky-300 border-sky-600'
+              }`}>
+                {alliance} Alliance
+              </span>
+            )}
           </h1>
         </div>
 
@@ -316,6 +344,40 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
               onChange={(e) => setTeamNumber(e.target.value)}
               className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 px-2.5 text-base font-mono font-bold text-white placeholder-slate-600 focus:outline-none focus:border-slate-600"
             />
+          </div>
+        </div>
+
+        {/* Alliance Selector */}
+        <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 space-y-1.5">
+          <span className="text-[11px] font-mono font-bold uppercase text-slate-400 block">
+            Alliance Color
+          </span>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setAlliance('red')}
+              className={`py-2 rounded-lg font-mono font-bold text-xs uppercase cursor-pointer border transition-all flex items-center justify-center gap-1.5 ${
+                alliance === 'red'
+                  ? 'bg-rose-950 text-rose-200 border-rose-500 shadow font-black'
+                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+              <span>Red Alliance</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAlliance('blue')}
+              className={`py-2 rounded-lg font-mono font-bold text-xs uppercase cursor-pointer border transition-all flex items-center justify-center gap-1.5 ${
+                alliance === 'blue'
+                  ? 'bg-sky-950 text-sky-200 border-sky-500 shadow font-black'
+                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <span className="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block" />
+              <span>Blue Alliance</span>
+            </button>
           </div>
         </div>
 

@@ -30,6 +30,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState<string>('home');
   const [selectedTeamNumber, setSelectedTeamNumber] = useState<number | undefined>(undefined);
   const [selectedMatchNumber, setSelectedMatchNumber] = useState<number | undefined>(undefined);
+  const [selectedAlliance, setSelectedAlliance] = useState<'red' | 'blue' | undefined>(undefined);
   const [compareTeamNums, setCompareTeamNums] = useState<number[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
   const [appMode, setAppMode] = useState<'captain' | 'scout'>(() => {
@@ -48,11 +49,22 @@ export default function App() {
     });
   }, []);
 
-  const handleNavigate = (view: string, teamNumber?: number, extraParam?: any) => {
+  const handleNavigate = (view: string, teamNumber?: number, extraParam?: any, allianceParam?: 'red' | 'blue') => {
     if (teamNumber) setSelectedTeamNumber(teamNumber);
     if (typeof teamNumber === 'number' && typeof extraParam === 'number') {
       setSelectedMatchNumber(extraParam);
+    } else if (view === 'match-scout' && typeof teamNumber === 'number' && extraParam === undefined) {
+      setSelectedMatchNumber(undefined);
     }
+
+    if (allianceParam === 'red' || allianceParam === 'blue') {
+      setSelectedAlliance(allianceParam);
+    } else if (extraParam === 'red' || extraParam === 'blue') {
+      setSelectedAlliance(extraParam);
+    } else {
+      setSelectedAlliance(undefined);
+    }
+
     if (view === 'compare' && Array.isArray(extraParam)) {
       setCompareTeamNums(extraParam);
     }
@@ -96,6 +108,7 @@ export default function App() {
               <MatchScoutForm
                 initialTeamNumber={selectedTeamNumber}
                 initialMatchNumber={selectedMatchNumber}
+                initialAlliance={selectedAlliance}
                 onNavigate={handleNavigate}
               />
             )}
