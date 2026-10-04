@@ -5,7 +5,7 @@
 
 import { scoutingDB } from '../db/indexedDB';
 import { scoutingAssignments, MatchScoutTask, MatchTarget } from '../db/scoutingAssignments';
-import { MatchScoutingRecord, PitData } from '../types/scouting';
+import { MatchScoutingRecord, PitData, FieldRouteType, DefenseEffectivenessType, RobotIssuesType } from '../types/scouting';
 
 export interface AssignmentPayload {
   type: 'ASSIGNMENT';
@@ -216,12 +216,31 @@ export const qrTransferEngine = {
    * Generate a standard single-record QR payload for PIT scouting
    */
   generateSinglePitQr(scoutId: string, teamNumber: number, pitData: PitData): string {
-    const cleanedPit = cleanEmptyFields(pitData);
+    const compactPit: any = {
+      dt: pitData.drivetrain,
+      dto: pitData.drivetrainOther,
+      sh: pitData.shooter,
+      sho: pitData.shooterOther,
+      hc: pitData.hopperCapacity,
+      sa: pitData.shootingAccuracy,
+      sz: pitData.shootingAreas,
+      ca: pitData.canShootAnywhere,
+      bt: pitData.bumpTrench,
+      ha: pitData.hasAutonomous,
+      arc: pitData.autoRoutinesCount,
+      ac: pitData.autoConsistency,
+      bi: pitData.biggestIssues,
+      bio: pitData.biggestIssueOther,
+      re: pitData.reliability,
+      no: pitData.notes,
+      sn: pitData.scoutName || scoutId,
+      lu: pitData.lastUpdated || Date.now(),
+    };
+
+    const cleanedPit = cleanEmptyFields(compactPit);
     const payload = {
       t: 'SD',
       s: scoutId,
-      c: 0,
-      tc: 1,
       r: [{
         t: 'P',
         id: `pit-${teamNumber}`,
@@ -237,22 +256,28 @@ export const qrTransferEngine = {
    * Generate a standard single-record QR payload for MATCH scouting
    */
   generateSingleMatchQr(scoutId: string, matchRecord: MatchScoutingRecord): string {
-    const record = {
-      ...matchRecord,
-      id: matchRecord.id || `match-${matchRecord.matchNumber}-${matchRecord.teamNumber}`
+    const rec = {
+      al: matchRecord.alliance === 'red' ? 'R' : matchRecord.alliance === 'blue' ? 'B' : undefined,
+      aw: matchRecord.autoWorked ? 1 : 0,
+      af: matchRecord.autoFuelScored || matchRecord.autoHighScored || 0,
+      tf: matchRecord.teleopFuelScored || matchRecord.teleopHighScored || 0,
+      fr: matchRecord.fieldRoute === 'BUMP' ? 'B' : matchRecord.fieldRoute === 'TRENCH' ? 'T' : matchRecord.fieldRoute === 'BOTH' ? '2' : 'N',
+      pd: matchRecord.playedDefense ? 1 : 0,
+      de: matchRecord.defenseEffectiveness === 'LOW' ? 'L' : matchRecord.defenseEffectiveness === 'HIGH' ? 'H' : matchRecord.defenseEffectiveness === 'MEDIUM' ? 'M' : undefined,
+      ri: matchRecord.robotIssues === 'MINOR' ? 'm' : matchRecord.robotIssues === 'MAJOR' ? 'M' : matchRecord.robotIssues === 'DISABLED' ? 'D' : 'N',
+      wn: matchRecord.whatHappenedNote || undefined,
+      qn: matchRecord.quickNote || matchRecord.notes || undefined,
+      im: matchRecord.impression || undefined,
     };
-    const { autoHighScored, teleopHighScored, notes, hangStatus, ...sanitizedRecord } = record as any;
-    const cleanedMatch = cleanEmptyFields(sanitizedRecord);
+    const cleanedMatch = cleanEmptyFields(rec);
     const payload = {
       t: 'SD',
       s: scoutId,
-      c: 0,
-      tc: 1,
       r: [{
         t: 'M',
-        id: sanitizedRecord.id,
-        tn: sanitizedRecord.teamNumber,
-        mn: sanitizedRecord.matchNumber,
+        id: matchRecord.id || `match-m${matchRecord.matchNumber}-t${matchRecord.teamNumber}`,
+        tn: matchRecord.teamNumber,
+        mn: matchRecord.matchNumber,
         d: cleanedMatch || {},
       }],
       ts: Date.now(),
@@ -266,6 +291,18 @@ export const qrTransferEngine = {
   async importScoutDataQrPayload(qrString: string): Promise<{ success: boolean; importedCount: number; duplicateCount: number; message: string }> {
     try {
       const parsed: any = JSON.parse(qrString.trim());
+
+      // If Captain scanned an Assignment QR code in Data Scanner modal
+      if (parsed.t === 'A' || parsed.type === 'ASSIGNMENT') {
+        const result = this.parseAssignmentPayload(qrString);
+        return {
+          success: result.success,
+          importedCount: result.success ? 1 : 0,
+          duplicateCount: 0,
+          message: result.message,
+        };
+      }
+
       const isCompact = parsed.t === 'SD';
       const isLegacy = parsed.type === 'SCOUT_DATA';
 
@@ -288,41 +325,121 @@ export const qrTransferEngine = {
 
       for (const rec of recordsList) {
         const recType = isCompact ? (rec.t === 'P' ? 'PIT' : 'MATCH') : rec.type;
-        const teamNum = isCompact ? rec.tn : rec.teamNumber;
+        const teamNum = isCompact ? (rec.tn || rec.teamNumber) : rec.teamNumber;
         const recData = isCompact ? rec.d : rec.data;
         const recId = rec.id || `${recType}-${teamNum}`;
 
         if (recType === 'PIT') {
-          const pitData = recData as PitData;
+          const d = recData || {};
+          const drivetrain = d.dt || d.drivetrain;
+          const drivetrainOther = d.dto || d.drivetrainOther;
+          const shooter = d.sh || d.shooter;
+          const shooterOther = d.sho || d.shooterOther;
+          const hopperCapacity = d.hc !== undefined ? Number(d.hc) : (d.hopperCapacity !== undefined ? Number(d.hopperCapacity) : undefined);
+          const shootingAccuracy = d.sa || d.shootingAccuracy;
+          const shootingAreas = d.sz || d.shootingAreas;
+          const canShootAnywhere = d.ca || d.canShootAnywhere;
+          const bumpTrench = d.bt || d.bumpTrench;
+          const hasAutonomous = d.ha || d.hasAutonomous;
+          const autoRoutinesCount = d.arc || d.autoRoutinesCount;
+          const autoConsistency = d.ac || d.autoConsistency;
+          const biggestIssues = d.bi || d.biggestIssues;
+          const biggestIssueOther = d.bio || d.biggestIssueOther;
+          const reliability = d.re || d.reliability;
+          const notes = d.no || d.notes;
+          const scoutName = d.sn || d.scoutName || parsed.s || 'Scout';
+          const lastUpdated = d.lu || d.lastUpdated || rec.ts || Date.now();
+
+          const decodedPit: PitData = {
+            drivetrain,
+            drivetrainOther,
+            shooter,
+            shooterOther,
+            hopperCapacity,
+            shootingAccuracy,
+            shootingAreas,
+            canShootAnywhere,
+            bumpTrench,
+            hasAutonomous,
+            autoRoutinesCount,
+            autoConsistency,
+            biggestIssues,
+            biggestIssueOther,
+            reliability,
+            notes,
+            scoutName,
+            lastUpdated,
+          };
+
           const existing = await scoutingDB.getTeam(teamNum);
 
           if (!existing) {
             await scoutingDB.saveTeam({
               teamNumber: teamNum,
               teamName: `Team ${teamNum}`,
-              pit: pitData,
+              pit: decodedPit,
               createdAt: Date.now(),
               updatedAt: Date.now(),
             });
             importedCount++;
           } else {
-            if (existing.pit && JSON.stringify(existing.pit) === JSON.stringify(pitData)) {
+            if (existing.pit && JSON.stringify(existing.pit) === JSON.stringify(decodedPit)) {
               duplicateCount++;
             } else {
-              existing.pit = { ...existing.pit, ...pitData };
+              existing.pit = { ...existing.pit, ...decodedPit };
               await scoutingDB.saveTeam(existing);
               importedCount++;
             }
           }
         } else if (recType === 'MATCH') {
-          const matchRecord = recData as MatchScoutingRecord;
-          const matchNumber = isCompact ? rec.mn : rec.matchNumber;
+          const d = recData || {};
+          const matchNumber = isCompact ? (rec.mn || d.matchNumber || d.mn) : (rec.matchNumber || d.matchNumber);
+          const autoWorked = d.aw !== undefined ? (d.aw === 1 || d.aw === true) : Boolean(d.autoWorked);
+          const autoFuelScored = d.af !== undefined ? Number(d.af) : Number(d.autoFuelScored || d.autoHighScored || 0);
+          const teleopFuelScored = d.tf !== undefined ? Number(d.tf) : Number(d.teleopFuelScored || d.teleopHighScored || 0);
+
+          let fieldRoute: FieldRouteType = 'NEITHER';
+          if (d.fr === 'B' || d.fieldRoute === 'BUMP') fieldRoute = 'BUMP';
+          else if (d.fr === 'T' || d.fieldRoute === 'TRENCH') fieldRoute = 'TRENCH';
+          else if (d.fr === '2' || d.fr === 'BOTH' || d.fieldRoute === 'BOTH') fieldRoute = 'BOTH';
+
+          const playedDefense = d.pd !== undefined ? (d.pd === 1 || d.pd === true) : Boolean(d.playedDefense);
+
+          let defenseEffectiveness: DefenseEffectivenessType | undefined = undefined;
+          if (d.de === 'L' || d.defenseEffectiveness === 'LOW') defenseEffectiveness = 'LOW';
+          else if (d.de === 'H' || d.defenseEffectiveness === 'HIGH') defenseEffectiveness = 'HIGH';
+          else if (d.de === 'M' || d.defenseEffectiveness === 'MEDIUM') defenseEffectiveness = 'MEDIUM';
+
+          let robotIssues: RobotIssuesType = 'NONE';
+          if (d.ri === 'm' || d.robotIssues === 'MINOR') robotIssues = 'MINOR';
+          else if (d.ri === 'M' || d.robotIssues === 'MAJOR') robotIssues = 'MAJOR';
+          else if (d.ri === 'D' || d.robotIssues === 'DISABLED') robotIssues = 'DISABLED';
+
+          let alliance: 'red' | 'blue' | undefined = undefined;
+          if (d.al === 'R' || d.alliance === 'red') alliance = 'red';
+          else if (d.al === 'B' || d.alliance === 'blue') alliance = 'blue';
+
+          const matchId = recId || rec.id || d.id || `match-m${matchNumber || 1}-t${teamNum}-${Date.now()}`;
+
           const finalMatch: MatchScoutingRecord = {
-            ...matchRecord,
-            id: recId,
+            id: matchId,
             teamNumber: teamNum,
-            matchNumber: matchNumber || matchRecord.matchNumber || 1,
-            timestamp: matchRecord.timestamp || Date.now(),
+            matchNumber: matchNumber || 1,
+            alliance,
+            timestamp: rec.ts || d.timestamp || Date.now(),
+            autoWorked,
+            autoFuelScored,
+            teleopFuelScored,
+            fieldRoute,
+            playedDefense,
+            defenseEffectiveness,
+            robotIssues,
+            whatHappenedNote: d.wn || d.whatHappenedNote || undefined,
+            quickNote: d.qn || d.quickNote || d.notes || undefined,
+            impression: d.im || d.impression || undefined,
+            autoHighScored: autoFuelScored,
+            teleopHighScored: teleopFuelScored,
+            notes: d.qn || d.quickNote || d.notes || undefined,
           };
 
           const existingMatches = await scoutingDB.getAllMatches();
@@ -344,6 +461,17 @@ export const qrTransferEngine = {
           } else {
             await scoutingDB.saveMatch(finalMatch);
             importedCount++;
+          }
+
+          // Ensure team profile exists
+          const existingTeam = await scoutingDB.getTeam(teamNum);
+          if (!existingTeam) {
+            await scoutingDB.saveTeam({
+              teamNumber: teamNum,
+              teamName: `Team ${teamNum}`,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            });
           }
         }
       }

@@ -177,8 +177,8 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
     loadData();
   };
 
-  const handleDeleteAssignment = (scoutName: string) => {
-    scoutingAssignments.deleteAssignment(scoutName);
+  const handleDeleteAssignment = (scoutName: string, role?: 'PIT_SCOUT' | 'MATCH_SCOUT', id?: string) => {
+    scoutingAssignments.deleteAssignment(scoutName, role, id);
     loadData();
   };
 
@@ -367,7 +367,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
 
               return (
                 <div
-                  key={a.scoutName}
+                  key={a.id || `${a.scoutName}-${a.role}-${a.updatedAt}`}
                   className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5 text-xs"
                 >
                   <div className="flex items-center justify-between">
@@ -390,7 +390,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
 
                       <button
                         type="button"
-                        onClick={() => handleDeleteAssignment(a.scoutName)}
+                        onClick={() => handleDeleteAssignment(a.scoutName, a.role, a.id)}
                         className="p-1 rounded-lg text-slate-500 hover:text-red-400 cursor-pointer transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />

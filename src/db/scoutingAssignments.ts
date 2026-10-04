@@ -70,6 +70,7 @@ export interface MatchScoutTask {
 export type MatchTarget = MatchScoutTask;
 
 export interface ScoutAssignment {
+  id?: string;
   scoutName: string;
   assignedTeams: number[];
   assignedMatches?: number[];
@@ -170,17 +171,27 @@ export const scoutingAssignments = {
     role: 'PIT_SCOUT' | 'MATCH_SCOUT',
     assignedTeams: number[],
     matchTasks: MatchScoutTask[] = [],
-    notes: string = ''
+    notes: string = '',
+    assignmentId?: string
   ): void {
     if (typeof localStorage === 'undefined') return;
     try {
       const all = this.getAllAssignments();
-      const filtered = all.filter((a) => a.scoutName.trim().toLowerCase() !== scoutName.trim().toLowerCase());
+      const targetId = assignmentId || `${scoutName.trim().toLowerCase()}-${role}-${Date.now()}`;
+
+      // Remove previous assignment ONLY if matching exact id OR if matching scoutName AND role
+      const filtered = all.filter((a) => {
+        if (assignmentId && a.id) {
+          return a.id !== assignmentId;
+        }
+        return !(a.scoutName.trim().toLowerCase() === scoutName.trim().toLowerCase() && a.role === role);
+      });
 
       const cleanTeams = Array.from(new Set(assignedTeams.filter((t) => Number.isInteger(t) && t > 0))).sort((a, b) => a - b);
       const cleanTasks = matchTasks.filter((t) => t.matchNumber > 0 && t.teamNumber > 0);
 
       filtered.push({
+        id: targetId,
         scoutName: scoutName.trim(),
         role,
         assignedTeams: role === 'MATCH_SCOUT' && cleanTasks.length > 0 ? Array.from(new Set(cleanTasks.map((t) => t.teamNumber))) : cleanTeams,
@@ -202,18 +213,27 @@ export const scoutingAssignments = {
     teams: number[], 
     role: 'PIT_SCOUT' | 'MATCH_SCOUT' = 'PIT_SCOUT', 
     notes: string = '',
-    matchTargets?: MatchTarget[]
+    matchTargets?: MatchTarget[],
+    assignmentId?: string
   ): void {
     const matchTasks = matchTargets && matchTargets.length > 0 ? matchTargets : [];
-    this.assignScout(scoutName, role, teams, matchTasks, notes);
+    this.assignScout(scoutName, role, teams, matchTasks, notes, assignmentId);
   },
 
   // Delete assignment for a scout
-  deleteAssignment(scoutName: string): void {
+  deleteAssignment(scoutName: string, role?: 'PIT_SCOUT' | 'MATCH_SCOUT', id?: string): void {
     if (typeof localStorage === 'undefined') return;
     try {
       const all = this.getAllAssignments();
-      const filtered = all.filter((a) => a.scoutName.trim().toLowerCase() !== scoutName.trim().toLowerCase());
+      const filtered = all.filter((a) => {
+        if (id && a.id) {
+          return a.id !== id;
+        }
+        if (role) {
+          return !(a.scoutName.trim().toLowerCase() === scoutName.trim().toLowerCase() && a.role === role);
+        }
+        return a.scoutName.trim().toLowerCase() !== scoutName.trim().toLowerCase();
+      });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
     } catch (e) {
       console.error('Failed to delete assignment:', e);
@@ -226,13 +246,15 @@ export const scoutingAssignments = {
     try {
       const myScout = this.getProfile().name.trim().toLowerCase();
       const all = this.getAllAssignments();
-      const matched = all.find((a) => a.scoutName.trim().toLowerCase() === myScout);
+      const userAssignments = all.filter((a) => a.scoutName.trim().toLowerCase() === myScout);
 
       let recordTasks: MatchScoutTask[] = [];
-      if (matched && matched.matchTasks && matched.matchTasks.length > 0) {
-        recordTasks = matched.matchTasks;
-      } else if (matched && matched.matchTargets && matched.matchTargets.length > 0) {
-        recordTasks = matched.matchTargets;
+      for (const matched of userAssignments) {
+        if (matched.matchTasks && matched.matchTasks.length > 0) {
+          recordTasks.push(...matched.matchTasks);
+        } else if (matched.matchTargets && matched.matchTargets.length > 0) {
+          recordTasks.push(...matched.matchTargets);
+        }
       }
 
       const raw = localStorage.getItem(MY_MATCH_TASKS_KEY);
@@ -278,8 +300,14 @@ export const scoutingAssignments = {
     try {
       const myScout = this.getProfile().name.trim().toLowerCase();
       const all = this.getAllAssignments();
-      const matched = all.find((a) => a.scoutName.trim().toLowerCase() === myScout);
-      const recordTeams = matched?.assignedTeams || [];
+      const userAssignments = all.filter((a) => a.scoutName.trim().toLowerCase() === myScout && a.role === 'PIT_SCOUT');
+
+      let recordTeams: number[] = [];
+      for (const matched of userAssignments) {
+        if (matched.assignedTeams) {
+          recordTeams.push(...matched.assignedTeams);
+        }
+      }
 
       const raw = localStorage.getItem(MY_TEAMS_KEY);
       const localTeams: number[] = raw ? JSON.parse(raw) : [];
