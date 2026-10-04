@@ -107,7 +107,7 @@ export function ScoutRoleSetupModal({
             </label>
             <input
               type="text"
-              placeholder="e.g. Kawser, Alex, Maya"
+              placeholder="Kawser, Alex, Maya"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-medium"

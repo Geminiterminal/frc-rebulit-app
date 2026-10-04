@@ -336,7 +336,7 @@ export function ScoutingAssignmentsCard({ onSelectTeam, onNavigate, compact = fa
               <form onSubmit={handleSaveScoutAssignment} className="space-y-2 pt-2 border-t border-slate-800">
                 <input
                   type="text"
-                  placeholder="Scout Name (e.g. Alex)"
+                  placeholder="Scout Name"
                   value={targetScout}
                   onChange={(e) => setTargetScout(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
@@ -344,7 +344,7 @@ export function ScoutingAssignmentsCard({ onSelectTeam, onNavigate, compact = fa
                 />
                 <input
                   type="text"
-                  placeholder="Teams (e.g. 254, 9751, 1678)"
+                  placeholder="Teams"
                   value={teamsCsvInput}
                   onChange={(e) => setTeamsCsvInput(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"

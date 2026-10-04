@@ -166,7 +166,7 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
         <Search className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
         <input
           type="text"
-          placeholder="Search team # (e.g. 9751) or name (Press Enter to open)"
+          placeholder="Search team # or name"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-20 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-slate-600 transition-colors font-mono"
@@ -359,7 +359,7 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
                   type="number"
                   autoFocus
                   required
-                  placeholder="e.g. 9751"
+                  placeholder="9751"
                   value={newTeamNumber}
                   onChange={(e) => setNewTeamNumber(e.target.value)}
                   className="w-full text-center text-2xl font-mono font-bold bg-slate-950 border border-slate-700 rounded-xl py-2 px-3 text-white focus:outline-none focus:border-blue-500"

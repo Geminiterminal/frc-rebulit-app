@@ -124,7 +124,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
             </label>
             <input
               type="text"
-              placeholder="Scout Name (e.g. Kawser, Alex, Maya)"
+              placeholder="Scout Name"
               value={scoutName}
               onChange={(e) => setScoutName(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500"
