@@ -123,6 +123,78 @@
   --color-amber-950: #3a1418;
 }
 
+/* Obsidian — neutral dark gray, violet accent */
+[data-theme="obsidian"] {
+  --color-slate-50: #f6f6f8;
+  --color-slate-100: #ebebee;
+  --color-slate-200: #dcdce1;
+  --color-slate-300: #bfbfc7;
+  --color-slate-400: #9b9ba4;
+  --color-slate-500: #71717e;
+  --color-slate-600: #42424a;
+  --color-slate-700: #34343a;
+  --color-slate-800: #262626;
+  --color-slate-900: #1e1e1e;
+  --color-slate-950: #141414;
+  --color-amber-200: #cdc3f8;
+  --color-amber-300: #a99af4;
+  --color-amber-400: #8b6cef;
+  --color-amber-500: #7c5ce6;
+  --color-amber-600: #6849cc;
+  --color-amber-700: #563ca6;
+  --color-amber-800: #452f80;
+  --color-amber-900: #36245f;
+  --color-amber-950: #251841;
+}
+
+/* Linear — near-black, indigo accent */
+[data-theme="linear"] {
+  --color-slate-50: #f7f7f8;
+  --color-slate-100: #ececee;
+  --color-slate-200: #dbdbdf;
+  --color-slate-300: #c0c0c8;
+  --color-slate-400: #9898a2;
+  --color-slate-500: #6e6e7a;
+  --color-slate-600: #383840;
+  --color-slate-700: #28282e;
+  --color-slate-800: #1c1c20;
+  --color-slate-900: #131316;
+  --color-slate-950: #0b0b0d;
+  --color-amber-200: #c2c8f5;
+  --color-amber-300: #9aa4ef;
+  --color-amber-400: #7b87e8;
+  --color-amber-500: #5e6ad2;
+  --color-amber-600: #4f59b3;
+  --color-amber-700: #424a94;
+  --color-amber-800: #363c76;
+  --color-amber-900: #2b3060;
+  --color-amber-950: #1c203f;
+}
+
+/* GitHub Dark */
+[data-theme="github"] {
+  --color-slate-50: #f5f8fa;
+  --color-slate-100: #e6eaef;
+  --color-slate-200: #d1d7de;
+  --color-slate-300: #b7bdc7;
+  --color-slate-400: #9198a1;
+  --color-slate-500: #656c76;
+  --color-slate-600: #2f353d;
+  --color-slate-700: #212830;
+  --color-slate-800: #151b23;
+  --color-slate-900: #0d1117;
+  --color-slate-950: #010409;
+  --color-amber-200: #a5d6ff;
+  --color-amber-300: #79c0ff;
+  --color-amber-400: #58a6ff;
+  --color-amber-500: #4493f8;
+  --color-amber-600: #3a7fd4;
+  --color-amber-700: #316bb0;
+  --color-amber-800: #29578c;
+  --color-amber-900: #21446b;
+  --color-amber-950: #182d49;
+}
+
 /* Light mode — inverted ramp, ink text on paper surfaces */
 [data-theme="light"] {
   --color-slate-950: #f4f6f8;

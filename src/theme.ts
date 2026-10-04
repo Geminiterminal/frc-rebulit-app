@@ -12,6 +12,10 @@ export const THEMES: AppTheme[] = [
   { id: 'blue', label: 'Blue', accent: '#3a78cf', page: '#0c1017' },
   { id: 'red', label: 'Red', accent: '#d64552', page: '#140d0e' },
   { id: 'light', label: 'Light', accent: '#336394', page: '#f4f6f8' },
+  { id: 'obsidian', label: 'Obsidian', accent: '#7c5ce6', page: '#141414' },
+  { id: 'linear', label: 'Linear', accent: '#5e6ad2', page: '#0b0b0d' },
+  { id: 'github', label: 'GitHub', accent: '#58a6ff', page: '#0d1117' },
+  { id: 'notion', label: 'Notion', accent: '#2383e2', page: '#f7f7f5' },
 ];
 
 const STORAGE_KEY = 'frc_theme';
