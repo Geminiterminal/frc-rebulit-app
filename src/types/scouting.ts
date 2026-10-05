@@ -6,11 +6,11 @@ export type DrivetrainType = 'SWERVE' | 'TANK / WEST COAST' | 'MECANUM' | 'OTHER
 
 export type ShooterType = 'FIXED' | 'TURRET' | 'PIVOTING' | 'DUMPER' | 'OTHER';
 
-export type ShootingAccuracy = '<50%' | '50–69%' | '70–84%' | '85–94%' | '95%+' | 'STILL TUNING';
+export type ShootingAccuracy = '<50%' | '50–69%' | '70–84%' | '85–94%' | '95%+';
 
-export type BumpTrenchCapability = 'BOTH' | 'BUMP ONLY' | 'TRENCH ONLY' | 'NEITHER';
+export type BumpTrenchCapability = 'BUMP AND TRENCH' | 'BUMP ONLY' | 'TRENCH ONLY' | 'BOTH' | 'NEITHER';
 
-export type AutoConsistency = 'VERY CONSISTENT' | 'MOSTLY CONSISTENT' | 'SOMETIMES WORKS' | 'RARELY WORKS' | 'STILL TUNING';
+export type AutoConsistency = 'VERY CONSISTENT' | 'MOSTLY CONSISTENT' | 'SOMETIMES WORKS' | 'SOMETIMES' | 'RARELY WORKS' | 'RARELY' | 'STILL TUNING';
 
 export type ReliabilityRating = 'VERY RELIABLE' | 'MOSTLY RELIABLE' | 'SOMEWHAT RELIABLE' | 'UNRELIABLE';
 
@@ -112,6 +112,8 @@ export interface MatchScoutingRecord {
 
   // 2. SCORING
   teleopFuelScored: number;
+  shooterAccuracy?: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXCELLENT';
+  canShootAnywhere?: boolean;
 
   // 3. FIELD ROUTE
   fieldRoute: FieldRouteType;
@@ -127,6 +129,11 @@ export interface MatchScoutingRecord {
   // 6. QUICK OBSERVATION
   quickNote?: string;
   impression?: 1 | 2 | 3 | 4 | 5;
+  rateAuto?: 1 | 2 | 3 | 4 | 5;
+  rateDriving?: 1 | 2 | 3 | 4 | 5;
+  rateShooting?: 1 | 2 | 3 | 4 | 5;
+  rateIntake?: 1 | 2 | 3 | 4 | 5;
+  rateHopper?: 1 | 2 | 3 | 4 | 5;
 
   // Legacy optional fields for backward compatibility with existing data
   autoHighScored?: number;

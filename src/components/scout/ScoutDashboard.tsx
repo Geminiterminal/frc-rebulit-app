@@ -181,163 +181,171 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
         </div>
       )}
 
-      {/* 1. MATCH SCOUTING ASSIGNMENTS BLOCK */}
+      {/* 1. MATCH ASSIGNMENT TABLE/BLOCK */}
       {myMatchTargets.length > 0 && (
-        <div className="p-4 rounded-2xl bg-slate-900 border border-amber-900/40 space-y-2.5 shadow-md">
-          <div className="border-b border-slate-800 pb-2 flex items-center gap-2">
-            <Gamepad2 className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-bold text-white uppercase tracking-wider">
-              Match Scouting Assignments ({myMatchTargets.length})
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-lg">
+          <div className="p-3.5 px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Gamepad2 className="w-4 h-4 text-amber-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-100 font-mono">
+                match assignment
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">
+              {myMatchTargets.length} {myMatchTargets.length === 1 ? 'task' : 'tasks'}
             </span>
           </div>
 
-          <div className="space-y-1.5">
-            {myMatchTargets.map((task) => {
-              const scoutedMatches = teamScoutedMatchesMap[task.teamNumber] || [];
-              const isMatchDone = scoutedMatches.includes(task.matchNumber);
+          <div className="overflow-x-auto">
+            <table className="w-full text-left font-mono text-xs">
+              <thead>
+                <tr className="bg-slate-950/70 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <th className="p-3 pl-4">team#</th>
+                  <th className="p-3">match #</th>
+                  <th className="p-3 pr-4 text-right">scout match</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-850">
+                {myMatchTargets.map((task) => {
+                  const scoutedMatches = teamScoutedMatchesMap[task.teamNumber] || [];
+                  const isMatchDone = scoutedMatches.includes(task.matchNumber);
 
-              // Determine alliance
-              let taskAlliance = task.alliance;
-              if (!taskAlliance) {
-                const sched = teamSchedulesMap[task.teamNumber] || [];
-                const m = sched.find((s) => s.matchNumber === task.matchNumber);
-                if (m) {
-                  if (m.redTeams.includes(task.teamNumber)) taskAlliance = 'red';
-                  else if (m.blueTeams.includes(task.teamNumber)) taskAlliance = 'blue';
-                }
-              }
+                  // Determine alliance
+                  let taskAlliance = task.alliance;
+                  if (!taskAlliance) {
+                    const sched = teamSchedulesMap[task.teamNumber] || [];
+                    const m = sched.find((s) => s.matchNumber === task.matchNumber);
+                    if (m) {
+                      if (m.redTeams.includes(task.teamNumber)) taskAlliance = 'red';
+                      else if (m.blueTeams.includes(task.teamNumber)) taskAlliance = 'blue';
+                    }
+                  }
 
-              return (
-                <div
-                  key={`task-m${task.matchNumber}-t${task.teamNumber}`}
-                  onClick={() => onNavigate('match-scout', task.teamNumber, task.matchNumber, taskAlliance)}
-                  className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-all cursor-pointer ${
-                    isMatchDone
-                      ? 'bg-slate-950 border-emerald-600/40 text-emerald-200 hover:border-emerald-500'
-                      : 'bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 flex-wrap font-mono font-bold text-xs sm:text-sm">
-                    <span className="text-white">Team #{task.teamNumber},</span>
-                    <span className="text-slate-200">Match #{task.matchNumber}</span>
-                    {taskAlliance === 'red' ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-rose-950 text-rose-300 border border-rose-600 shadow-sm">
-                        Red
-                      </span>
-                    ) : taskAlliance === 'blue' ? (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-sky-950 text-sky-300 border border-sky-600 shadow-sm">
-                        Blue
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {isMatchDone && (
-                      <span className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Done</span>
-                      </span>
-                    )}
-
-                    {isMatchDone ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleGenerateTaskQr({ type: 'MATCH', teamNumber: task.teamNumber, matchNumber: task.matchNumber });
-                        }}
-                        className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-100 border border-slate-700 text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors shrink-0 font-mono"
-                      >
-                        <QrCode className="w-3.5 h-3.5 text-slate-300" />
-                        <span>QR</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onNavigate('match-scout', task.teamNumber, task.matchNumber, taskAlliance);
-                        }}
-                        className="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-colors font-mono shrink-0 bg-amber-500 hover:bg-amber-400 text-slate-950 shadow font-black"
-                      >
-                        Scout Match
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                  return (
+                    <tr
+                      key={`task-m${task.matchNumber}-t${task.teamNumber}`}
+                      className="hover:bg-slate-850/50 transition-colors"
+                    >
+                      <td className="p-3 pl-4 font-bold text-white whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span>{task.teamNumber}</span>
+                          {taskAlliance === 'red' && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800 font-bold uppercase">
+                              R
+                            </span>
+                          )}
+                          {taskAlliance === 'blue' && (
+                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800 font-bold uppercase">
+                              B
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-3 font-semibold text-slate-200">
+                        {task.matchNumber}
+                      </td>
+                      <td className="p-3 pr-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {isMatchDone && (
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateTaskQr({ type: 'MATCH', teamNumber: task.teamNumber, matchNumber: task.matchNumber })}
+                              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 text-xs font-bold cursor-pointer inline-flex items-center gap-1"
+                              title="Show QR"
+                            >
+                              <QrCode className="w-3 h-3 text-slate-300" />
+                              <span>QR</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => onNavigate('match-scout', task.teamNumber, task.matchNumber, taskAlliance)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                              isMatchDone
+                                ? 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-800'
+                                : 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow-sm'
+                            }`}
+                          >
+                            {isMatchDone ? 'Edit Match' : 'scout match'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* 2. PIT SCOUTING TARGETS BLOCK */}
+      {/* 2. PIT ASSIGNMENT TABLE/BLOCK */}
       {myTargetTeams.length > 0 && (
-        <div className="p-4 rounded-2xl bg-slate-900 border border-blue-900/40 space-y-2.5 shadow-md">
-          <div className="border-b border-slate-800 pb-2 flex items-center gap-2">
-            <Target className="w-4 h-4 text-blue-400" />
-            <span className="text-xs font-bold text-white uppercase tracking-wider">
-              Pit Scouting Targets ({myTargetTeams.length})
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-lg">
+          <div className="p-3.5 px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-blue-400" />
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-100 font-mono">
+                pit assignment
+              </span>
+            </div>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800">
+              {myTargetTeams.length} {myTargetTeams.length === 1 ? 'team' : 'teams'}
             </span>
           </div>
 
-          <div className="space-y-1.5 font-mono">
-            {myTargetTeams.map((teamNum) => {
-              const status = teamStatuses[teamNum];
-              const isDone = status?.isPitScouted;
+          <div className="overflow-x-auto">
+            <table className="w-full text-left font-mono text-xs">
+              <thead>
+                <tr className="bg-slate-950/70 border-b border-slate-800/80 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <th className="p-3 pl-4">team#</th>
+                  <th className="p-3 pr-4 text-right">scout pit</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-850">
+                {myTargetTeams.map((teamNum) => {
+                  const status = teamStatuses[teamNum];
+                  const isDone = status?.isPitScouted;
 
-              return (
-                <div
-                  key={`pit-${teamNum}`}
-                  onClick={() => onNavigate('pit-scout', teamNum)}
-                  className={`rounded-xl border transition-all overflow-hidden cursor-pointer ${
-                    isDone
-                      ? 'bg-slate-950 border-emerald-600/40 hover:border-emerald-500'
-                      : 'bg-slate-950 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="p-3 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 font-bold text-xs sm:text-sm">
-                      <span className="text-slate-100">Team #{teamNum}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {isDone && (
-                        <span className="text-[10px] font-mono text-emerald-400 font-bold flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Done</span>
-                        </span>
-                      )}
-
-                      {isDone ? (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleGenerateTaskQr({ type: 'PIT', teamNumber: teamNum });
-                          }}
-                          className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-100 border border-slate-700 text-xs font-bold cursor-pointer flex items-center gap-1 transition-colors shrink-0 font-mono"
-                        >
-                          <QrCode className="w-3.5 h-3.5 text-slate-300" />
-                          <span>QR</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onNavigate('pit-scout', teamNum);
-                          }}
-                          className="px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-colors bg-amber-500 hover:bg-amber-400 text-slate-950 shadow"
-                        >
-                          Scout Pit
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                  return (
+                    <tr
+                      key={`pit-${teamNum}`}
+                      className="hover:bg-slate-850/50 transition-colors"
+                    >
+                      <td className="p-3 pl-4 font-bold text-white whitespace-nowrap">
+                        {teamNum}
+                      </td>
+                      <td className="p-3 pr-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {isDone && (
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateTaskQr({ type: 'PIT', teamNumber: teamNum })}
+                              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 text-xs font-bold cursor-pointer inline-flex items-center gap-1"
+                              title="Show QR"
+                            >
+                              <QrCode className="w-3 h-3 text-slate-300" />
+                              <span>QR</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => onNavigate('pit-scout', teamNum)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                              isDone
+                                ? 'bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-800'
+                                : 'bg-blue-600 hover:bg-blue-500 text-white font-black shadow-sm'
+                            }`}
+                          >
+                            {isDone ? 'Edit Pit' : 'scout pit'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

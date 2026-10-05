@@ -261,13 +261,18 @@ export const qrTransferEngine = {
       aw: matchRecord.autoWorked ? 1 : 0,
       af: matchRecord.autoFuelScored || matchRecord.autoHighScored || 0,
       tf: matchRecord.teleopFuelScored || matchRecord.teleopHighScored || 0,
-      fr: matchRecord.fieldRoute === 'BUMP' ? 'B' : matchRecord.fieldRoute === 'TRENCH' ? 'T' : matchRecord.fieldRoute === 'BOTH' ? '2' : 'N',
-      pd: matchRecord.playedDefense ? 1 : 0,
-      de: matchRecord.defenseEffectiveness === 'LOW' ? 'L' : matchRecord.defenseEffectiveness === 'HIGH' ? 'H' : matchRecord.defenseEffectiveness === 'MEDIUM' ? 'M' : undefined,
-      ri: matchRecord.robotIssues === 'MINOR' ? 'm' : matchRecord.robotIssues === 'MAJOR' ? 'M' : matchRecord.robotIssues === 'DISABLED' ? 'D' : 'N',
+      sac: matchRecord.shooterAccuracy || undefined,
+      csa: matchRecord.canShootAnywhere ? 1 : 0,
+      fr: matchRecord.fieldRoute,
+      de: matchRecord.defenseEffectiveness,
+      ri: matchRecord.robotIssues,
       wn: matchRecord.whatHappenedNote || undefined,
       qn: matchRecord.quickNote || matchRecord.notes || undefined,
-      im: matchRecord.impression || undefined,
+      ra: matchRecord.rateAuto,
+      rd: matchRecord.rateDriving,
+      rs: matchRecord.rateShooting,
+      rit: matchRecord.rateIntake,
+      rh: matchRecord.rateHopper,
     };
     const cleanedMatch = cleanEmptyFields(rec);
     const payload = {
@@ -398,22 +403,24 @@ export const qrTransferEngine = {
           const autoFuelScored = d.af !== undefined ? Number(d.af) : Number(d.autoFuelScored || d.autoHighScored || 0);
           const teleopFuelScored = d.tf !== undefined ? Number(d.tf) : Number(d.teleopFuelScored || d.teleopHighScored || 0);
 
-          let fieldRoute: FieldRouteType = 'NEITHER';
-          if (d.fr === 'B' || d.fieldRoute === 'BUMP') fieldRoute = 'BUMP';
-          else if (d.fr === 'T' || d.fieldRoute === 'TRENCH') fieldRoute = 'TRENCH';
-          else if (d.fr === '2' || d.fr === 'BOTH' || d.fieldRoute === 'BOTH') fieldRoute = 'BOTH';
+          const shooterAccuracy = d.sac || d.shooterAccuracy;
+          const canShootAnywhere = d.csa !== undefined ? (d.csa === 1 || d.csa === true) : Boolean(d.canShootAnywhere);
+          const defenseEffectiveness = d.de || d.defenseEffectiveness;
+          const parseRating = (val: any): 1 | 2 | 3 | 4 | 5 | undefined => {
+            const n = Number(val);
+            return (n >= 1 && n <= 5) ? (n as 1 | 2 | 3 | 4 | 5) : undefined;
+          };
 
+          const rateAuto = parseRating(d.ra !== undefined ? d.ra : d.rateAuto);
+          const rateDriving = parseRating(d.rd !== undefined ? d.rd : d.rateDriving);
+          const rateShooting = parseRating(d.rs !== undefined ? d.rs : d.rateShooting);
+          const rateIntake = parseRating(d.rit !== undefined ? d.rit : d.rateIntake);
+          const rateHopper = parseRating(d.rh !== undefined ? d.rh : d.rateHopper);
+
+          let fieldRoute: FieldRouteType = d.fr || 'NEITHER';
           const playedDefense = d.pd !== undefined ? (d.pd === 1 || d.pd === true) : Boolean(d.playedDefense);
 
-          let defenseEffectiveness: DefenseEffectivenessType | undefined = undefined;
-          if (d.de === 'L' || d.defenseEffectiveness === 'LOW') defenseEffectiveness = 'LOW';
-          else if (d.de === 'H' || d.defenseEffectiveness === 'HIGH') defenseEffectiveness = 'HIGH';
-          else if (d.de === 'M' || d.defenseEffectiveness === 'MEDIUM') defenseEffectiveness = 'MEDIUM';
-
-          let robotIssues: RobotIssuesType = 'NONE';
-          if (d.ri === 'm' || d.robotIssues === 'MINOR') robotIssues = 'MINOR';
-          else if (d.ri === 'M' || d.robotIssues === 'MAJOR') robotIssues = 'MAJOR';
-          else if (d.ri === 'D' || d.robotIssues === 'DISABLED') robotIssues = 'DISABLED';
+          let robotIssues: RobotIssuesType = d.ri || 'NONE';
 
           let alliance: 'red' | 'blue' | undefined = undefined;
           if (d.al === 'R' || d.alliance === 'red') alliance = 'red';
@@ -430,10 +437,17 @@ export const qrTransferEngine = {
             autoWorked,
             autoFuelScored,
             teleopFuelScored,
+            shooterAccuracy,
+            canShootAnywhere,
             fieldRoute,
-            playedDefense,
             defenseEffectiveness,
+            playedDefense,
             robotIssues,
+            rateAuto,
+            rateDriving,
+            rateShooting,
+            rateIntake,
+            rateHopper,
             whatHappenedNote: d.wn || d.whatHappenedNote || undefined,
             quickNote: d.qn || d.quickNote || d.notes || undefined,
             impression: d.im || d.impression || undefined,

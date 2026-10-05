@@ -14,9 +14,10 @@ import {
 
 interface SettingsViewProps {
   onNavigate: (view: string) => void;
+  onBack: () => void;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate, onBack }) => {
   const [eventCode, setEventCode] = useState('');
   const [tbaApiKey, setTbaApiKey] = useState('');
   const [bulkInput, setBulkInput] = useState('');

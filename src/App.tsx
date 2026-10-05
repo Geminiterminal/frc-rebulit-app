@@ -49,7 +49,18 @@ export default function App() {
     });
   }, []);
 
+  const [navStack, setNavStack] = useState<{view: string, teamNumber?: number, matches?: number, alliance?: 'red' | 'blue', extraParam?: any}[]>([]);
+
   const handleNavigate = (view: string, teamNumber?: number, extraParam?: any, allianceParam?: 'red' | 'blue') => {
+    // Push current state to stack before navigating
+    setNavStack(prev => [...prev, {
+      view: currentView,
+      teamNumber: selectedTeamNumber,
+      matches: selectedMatchNumber,
+      alliance: selectedAlliance,
+      extraParam: currentView === 'compare' ? compareTeamNums : undefined
+    }]);
+
     if (teamNumber) setSelectedTeamNumber(teamNumber);
     if (typeof teamNumber === 'number' && typeof extraParam === 'number') {
       setSelectedMatchNumber(extraParam);
@@ -71,6 +82,23 @@ export default function App() {
     setCurrentView(view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  const handleBack = () => {
+    if (navStack.length === 0) return;
+    const last = navStack[navStack.length - 1];
+    setNavStack(prev => prev.slice(0, -1));
+    
+    // Restore state
+    if (last.teamNumber) setSelectedTeamNumber(last.teamNumber);
+    if (last.matches) setSelectedMatchNumber(last.matches);
+    if (last.alliance) setSelectedAlliance(last.alliance);
+    if (last.extraParam && last.view === 'compare') setCompareTeamNums(last.extraParam);
+    
+    setCurrentView(last.view);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const hasHistory = navStack.length > 0;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-slate-700 selection:text-white">
@@ -94,13 +122,14 @@ export default function App() {
         ) : (
           <>
             {currentView === 'home' && (
-              <HomeScreen onNavigate={handleNavigate} appMode={appMode} />
+              <HomeScreen onNavigate={handleNavigate} onBack={handleBack} appMode={appMode} />
             )}
 
             {currentView === 'pit-scout' && (
               <PitScoutForm
                 initialTeamNumber={selectedTeamNumber}
                 onNavigate={handleNavigate}
+                onBack={handleBack}
               />
             )}
 
@@ -110,25 +139,27 @@ export default function App() {
                 initialMatchNumber={selectedMatchNumber}
                 initialAlliance={selectedAlliance}
                 onNavigate={handleNavigate}
+                onBack={handleBack}
               />
             )}
 
             {currentView === 'strategy-field' && (
-              <StrategyField onNavigate={handleNavigate} />
+              <StrategyField onNavigate={handleNavigate} onBack={handleBack} />
             )}
 
             {currentView === 'teams' && (
-              <TeamList onNavigate={handleNavigate} />
+              <TeamList onNavigate={handleNavigate} onBack={handleBack} />
             )}
 
             {currentView === 'picklist' && (
-              <PicklistView onNavigate={handleNavigate} />
+              <PicklistView onNavigate={handleNavigate} onBack={handleBack} />
             )}
 
             {currentView === 'compare' && (
               <TeamCompareView
                 initialSelectedTeams={compareTeamNums}
                 onNavigate={handleNavigate}
+                onBack={handleBack}
               />
             )}
 
@@ -136,19 +167,20 @@ export default function App() {
               <TeamProfileView
                 teamNumber={selectedTeamNumber}
                 onNavigate={handleNavigate}
+                onBack={handleBack}
               />
             )}
 
             {currentView === 'event-data' && (
-              <EventDataView onNavigate={handleNavigate} />
+              <EventDataView onNavigate={handleNavigate} onBack={handleBack} />
             )}
 
             {currentView === 'import-export' && (
-              <DataManagement onNavigate={handleNavigate} />
+              <DataManagement onNavigate={handleNavigate} onBack={handleBack} />
             )}
 
             {currentView === 'settings' && (
-              <SettingsView onNavigate={handleNavigate} />
+              <SettingsView onNavigate={handleNavigate} onBack={handleBack} />
             )}
           </>
         )}

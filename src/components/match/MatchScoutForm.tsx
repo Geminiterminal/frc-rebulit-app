@@ -3,7 +3,6 @@ import QRCode from 'qrcode';
 import { 
   MatchScoutingRecord, 
   FieldRouteType, 
-  DefenseEffectivenessType, 
   RobotIssuesType,
   EventScheduleMatch 
 } from '../../types/scouting';
@@ -15,11 +14,12 @@ import {
   ArrowLeft, 
   Check, 
   CheckCircle2,
-  AlertTriangle,
   Zap,
   Target,
   Route,
   Shield,
+  AlertTriangle,
+  Star,
   MessageSquare,
   QrCode,
   X,
@@ -31,6 +31,7 @@ interface MatchScoutFormProps {
   initialMatchNumber?: number;
   initialAlliance?: 'red' | 'blue';
   onNavigate: (view: string, teamNumber?: number, extraParam?: any, allianceParam?: 'red' | 'blue') => void;
+  onBack: () => void;
 }
 
 export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
@@ -38,8 +39,9 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
   initialMatchNumber = 1,
   initialAlliance,
   onNavigate,
+  onBack,
 }) => {
-  // MATCH IDENTIFICATION
+  // MATCH SETUP
   const [matchNumber, setMatchNumber] = useState<number>(initialMatchNumber);
   const [teamNumber, setTeamNumber] = useState<string>(
     initialTeamNumber ? initialTeamNumber.toString() : ''
@@ -47,27 +49,32 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
   const [alliance, setAlliance] = useState<'red' | 'blue' | null>(initialAlliance || null);
   const [teamSchedule, setTeamSchedule] = useState<EventScheduleMatch[]>([]);
 
-  // 1. AUTONOMOUS
+  // AUTO
   const [autoWorked, setAutoWorked] = useState<boolean | null>(null);
   const [autoFuelScored, setAutoFuelScored] = useState<number>(0);
 
-  // 2. SCORING
+  // TELEOP
   const [teleopFuelScored, setTeleopFuelScored] = useState<number>(0);
 
-  // 3. FIELD ROUTE
+  // ROUTE
   const [fieldRoute, setFieldRoute] = useState<FieldRouteType | null>(null);
 
-  // 4. DEFENSE
-  const [playedDefense, setPlayedDefense] = useState<boolean | null>(null);
-  const [defenseEffectiveness, setDefenseEffectiveness] = useState<DefenseEffectivenessType | null>(null);
+  // DEFENSE
+  const [defenseLevel, setDefenseLevel] = useState<'NONE' | 'LOW' | 'MED' | 'HIGH' | null>(null);
 
-  // 5. ROBOT RELIABILITY
+  // ROBOT ISSUE
   const [robotIssues, setRobotIssues] = useState<RobotIssuesType | null>(null);
   const [whatHappenedNote, setWhatHappenedNote] = useState<string>('');
 
-  // 6. QUICK OBSERVATION
+  // MATCH RATING (1-5)
+  const [rateAuto, setRateAuto] = useState<number | null>(null);
+  const [rateDriving, setRateDriving] = useState<number | null>(null);
+  const [rateShooting, setRateShooting] = useState<number | null>(null);
+  const [rateIntake, setRateIntake] = useState<number | null>(null);
+  const [rateHopper, setRateHopper] = useState<number | null>(null);
+
+  // NOTES
   const [quickNote, setQuickNote] = useState<string>('');
-  const [impression, setImpression] = useState<number | null>(null);
 
   // UI state
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -120,21 +127,27 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           setAutoFuelScored(existing.autoFuelScored || existing.autoHighScored || 0);
           setTeleopFuelScored(existing.teleopFuelScored || existing.teleopHighScored || 0);
           setFieldRoute(existing.fieldRoute || null);
-          setPlayedDefense(existing.playedDefense);
-          setDefenseEffectiveness(existing.defenseEffectiveness || null);
           setRobotIssues(existing.robotIssues || null);
           setWhatHappenedNote(existing.whatHappenedNote || '');
           setQuickNote(existing.quickNote || existing.notes || '');
+          setRateAuto(existing.rateAuto || null);
+          setRateDriving(existing.rateDriving || null);
+          setRateShooting(existing.rateShooting || null);
+          setRateIntake(existing.rateIntake || null);
+          setRateHopper(existing.rateHopper || null);
         } else {
           setAutoWorked(null);
           setAutoFuelScored(0);
           setTeleopFuelScored(0);
           setFieldRoute(null);
-          setPlayedDefense(null);
-          setDefenseEffectiveness(null);
           setRobotIssues(null);
           setWhatHappenedNote('');
           setQuickNote('');
+          setRateAuto(null);
+          setRateDriving(null);
+          setRateShooting(null);
+          setRateIntake(null);
+          setRateHopper(null);
         }
       });
     }
@@ -163,14 +176,19 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       autoFuelScored,
       teleopFuelScored,
       fieldRoute: fieldRoute || 'NEITHER',
-      playedDefense: playedDefense === true,
-      defenseEffectiveness: playedDefense === true ? (defenseEffectiveness || 'MEDIUM') : undefined,
+      playedDefense: defenseLevel !== 'NONE',
+      defenseEffectiveness: defenseLevel !== 'NONE' ? (defenseLevel === 'HIGH' ? 'HIGH' : defenseLevel === 'LOW' ? 'LOW' : 'MEDIUM') : undefined,
       robotIssues: robotIssues || 'NONE',
       whatHappenedNote: (robotIssues && robotIssues !== 'NONE') ? whatHappenedNote : undefined,
       quickNote: quickNote.trim() || undefined,
       autoHighScored: autoFuelScored,
       teleopHighScored: teleopFuelScored,
       notes: quickNote,
+      rateAuto: rateAuto as any,
+      rateDriving: rateDriving as any,
+      rateShooting: rateShooting as any,
+      rateIntake: rateIntake as any,
+      rateHopper: rateHopper as any,
     };
 
     await scoutingDB.saveMatch(record);
@@ -200,11 +218,14 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       setAutoFuelScored(0);
       setTeleopFuelScored(0);
       setFieldRoute(null);
-      setPlayedDefense(null);
-      setDefenseEffectiveness(null);
       setRobotIssues(null);
       setWhatHappenedNote('');
       setQuickNote('');
+      setRateAuto(3);
+      setRateDriving(3);
+      setRateShooting(3);
+      setRateIntake(3);
+      setRateHopper(3);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       onNavigate('home');
     }, 1000);
@@ -231,12 +252,16 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       autoFuelScored,
       teleopFuelScored,
       fieldRoute: fieldRoute || 'NEITHER',
-      playedDefense: playedDefense === true,
-      defenseEffectiveness: playedDefense === true ? (defenseEffectiveness || 'MEDIUM') : undefined,
+      playedDefense: defenseLevel !== 'NONE',
+      defenseEffectiveness: defenseLevel !== 'NONE' ? (defenseLevel === 'HIGH' ? 'HIGH' : defenseLevel === 'LOW' ? 'LOW' : 'MEDIUM') : undefined,
       robotIssues: robotIssues || 'NONE',
       whatHappenedNote: (robotIssues && robotIssues !== 'NONE') ? whatHappenedNote : undefined,
       quickNote: quickNote.trim() || undefined,
-      impression: (impression as 1 | 2 | 3 | 4 | 5) || undefined,
+      rateAuto: rateAuto as any,
+      rateDriving: rateDriving as any,
+      rateShooting: rateShooting as any,
+      rateIntake: rateIntake as any,
+      rateHopper: rateHopper as any,
     };
 
     const payloadStr = qrTransferEngine.generateSingleMatchQr(scoutName, record);
@@ -254,7 +279,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
     <form onSubmit={handleSaveMatch} className="max-w-xl mx-auto px-3.5 sm:px-5 py-4 pb-32 flex flex-col gap-4">
       {/* Toast */}
       {toastMessage && (
-        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-slate-100 font-mono font-bold text-xs px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 border border-slate-700 animate-bounce">
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-800 text-slate-100 font-mono font-bold text-xs px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 border border-slate-700">
           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           <span>{toastMessage}</span>
         </div>
@@ -289,11 +314,11 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-100 font-bold font-mono text-xs uppercase shadow transition-all cursor-pointer border border-slate-700"
         >
           <Save className="w-4 h-4" />
-          <span>SAVE</span>
+          <span>SAVE MATCH</span>
         </button>
       </div>
 
-      {/* MATCH IDENTIFICATION */}
+      {/* MATCH SETUP */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
         <div className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
           Match Setup
@@ -334,12 +359,12 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           {/* Team Number */}
           <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between gap-1.5">
             <span className="text-[11px] font-mono font-bold uppercase text-slate-400">
-              Team Number
+              Team #
             </span>
             <input
               type="number"
               required
-              placeholder="Team #"
+              placeholder="Team Number"
               value={teamNumber}
               onChange={(e) => setTeamNumber(e.target.value)}
               className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 px-2.5 text-base font-mono font-bold text-white placeholder-slate-600 focus:outline-none focus:border-slate-600"
@@ -350,7 +375,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         {/* Alliance Selector */}
         <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 space-y-1.5">
           <span className="text-[11px] font-mono font-bold uppercase text-slate-400 block">
-            Alliance Color
+            Alliance
           </span>
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -363,7 +388,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
               }`}
             >
               <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-              <span>Red Alliance</span>
+              <span>RED</span>
             </button>
 
             <button
@@ -376,7 +401,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
               }`}
             >
               <span className="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block" />
-              <span>Blue Alliance</span>
+              <span>BLUE</span>
             </button>
           </div>
         </div>
@@ -417,14 +442,14 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         )}
       </div>
 
-      {/* 1. AUTONOMOUS */}
+      {/* AUTO */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
         <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
           <Zap className="w-3.5 h-3.5 text-slate-400" />
-          <span>1. Autonomous</span>
+          <span>AUTO</span>
         </div>
 
-        {/* Auto Worked */}
+        {/* Auto Worked? */}
         <div>
           <span className="block text-[11px] font-mono font-semibold uppercase text-slate-400 mb-1.5">
             Auto Worked?
@@ -461,7 +486,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         {/* Auto Fuel Counter */}
         <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
           <div className="flex items-center justify-between text-xs font-mono text-slate-300">
-            <span>Auto Fuel Scored</span>
+            <span>Auto Fuel</span>
             <span className="text-base font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-100">
               {autoFuelScored}
             </span>
@@ -471,47 +496,51 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, -20))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
             >
               −20
             </button>
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, -5))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
             >
               −5
             </button>
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, -1))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
             >
               −1
             </button>
 
-            <div className="py-2 rounded-lg bg-slate-900 text-slate-100 font-mono font-bold text-xs border border-slate-800 flex items-center justify-center">
-              {autoFuelScored}
-            </div>
+            <button
+              type="button"
+              onClick={() => setAutoFuelScored(0)}
+              className="py-2 rounded-lg bg-slate-900 text-slate-100 font-mono font-bold text-xs border border-slate-800 flex items-center justify-center cursor-pointer"
+            >
+              0
+            </button>
 
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, 1))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
             >
               +1
             </button>
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, 5))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
             >
               +5
             </button>
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, 20))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
             >
               +20
             </button>
@@ -519,16 +548,16 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         </div>
       </div>
 
-      {/* 2. SCORING */}
+      {/* TELEOP */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
         <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
           <Target className="w-3.5 h-3.5 text-slate-400" />
-          <span>2. Teleop Scoring</span>
+          <span>TELEOP</span>
         </div>
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs font-mono text-slate-300">
-            <span>Teleop Fuel Scored</span>
+            <span>Fuel Scored</span>
             <span className="text-base font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-100">
               {teleopFuelScored}
             </span>
@@ -538,47 +567,51 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, -20))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
             >
               −20
             </button>
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, -5))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
             >
               −5
             </button>
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, -1))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
             >
               −1
             </button>
 
-            <div className="py-2 rounded-lg bg-slate-900 text-slate-100 font-mono font-bold text-xs border border-slate-800 flex items-center justify-center">
-              {teleopFuelScored}
-            </div>
+            <button
+              type="button"
+              onClick={() => setTeleopFuelScored(0)}
+              className="py-2 rounded-lg bg-slate-900 text-slate-100 font-mono font-bold text-xs border border-slate-800 flex items-center justify-center cursor-pointer"
+            >
+              0
+            </button>
 
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, 1))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
             >
               +1
             </button>
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, 5))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
             >
               +5
             </button>
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, 20))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850"
+              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
             >
               +20
             </button>
@@ -586,11 +619,11 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         </div>
       </div>
 
-      {/* 3. FIELD ROUTE */}
+      {/* ROUTE */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
         <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
           <Route className="w-3.5 h-3.5 text-slate-400" />
-          <span>3. Field Route</span>
+          <span>ROUTE</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -611,74 +644,36 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         </div>
       </div>
 
-      {/* 4. DEFENSE */}
-      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2.5">
+      {/* DEFENSE */}
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
         <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
           <Shield className="w-3.5 h-3.5 text-slate-400" />
-          <span>4. Defense</span>
+          <span>DEFENSE</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setPlayedDefense(true)}
-            className={`py-2 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              playedDefense === true
-                ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
-                : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
-            }`}
-          >
-            {playedDefense === true && <Check className="w-3.5 h-3.5 text-amber-400" />}
-            <span>YES</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setPlayedDefense(false);
-              setDefenseEffectiveness(null);
-            }}
-            className={`py-2 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-              playedDefense === false
-                ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
-                : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
-            }`}
-          >
-            {playedDefense === false && <Check className="w-3.5 h-3.5 text-slate-400" />}
-            <span>NO</span>
-          </button>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {(['NONE', 'LOW', 'MED', 'HIGH'] as const).map((lvl) => (
+            <button
+              key={lvl}
+              type="button"
+              onClick={() => setDefenseLevel(lvl)}
+              className={`py-2.5 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer ${
+                defenseLevel === lvl
+                  ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
+                  : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
+              }`}
+            >
+              {lvl}
+            </button>
+          ))}
         </div>
-
-        {playedDefense === true && (
-          <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
-            <span className="block text-[11px] font-mono font-semibold uppercase text-slate-400">
-              Defense Effectiveness
-            </span>
-            <div className="grid grid-cols-3 gap-2">
-              {(['LOW', 'MEDIUM', 'HIGH'] as DefenseEffectivenessType[]).map((eff) => (
-                <button
-                  key={eff}
-                  type="button"
-                  onClick={() => setDefenseEffectiveness(eff)}
-                  className={`py-2 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer ${
-                    defenseEffectiveness === eff
-                      ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
-                      : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
-                  }`}
-                >
-                  {eff}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* 5. ROBOT RELIABILITY */}
+      {/* ROBOT ISSUE */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2.5">
         <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
           <AlertTriangle className="w-3.5 h-3.5 text-slate-400" />
-          <span>5. Issues</span>
+          <span>ROBOT ISSUE</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -711,19 +706,124 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         )}
       </div>
 
-      {/* 6. QUICK OBSERVATION */}
+      {/* MATCH RATING */}
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
+        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+          <Star className="w-3.5 h-3.5 text-amber-400" />
+          <span>MATCH RATING</span>
+        </div>
+
+        <div className="space-y-3 text-xs font-mono">
+          {/* Rate Auto */}
+          <div className="flex items-center justify-between">
+            <span className="text-slate-300 uppercase font-bold">Rate Auto</span>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={`auto-${n}`}
+                  type="button"
+                  onClick={() => setRateAuto(n)}
+                  className={`w-7 h-7 rounded-lg font-bold flex items-center justify-center cursor-pointer transition-colors ${
+                    (rateAuto || 0) >= n ? 'bg-amber-500 text-slate-950' : 'bg-slate-950 text-slate-500 border border-slate-850'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Rate Driving */}
+          <div className="flex items-center justify-between">
+            <span className="text-slate-300 uppercase font-bold">Rate Driving</span>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={`drive-${n}`}
+                  type="button"
+                  onClick={() => setRateDriving(n)}
+                  className={`w-7 h-7 rounded-lg font-bold flex items-center justify-center cursor-pointer transition-colors ${
+                    (rateDriving || 0) >= n ? 'bg-amber-500 text-slate-950' : 'bg-slate-950 text-slate-500 border border-slate-850'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Rate Shooting */}
+          <div className="flex items-center justify-between">
+            <span className="text-slate-300 uppercase font-bold">Rate Shooting</span>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={`shoot-${n}`}
+                  type="button"
+                  onClick={() => setRateShooting(n)}
+                  className={`w-7 h-7 rounded-lg font-bold flex items-center justify-center cursor-pointer transition-colors ${
+                    (rateShooting || 0) >= n ? 'bg-amber-500 text-slate-950' : 'bg-slate-950 text-slate-500 border border-slate-850'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Rate Intake */}
+          <div className="flex items-center justify-between">
+            <span className="text-slate-300 uppercase font-bold">Rate Intake</span>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={`intake-${n}`}
+                  type="button"
+                  onClick={() => setRateIntake(n)}
+                  className={`w-7 h-7 rounded-lg font-bold flex items-center justify-center cursor-pointer transition-colors ${
+                    (rateIntake || 0) >= n ? 'bg-amber-500 text-slate-950' : 'bg-slate-950 text-slate-500 border border-slate-850'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Rate Hopper */}
+          <div className="flex items-center justify-between">
+            <span className="text-slate-300 uppercase font-bold">Rate Hopper</span>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button
+                  key={`hopper-${n}`}
+                  type="button"
+                  onClick={() => setRateHopper(n)}
+                  className={`w-7 h-7 rounded-lg font-bold flex items-center justify-center cursor-pointer transition-colors ${
+                    (rateHopper || 0) >= n ? 'bg-amber-500 text-slate-950' : 'bg-slate-950 text-slate-500 border border-slate-850'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* NOTES */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
         <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
           <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
-          <span>6. Notes</span>
+          <span>Notes</span>
         </div>
 
         <textarea
           rows={2}
-          placeholder="Observations..."
+          placeholder="Quick note..."
           value={quickNote}
           onChange={(e) => setQuickNote(e.target.value)}
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600 resize-none"
+          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600 resize-none font-mono"
         />
       </div>
 

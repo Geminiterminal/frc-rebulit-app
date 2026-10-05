@@ -145,19 +145,17 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
 
     if (newScoutRole === 'PIT_SCOUT') {
       finalTeams = [...selectedTeamNums];
+      if (manualTeamInput.trim()) {
+        const parsedNums = manualTeamInput
+          .split(',')
+          .map((n) => parseInt(n.trim(), 10))
+          .filter((n) => !isNaN(n) && n > 0);
+        finalTeams = Array.from(new Set([...finalTeams, ...parsedNums]));
+      }
     } else {
-      // Match Scout
+      // Match Scout: only match targets, no pit teams
       finalTargets = [...selectedMatchTargets];
-      const targetTeamNums = selectedMatchTargets.map((mt) => mt.teamNumber);
-      finalTeams = Array.from(new Set([...selectedTeamNums, ...targetTeamNums]));
-    }
-
-    if (manualTeamInput.trim()) {
-      const parsedNums = manualTeamInput
-        .split(',')
-        .map((n) => parseInt(n.trim(), 10))
-        .filter((n) => !isNaN(n) && n > 0);
-      finalTeams = Array.from(new Set([...finalTeams, ...parsedNums]));
+      finalTeams = [];
     }
 
     scoutingAssignments.assignTeamsToScout(
@@ -188,9 +186,9 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
     const payloadStr = qrTransferEngine.generateAssignmentPayload(
       assignment.scoutName,
       roleType,
-      assignment.assignedTeams,
-      assignment.matchNumber,
-      assignment.matchTargets
+      isPit ? (assignment.assignedTeams || []) : [],
+      isPit ? undefined : assignment.matchNumber,
+      isPit ? undefined : (assignment.matchTargets || assignment.matchTasks)
     );
 
     try {

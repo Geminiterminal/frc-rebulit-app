@@ -27,12 +27,12 @@ export const AutonomousDrawer: React.FC<AutonomousDrawerProps> = ({
   onSave,
   readOnly = false,
 }) => {
-  const [paths, setPaths] = useState<DrawingPath[]>(drawing?.paths || []);
-  const [history, setHistory] = useState<DrawingPath[][]>([drawing?.paths || []]);
+  const [paths, setPaths] = useState<DrawingPath[]>(drawing?.paths ?? []);
+  const [history, setHistory] = useState<DrawingPath[][]>(drawing?.paths ? [drawing.paths] : [[]]);
   const [historyStep, setHistoryStep] = useState<number>(0);
 
   const [startPos, setStartPos] = useState<StartPosition | undefined>(
-    drawing?.startPosition || { x: 50, y: 15, angle: 180, label: 'Start' }
+    drawing?.startPosition
   );
 
   const [activeTool, setActiveTool] = useState<'draw' | 'start-pos'>('draw');
@@ -47,8 +47,8 @@ export const AutonomousDrawer: React.FC<AutonomousDrawerProps> = ({
 
   useEffect(() => {
     if (drawing) {
-      setPaths(drawing.paths || []);
-      setHistory([drawing.paths || []]);
+      setPaths(drawing.paths ?? []);
+      setHistory(drawing.paths ? [drawing.paths] : [[]]);
       setHistoryStep(0);
       setStartPos(drawing.startPosition);
     }

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { TeamProfile, MatchScoutingRecord, ShooterType } from '../../types/scouting';
+import { TeamProfile, MatchScoutingRecord } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
 import { tbaApi } from '../../utils/tbaApi';
 import { 
+  ArrowLeft,
   ArrowUpDown, 
-  Filter, 
   CheckSquare, 
   Square, 
   Edit3, 
@@ -12,29 +12,23 @@ import {
   ChevronUp, 
   ChevronDown, 
   GripVertical, 
-  RotateCcw, 
   UserX, 
   UserCheck, 
   ChevronRight,
   Ban,
-  SlidersHorizontal,
   RefreshCw
 } from 'lucide-react';
 
 interface PicklistViewProps {
   onNavigate: (view: string, teamNumber?: number, extraParam?: any) => void;
+  onBack: () => void;
 }
 
 export type SortOption = 
   | 'preferenceRank'
   | 'officialRank'
-  | 'stateRank'
   | 'totalFuel' 
-  | 'autoSuccess' 
   | 'autoFuel' 
-  | 'reliability' 
-  | 'defense' 
-  | 'defenseEffectiveness' 
   | 'matchesScouted';
 
 interface EnrichedTeam {
@@ -42,22 +36,17 @@ interface EnrichedTeam {
   teamNumber: number;
   teamName: string;
   matchesCount: number;
-  autoSuccessRatio: number;
-  autoSuccessStr: string;
-  avgAutoFuel: number;
-  avgTeleopFuel: number;
+  highestFuel: number;
+  lowestFuel: number;
   avgTotalFuel: number;
-  reliabilityVal: number;
-  reliabilityLabel: string;
-  defenseVal: number;
-  defenseLabel: string;
+  avgAutoFuel: number;
+  hopperCapacity: number | string;
   officialRank?: number;
-  stateRank?: number;
   customPicklistRank?: number;
   isUnavailable: boolean;
 }
 
-export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
+export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }) => {
   const [teams, setTeams] = useState<TeamProfile[]>([]);
   const [matches, setMatches] = useState<MatchScoutingRecord[]>([]);
   const [sortBy, setSortBy] = useState<SortOption>('preferenceRank');
@@ -66,18 +55,9 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
   const [separateUnavailable, setSeparateUnavailable] = useState<boolean>(true);
   const [isUnavailableCollapsed, setIsUnavailableCollapsed] = useState<boolean>(false);
 
-  // Advanced Filter Variables State
-  const [showFilterModal, setShowFilterModal] = useState<boolean>(false);
-  const [filterDrivetrain, setFilterDrivetrain] = useState<string>('ALL');
-  const [filterShooter, setFilterShooter] = useState<string>('ALL');
-  const [filterCapability, setFilterCapability] = useState<string>('ALL');
-  const [filterReliability, setFilterReliability] = useState<string>('ALL');
-  const [filterDefense, setFilterDefense] = useState<string>('ALL');
-  const [filterAuto, setFilterAuto] = useState<string>('ALL');
-
   // Manual rank editing state
   const [editingRankTeamNum, setEditingRankTeamNum] = useState<number | null>(null);
-  const [editingRankType, setEditingRankType] = useState<'official' | 'state' | 'preference' | null>(null);
+  const [editingRankType, setEditingRankType] = useState<'official' | 'preference' | null>(null);
   const [tempRankValue, setTempRankValue] = useState<string>('');
 
   // Drag and drop state
@@ -238,34 +218,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     await scoutingDB.saveTeamsBatch(reindexed);
   };
 
-  const handleInitializeFrom = async (criterion: 'officialRank' | 'fuel' | 'stateRank') => {
-    const sorted = [...teams].sort((a, b) => {
-      if (criterion === 'officialRank') {
-        const rA = a.officialRank ?? 9999;
-        const rB = b.officialRank ?? 9999;
-        return rA - rB;
-      } else if (criterion === 'stateRank') {
-        const rA = a.stateRank ?? 9999;
-        const rB = b.stateRank ?? 9999;
-        return rA - rB;
-      } else {
-        const fuelA = matches.filter((m) => m.teamNumber === a.teamNumber).reduce((sum, m) => sum + (m.autoFuelScored || 0) + (m.teleopFuelScored || 0), 0);
-        const fuelB = matches.filter((m) => m.teamNumber === b.teamNumber).reduce((sum, m) => sum + (m.autoFuelScored || 0) + (m.teleopFuelScored || 0), 0);
-        return fuelB - fuelA;
-      }
-    });
-
-    const reindexed = sorted.map((t, idx) => ({
-      ...t,
-      customPicklistRank: idx + 1,
-    }));
-
-    setTeams(reindexed);
-    setSortBy('preferenceRank');
-    await scoutingDB.saveTeamsBatch(reindexed);
-  };
-
-  const handleSaveManualRank = async (teamNum: number, rankType: 'official' | 'state') => {
+  const handleSaveManualRank = async (teamNum: number, rankType: 'official') => {
     const targetTeam = teams.find((t) => t.teamNumber === teamNum);
     if (!targetTeam) return;
 
@@ -274,7 +227,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
 
     const updated = {
       ...targetTeam,
-      [rankType === 'official' ? 'officialRank' : 'stateRank']: newRank,
+      officialRank: newRank,
       updatedAt: Date.now(),
     };
 
@@ -297,105 +250,31 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
     }
   };
 
-  const resetAllFilters = () => {
-    setFilterDrivetrain('ALL');
-    setFilterShooter('ALL');
-    setFilterCapability('ALL');
-    setFilterReliability('ALL');
-    setFilterDefense('ALL');
-    setFilterAuto('ALL');
-    setFilterQuery('');
-  };
-
-  const activeFilterCount = 
-    (filterDrivetrain !== 'ALL' ? 1 : 0) +
-    (filterShooter !== 'ALL' ? 1 : 0) +
-    (filterCapability !== 'ALL' ? 1 : 0) +
-    (filterReliability !== 'ALL' ? 1 : 0) +
-    (filterDefense !== 'ALL' ? 1 : 0) +
-    (filterAuto !== 'ALL' ? 1 : 0);
-
   const enrichedTeams: EnrichedTeam[] = teams.map((team) => {
     const teamMatches = matches.filter((m) => m.teamNumber === team.teamNumber);
     const count = teamMatches.length;
 
-    const autoWorkedCount = teamMatches.filter((m) => m.autoWorked !== false).length;
-    const autoSuccessRatio = count > 0 ? autoWorkedCount / count : 0;
-    const autoSuccessStr = count > 0 ? `${autoWorkedCount}/${count}` : '0/0';
+    const totalFuelValues = teamMatches.map((m) => (m.autoFuelScored ?? m.autoHighScored ?? 0) + (m.teleopFuelScored ?? m.teleopHighScored ?? 0));
+    const autoFuelValues = teamMatches.map((m) => m.autoFuelScored ?? m.autoHighScored ?? 0);
 
-    const avgAutoFuel = count
-      ? teamMatches.reduce((sum, m) => sum + (m.autoFuelScored ?? m.autoHighScored ?? 0), 0) / count
-      : 0;
+    const highestFuel = count > 0 ? Math.max(...totalFuelValues) : 0;
+    const lowestFuel = count > 0 ? Math.min(...totalFuelValues) : 0;
+    const avgTotalFuel = count > 0 ? totalFuelValues.reduce((a, b) => a + b, 0) / count : 0;
+    const avgAutoFuel = count > 0 ? autoFuelValues.reduce((a, b) => a + b, 0) / count : 0;
 
-    const avgTeleopFuel = count
-      ? teamMatches.reduce((sum, m) => sum + (m.teleopFuelScored ?? m.teleopHighScored ?? 0), 0) / count
-      : 0;
-
-    const avgTotalFuel = avgAutoFuel + avgTeleopFuel;
-
-    let reliabilityVal = 0;
-    let reliabilityLabel = 'N/A';
-
-    if (count > 0) {
-      const majorIssues = teamMatches.filter((m) => m.robotIssues === 'MAJOR' || m.robotIssues === 'DISABLED').length;
-      const minorIssues = teamMatches.filter((m) => m.robotIssues === 'MINOR').length;
-      if (majorIssues >= 2) {
-        reliabilityVal = 1;
-        reliabilityLabel = 'LOW';
-      } else if (majorIssues === 1 || minorIssues >= 2) {
-        reliabilityVal = 2;
-        reliabilityLabel = 'MED';
-      } else {
-        reliabilityVal = 3;
-        reliabilityLabel = 'HIGH';
-      }
-    } else if (team.pit?.reliability) {
-      if (team.pit.reliability === 'VERY RELIABLE') {
-        reliabilityVal = 3;
-        reliabilityLabel = 'HIGH';
-      } else if (team.pit.reliability === 'MOSTLY RELIABLE') {
-        reliabilityVal = 2;
-        reliabilityLabel = 'MED';
-      } else if (team.pit.reliability === 'SOMEWHAT RELIABLE') {
-        reliabilityVal = 1;
-        reliabilityLabel = 'LOW';
-      }
-    }
-
-    const defenseMatches = teamMatches.filter((m) => m.playedDefense);
-    let defenseVal = 0;
-    let defenseLabel = 'NONE';
-    if (defenseMatches.length > 0) {
-      const highDef = defenseMatches.filter((m) => m.defenseEffectiveness === 'HIGH').length;
-      const medDef = defenseMatches.filter((m) => m.defenseEffectiveness === 'MEDIUM').length;
-      if (highDef > 0) {
-        defenseVal = 3;
-        defenseLabel = 'HIGH';
-      } else if (medDef > 0) {
-        defenseVal = 2;
-        defenseLabel = 'MED';
-      } else {
-        defenseVal = 1;
-        defenseLabel = 'LOW';
-      }
-    }
+    const hopperCapacity = team.pit?.hopperCapacity !== undefined ? team.pit.hopperCapacity : '—';
 
     return {
       team,
       teamNumber: team.teamNumber,
       teamName: team.teamName,
       matchesCount: count,
-      autoSuccessRatio,
-      autoSuccessStr,
-      avgAutoFuel,
-      avgTeleopFuel,
+      highestFuel,
+      lowestFuel,
       avgTotalFuel,
-      reliabilityVal,
-      reliabilityLabel,
-      defenseVal,
-      defenseLabel,
+      avgAutoFuel,
+      hopperCapacity,
       officialRank: team.officialRank,
-      stateRank: team.stateRank,
       customPicklistRank: team.customPicklistRank,
       isUnavailable: !!team.isUnavailable,
     };
@@ -410,25 +289,13 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
       }
       case 'totalFuel':
         return b.avgTotalFuel - a.avgTotalFuel;
-      case 'autoSuccess':
-        return b.autoSuccessRatio - a.autoSuccessRatio;
       case 'autoFuel':
         return b.avgAutoFuel - a.avgAutoFuel;
-      case 'reliability':
-        return b.reliabilityVal - a.reliabilityVal;
-      case 'defense':
-      case 'defenseEffectiveness':
-        return b.defenseVal - a.defenseVal;
       case 'matchesScouted':
         return b.matchesCount - a.matchesCount;
       case 'officialRank': {
         const rA = a.officialRank !== undefined ? a.officialRank : 999;
         const rB = b.officialRank !== undefined ? b.officialRank : 999;
-        return rA - rB;
-      }
-      case 'stateRank': {
-        const rA = a.stateRank !== undefined ? a.stateRank : 999;
-        const rB = b.stateRank !== undefined ? b.stateRank : 999;
         return rA - rB;
       }
       default:
@@ -439,40 +306,8 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
   const filteredTeams = enrichedTeams.filter((item) => {
     if (filterQuery) {
       const q = filterQuery.toLowerCase();
-      const matchQuery = item.teamNumber.toString().includes(q) || item.teamName.toLowerCase().includes(q);
-      if (!matchQuery) return false;
+      return item.teamNumber.toString().includes(q) || item.teamName.toLowerCase().includes(q);
     }
-
-    if (filterDrivetrain !== 'ALL') {
-      const dt = item.team.pit?.drivetrain || '';
-      if (dt !== filterDrivetrain) return false;
-    }
-
-    if (filterShooter !== 'ALL') {
-      const shooters = item.team.pit?.shooter || [];
-      if (!shooters.includes(filterShooter as ShooterType)) return false;
-    }
-
-    if (filterCapability !== 'ALL') {
-      const cap = item.team.pit?.bumpTrench || '';
-      if (cap !== filterCapability) return false;
-    }
-
-    if (filterReliability !== 'ALL') {
-      if (filterReliability === 'HIGH' && item.reliabilityLabel !== 'HIGH') return false;
-      if (filterReliability === 'MED+' && item.reliabilityLabel === 'LOW') return false;
-    }
-
-    if (filterDefense !== 'ALL') {
-      if (filterDefense === 'HIGH' && item.defenseLabel !== 'HIGH') return false;
-      if (filterDefense === 'ANY' && item.defenseLabel === 'NONE') return false;
-    }
-
-    if (filterAuto !== 'ALL') {
-      if (filterAuto === 'HAS_AUTO' && item.team.pit?.hasAutonomous === 'NO') return false;
-      if (filterAuto === 'CONSISTENT_AUTO' && item.autoSuccessRatio < 0.75) return false;
-    }
-
     return true;
   });
 
@@ -483,7 +318,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
   const renderTeamRow = (item: EnrichedTeam, displayIndex: number, isUnavailableSection: boolean = false) => {
     const isSelected = selectedTeamNums.includes(item.teamNumber);
     const isEditingOfficial = editingRankTeamNum === item.teamNumber && editingRankType === 'official';
-    const isEditingState = editingRankTeamNum === item.teamNumber && editingRankType === 'state';
     const isEditingPref = editingRankTeamNum === item.teamNumber && editingRankType === 'preference';
 
     const rowUnavailable = item.isUnavailable;
@@ -504,7 +338,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
         } ${draggedTeamNum === item.teamNumber ? 'opacity-30 border-2 border-dashed border-slate-500' : ''}`}
       >
         {/* Availability Cross-off */}
-        <td className="p-3 text-center">
+        <td className="p-2 sm:p-3 text-center">
           <button
             type="button"
             onClick={() => handleToggleUnavailable(item.teamNumber, item.isUnavailable)}
@@ -524,7 +358,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
         </td>
 
         {/* Compare Checkbox */}
-        <td className="p-3 text-center">
+        <td className="p-2 sm:p-3 text-center">
           <button
             type="button"
             onClick={() => toggleSelectTeam(item.teamNumber)}
@@ -539,8 +373,121 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
           </button>
         </td>
 
-        {/* Custom Rank */}
-        <td className="p-3 text-center">
+        {/* Team Number and Name */}
+        <td className="p-2 sm:p-3">
+          <div className="flex flex-col">
+            <div className="flex items-center gap-1.5">
+              <span 
+                onClick={() => onNavigate('team-profile', item.teamNumber)}
+                className={`font-mono font-bold text-sm cursor-pointer hover:underline ${
+                  rowUnavailable 
+                    ? 'line-through text-slate-500' 
+                    : 'text-slate-100'
+                }`}
+              >
+                #{item.teamNumber}
+              </span>
+              {rowUnavailable && (
+                <span className="px-1.5 py-0.2 rounded bg-rose-950 text-rose-400 border border-rose-800 text-[9px] font-mono font-bold uppercase">
+                  PICKED
+                </span>
+              )}
+            </div>
+            <span className={`text-[10px] truncate max-w-[100px] ${rowUnavailable ? 'line-through text-slate-600' : 'text-slate-400'}`}>
+              {item.teamName}
+            </span>
+          </div>
+        </td>
+
+        {/* Matches */}
+        <td className="p-2 sm:p-3 text-center font-mono font-bold text-slate-300">
+          <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
+            {item.matchesCount}
+          </span>
+        </td>
+
+        {/* Highest Fuel */}
+        <td className="p-2 sm:p-3 text-center font-mono font-bold text-emerald-400">
+          <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
+            {item.highestFuel}
+          </span>
+        </td>
+
+        {/* Lowest Fuel */}
+        <td className="p-2 sm:p-3 text-center font-mono font-bold text-amber-400">
+          <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
+            {item.lowestFuel}
+          </span>
+        </td>
+
+        {/* Avg Fuel */}
+        <td className="p-2 sm:p-3 text-center font-mono font-bold text-slate-100 text-sm">
+          <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
+            {item.avgTotalFuel.toFixed(1)}
+          </span>
+        </td>
+
+        {/* Avg Auto Fuel */}
+        <td className="p-2 sm:p-3 text-center font-mono font-bold text-blue-400">
+          <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
+            {item.avgAutoFuel.toFixed(1)}
+          </span>
+        </td>
+
+        {/* Hopper Capacity */}
+        <td className="p-2 sm:p-3 text-center font-mono font-bold text-slate-300">
+          <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
+            {item.hopperCapacity}
+          </span>
+        </td>
+
+        {/* Event Rank */}
+        <td className="p-2 sm:p-3 text-center font-mono font-bold">
+          {isEditingOfficial ? (
+            <div className="flex items-center justify-center gap-1">
+              <input
+                type="number"
+                value={tempRankValue}
+                onChange={(e) => setTempRankValue(e.target.value)}
+                placeholder="Rank #"
+                autoFocus
+                className="w-14 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-center font-mono text-xs text-white focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveManualRank(item.teamNumber, 'official');
+                  if (e.key === 'Escape') setEditingRankTeamNum(null);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => handleSaveManualRank(item.teamNumber, 'official')}
+                className="p-1 rounded bg-slate-800 text-white cursor-pointer"
+              >
+                <Check className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-1 group">
+              <span className={item.officialRank ? 'text-slate-200 font-bold' : 'text-slate-500 font-bold'}>
+                {item.officialRank ? `#${item.officialRank}` : '—'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingRankTeamNum(item.teamNumber);
+                  setEditingRankType('official');
+                  setTempRankValue(item.officialRank ? item.officialRank.toString() : '');
+                }}
+                className="opacity-40 group-hover:opacity-100 p-1 text-slate-400 hover:text-white transition-opacity cursor-pointer"
+                title="Edit Event Rank"
+              >
+                <Edit3 className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+        </td>
+
+        {/* FRC Rank (Custom Picklist Rank) */}
+        <td className="p-2 sm:p-3 text-center">
           {isEditingPref ? (
             <div className="flex items-center justify-center gap-1">
               <input
@@ -568,23 +515,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
               {sortBy === 'preferenceRank' && !rowUnavailable && (
                 <div className="flex items-center gap-0.5 text-slate-500 mr-0.5">
                   <GripVertical className="w-3.5 h-3.5 text-slate-600 cursor-grab hidden sm:inline" />
-                  <div className="flex flex-col -space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => handleMovePreference(item.teamNumber, 'UP')}
-                      disabled={displayIndex === 0}
-                      className="p-0.5 hover:text-white text-slate-500 disabled:opacity-20 cursor-pointer"
-                    >
-                      <ChevronUp className="w-3 h-3" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMovePreference(item.teamNumber, 'DOWN')}
-                      className="p-0.5 hover:text-white text-slate-500 cursor-pointer"
-                    >
-                      <ChevronDown className="w-3 h-3" />
-                    </button>
-                  </div>
                 </div>
               )}
               <span
@@ -596,7 +526,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
                 className={`font-mono font-bold text-xs px-2 py-0.5 rounded cursor-pointer transition-colors ${
                   rowUnavailable
                     ? 'text-slate-500 bg-slate-900 line-through'
-                    : 'text-slate-300 bg-slate-900/80 hover:bg-slate-800'
+                    : 'text-amber-400 bg-slate-900/80 hover:bg-slate-800'
                 }`}
               >
                 #{item.customPicklistRank ?? displayIndex + 1}
@@ -605,158 +535,8 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
           )}
         </td>
 
-        {/* Team Number and Name */}
-        <td className="p-3">
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <span 
-                onClick={() => onNavigate('team-profile', item.teamNumber)}
-                className={`font-mono font-bold text-sm cursor-pointer hover:underline ${
-                  rowUnavailable 
-                    ? 'line-through text-slate-500' 
-                    : 'text-slate-100'
-                }`}
-              >
-                #{item.teamNumber}
-              </span>
-              {rowUnavailable && (
-                <span className="px-1.5 py-0.2 rounded bg-rose-950 text-rose-400 border border-rose-800 text-[9px] font-mono font-bold uppercase">
-                  PICKED
-                </span>
-              )}
-            </div>
-            <span className={`text-[11px] truncate max-w-[120px] ${rowUnavailable ? 'line-through text-slate-600' : 'text-slate-400'}`}>
-              {item.teamName}
-            </span>
-          </div>
-        </td>
-
-        {/* Auto Success */}
-        <td className="p-3 text-center font-mono font-bold text-slate-300">
-          <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
-            {item.autoSuccessStr}
-          </span>
-        </td>
-
-        {/* Total Fuel */}
-        <td className="p-3 text-center font-mono font-bold text-slate-200 text-sm">
-          <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
-            {item.avgTotalFuel.toFixed(1)}
-          </span>
-        </td>
-
-        {/* Reliability */}
-        <td className="p-3 text-center font-mono font-bold">
-          <span
-            className={`px-2 py-0.5 rounded text-[10px] ${
-              rowUnavailable
-                ? 'bg-slate-900 text-slate-600 border border-slate-800'
-                : 'bg-slate-900 text-slate-300 border border-slate-800'
-            }`}
-          >
-            {item.reliabilityLabel}
-          </span>
-        </td>
-
-        {/* Defense */}
-        <td className="p-3 text-center font-mono font-bold">
-          <span className={`px-2 py-0.5 rounded text-[10px] ${rowUnavailable ? 'text-slate-600' : 'text-slate-300'}`}>
-            {item.defenseLabel}
-          </span>
-        </td>
-
-        {/* Official Event Rank */}
-        <td className="p-3 text-center font-mono font-bold">
-          {isEditingOfficial ? (
-            <div className="flex items-center justify-center gap-1">
-              <input
-                type="number"
-                value={tempRankValue}
-                onChange={(e) => setTempRankValue(e.target.value)}
-                placeholder="Rank #"
-                autoFocus
-                className="w-14 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-center font-mono text-xs text-white focus:outline-none"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveManualRank(item.teamNumber, 'official');
-                  if (e.key === 'Escape') setEditingRankTeamNum(null);
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => handleSaveManualRank(item.teamNumber, 'official')}
-                className="p-1 rounded bg-slate-800 text-white cursor-pointer"
-              >
-                <Check className="w-3 h-3" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center gap-1.5 group">
-              <span className={item.officialRank ? 'text-slate-200 font-bold' : 'text-slate-500 font-bold'}>
-                {item.officialRank ? `Rank ${item.officialRank}` : '—'}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingRankTeamNum(item.teamNumber);
-                  setEditingRankType('official');
-                  setTempRankValue(item.officialRank ? item.officialRank.toString() : '');
-                }}
-                className="opacity-40 group-hover:opacity-100 p-1 text-slate-400 hover:text-white transition-opacity cursor-pointer"
-                title="Edit Event Rank"
-              >
-                <Edit3 className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-        </td>
-
-        {/* State Rank */}
-        <td className="p-3 text-center font-mono font-bold">
-          {isEditingState ? (
-            <div className="flex items-center justify-center gap-1">
-              <input
-                type="number"
-                value={tempRankValue}
-                onChange={(e) => setTempRankValue(e.target.value)}
-                placeholder="State #"
-                autoFocus
-                className="w-14 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-center font-mono text-xs text-white focus:outline-none"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSaveManualRank(item.teamNumber, 'state');
-                  if (e.key === 'Escape') setEditingRankTeamNum(null);
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => handleSaveManualRank(item.teamNumber, 'state')}
-                className="p-1 rounded bg-slate-800 text-white cursor-pointer"
-              >
-                <Check className="w-3 h-3" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center gap-1.5 group">
-              <span className={item.stateRank ? 'text-slate-300 font-bold' : 'text-slate-500 font-bold'}>
-                {item.stateRank ? `Rank ${item.stateRank}` : '—'}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditingRankTeamNum(item.teamNumber);
-                  setEditingRankType('state');
-                  setTempRankValue(item.stateRank ? item.stateRank.toString() : '');
-                }}
-                className="opacity-40 group-hover:opacity-100 p-1 text-slate-400 hover:text-white transition-opacity cursor-pointer"
-                title="Edit State Rank"
-              >
-                <Edit3 className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-        </td>
-
         {/* Action */}
-        <td className="p-3 text-right">
+        <td className="p-2 sm:p-3 text-right">
           <button
             type="button"
             onClick={() => onNavigate('team-profile', item.teamNumber)}
@@ -771,12 +551,30 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
 
   return (
     <div className="max-w-5xl mx-auto px-3.5 sm:px-5 py-4 pb-32 flex flex-col gap-4">
+      {/* Top Header Navigation */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white font-mono font-bold cursor-pointer transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>← BACK</span>
+        </button>
+
+        <span className="text-xs font-bold text-slate-300 tracking-widest uppercase font-mono">
+          RANKINGS
+        </span>
+
+        <div className="w-16" />
+      </div>
+
       {/* Controls Bar */}
       <div className="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-sm">
         <div className="flex items-center gap-2">
           <label className="text-xs font-mono font-bold uppercase text-slate-400 flex items-center gap-1.5 shrink-0">
             <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
-            <span>Rank by:</span>
+            <span>Sort by:</span>
           </label>
           <select
             value={sortBy}
@@ -785,12 +583,8 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
           >
             <option value="preferenceRank">Custom Rank</option>
             <option value="officialRank">Official Event Rank</option>
-            <option value="stateRank">State Rank</option>
             <option value="totalFuel">Average Fuel (Total)</option>
-            <option value="autoSuccess">Auto Success Rate</option>
             <option value="autoFuel">Auto Fuel</option>
-            <option value="reliability">Reliability</option>
-            <option value="defense">Defense</option>
             <option value="matchesScouted">Matches Scouted</option>
           </select>
         </div>
@@ -804,58 +598,6 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
           >
             <RefreshCw className={`w-3.5 h-3.5 text-slate-300 ${isSyncingRankings ? 'animate-spin' : ''}`} />
             <span>{isSyncingRankings ? 'Syncing...' : 'Sync Rankings'}</span>
-          </button>
-
-          {/* Preset Custom Initializer */}
-          <div className="relative group">
-            <button
-              type="button"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 font-mono text-xs font-bold cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-              <span>Reset ▾</span>
-            </button>
-            <div className="absolute right-0 top-full mt-1.5 w-48 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-1 z-30 hidden group-hover:flex flex-col">
-              <button
-                type="button"
-                onClick={() => handleInitializeFrom('officialRank')}
-                className="w-full text-left px-3 py-1.5 text-xs font-mono text-slate-300 hover:bg-slate-900 rounded-lg cursor-pointer"
-              >
-                By Event Rank
-              </button>
-              <button
-                type="button"
-                onClick={() => handleInitializeFrom('stateRank')}
-                className="w-full text-left px-3 py-1.5 text-xs font-mono text-slate-300 hover:bg-slate-900 rounded-lg cursor-pointer"
-              >
-                By State Rank
-              </button>
-              <button
-                type="button"
-                onClick={() => handleInitializeFrom('fuel')}
-                className="w-full text-left px-3 py-1.5 text-xs font-mono text-slate-300 hover:bg-slate-900 rounded-lg cursor-pointer"
-              >
-                By Fuel Score
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowFilterModal(true)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-mono font-bold transition-colors cursor-pointer ${
-              activeFilterCount > 0
-                ? 'bg-slate-800 border-slate-600 text-white'
-                : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800'
-            }`}
-          >
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <span>Filters</span>
-            {activeFilterCount > 0 && (
-              <span className="w-4 h-4 rounded-full bg-slate-700 text-white text-[10px] font-bold flex items-center justify-center">
-                {activeFilterCount}
-              </span>
-            )}
           </button>
 
           <input
@@ -903,25 +645,26 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
 
         <table className="w-full text-left border-collapse text-xs sm:text-sm">
           <thead>
-            <tr className="bg-slate-900/90 border-b border-slate-800 font-mono font-bold text-slate-400 text-[11px] uppercase">
-              <th className="p-3 w-12 text-center">Cross Off</th>
-              <th className="p-3 w-10 text-center">Compare</th>
-              <th className="p-3 w-20 text-center">Rank #</th>
-              <th className="p-3 min-w-[110px]">TEAM</th>
-              <th className="p-3 text-center">AUTO</th>
-              <th className="p-3 text-center">FUEL</th>
-              <th className="p-3 text-center">REL.</th>
-              <th className="p-3 text-center">DEF.</th>
-              <th className="p-3 text-center">EVENT</th>
-              <th className="p-3 text-center">STATE</th>
-              <th className="p-3 text-right">ACTION</th>
+            <tr className="bg-slate-900/90 border-b border-slate-800 font-mono font-bold text-slate-400 text-[11px] uppercase whitespace-nowrap">
+              <th className="p-2 sm:p-3 w-10 text-center">Cross Off</th>
+              <th className="p-2 sm:p-3 w-10 text-center">Compare</th>
+              <th className="p-2 sm:p-3 min-w-[90px]">Team</th>
+              <th className="p-2 sm:p-3 text-center">Matches</th>
+              <th className="p-2 sm:p-3 text-center">Highest Fuel</th>
+              <th className="p-2 sm:p-3 text-center">Lowest Fuel</th>
+              <th className="p-2 sm:p-3 text-center">Avg Fuel</th>
+              <th className="p-2 sm:p-3 text-center">Avg Auto Fuel</th>
+              <th className="p-2 sm:p-3 text-center">Hopper Capacity</th>
+              <th className="p-2 sm:p-3 text-center">Event Rank</th>
+              <th className="p-2 sm:p-3 text-center">FRC Rank</th>
+              <th className="p-2 sm:p-3 text-right">Action</th>
             </tr>
           </thead>
 
           <tbody className="divide-y divide-slate-850">
             {(!separateUnavailable ? unifiedTeams : availableTeams).length === 0 ? (
               <tr>
-                <td colSpan={11} className="p-8 text-center text-slate-500 font-mono text-xs">
+                <td colSpan={12} className="p-8 text-center text-slate-500 font-mono text-xs">
                   No teams found.
                 </td>
               </tr>
@@ -956,18 +699,19 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
           {!isUnavailableCollapsed && (
             <table className="w-full text-left border-collapse text-xs sm:text-sm opacity-85">
               <thead>
-                <tr className="bg-slate-900/70 border-b border-slate-800 font-mono font-bold text-slate-500 text-[11px] uppercase">
-                  <th className="p-3 w-12 text-center">Restore</th>
-                  <th className="p-3 w-10 text-center">Compare</th>
-                  <th className="p-3 w-20 text-center">Rank #</th>
-                  <th className="p-3 min-w-[110px]">TEAM</th>
-                  <th className="p-3 text-center">AUTO</th>
-                  <th className="p-3 text-center">FUEL</th>
-                  <th className="p-3 text-center">REL.</th>
-                  <th className="p-3 text-center">DEF.</th>
-                  <th className="p-3 text-center">EVENT</th>
-                  <th className="p-3 text-center">STATE</th>
-                  <th className="p-3 text-right">ACTION</th>
+                <tr className="bg-slate-900/70 border-b border-slate-800 font-mono font-bold text-slate-500 text-[11px] uppercase whitespace-nowrap">
+                  <th className="p-2 sm:p-3 w-10 text-center">Restore</th>
+                  <th className="p-2 sm:p-3 w-10 text-center">Compare</th>
+                  <th className="p-2 sm:p-3 min-w-[90px]">Team</th>
+                  <th className="p-2 sm:p-3 text-center">Matches</th>
+                  <th className="p-2 sm:p-3 text-center">Highest Fuel</th>
+                  <th className="p-2 sm:p-3 text-center">Lowest Fuel</th>
+                  <th className="p-2 sm:p-3 text-center">Avg Fuel</th>
+                  <th className="p-2 sm:p-3 text-center">Avg Auto Fuel</th>
+                  <th className="p-2 sm:p-3 text-center">Hopper Capacity</th>
+                  <th className="p-2 sm:p-3 text-center">Event Rank</th>
+                  <th className="p-2 sm:p-3 text-center">FRC Rank</th>
+                  <th className="p-2 sm:p-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-850">
@@ -978,109 +722,16 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* FILTER MODAL */}
-      {showFilterModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-lg w-full shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <SlidersHorizontal className="w-4 h-4 text-slate-400" />
-                <h3 className="font-mono font-bold text-sm text-white uppercase">Filter Variables</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowFilterModal(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div>
-                <label className="text-[11px] font-mono font-bold uppercase text-slate-400 block mb-1">
-                  Drivetrain
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {['ALL', 'SWERVE', 'TANK / WEST COAST', 'MECANUM', 'OTHER'].map((dt) => (
-                    <button
-                      key={dt}
-                      type="button"
-                      onClick={() => setFilterDrivetrain(dt)}
-                      className={`px-3 py-1 rounded-xl font-semibold uppercase ${
-                        filterDrivetrain === dt
-                          ? 'bg-slate-800 text-white border border-slate-600'
-                          : 'bg-slate-950 text-slate-400 border border-slate-850'
-                      }`}
-                    >
-                      {dt}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-mono font-bold uppercase text-slate-400 block mb-1">
-                  Shooter
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {['ALL', 'TURRET', 'FIXED', 'PIVOTING', 'DUMPER'].map((sh) => (
-                    <button
-                      key={sh}
-                      type="button"
-                      onClick={() => setFilterShooter(sh)}
-                      className={`px-3 py-1 rounded-xl font-semibold uppercase ${
-                        filterShooter === sh
-                          ? 'bg-slate-800 text-white border border-slate-600'
-                          : 'bg-slate-950 text-slate-400 border border-slate-850'
-                      }`}
-                    >
-                      {sh}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-mono font-bold uppercase text-slate-400 block mb-1">
-                  Bump & Trench
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {['ALL', 'BOTH', 'BUMP ONLY', 'TRENCH ONLY', 'NEITHER'].map((cap) => (
-                    <button
-                      key={cap}
-                      type="button"
-                      onClick={() => setFilterCapability(cap)}
-                      className={`px-3 py-1 rounded-xl font-semibold uppercase ${
-                        filterCapability === cap
-                          ? 'bg-slate-800 text-white border border-slate-600'
-                          : 'bg-slate-950 text-slate-400 border border-slate-850'
-                      }`}
-                    >
-                      {cap}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center pt-2 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={resetAllFilters}
-                className="text-xs text-slate-400 hover:text-white"
-              >
-                Reset Filters
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowFilterModal(false)}
-                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-750 text-white rounded-xl text-xs font-bold"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
+      {/* Stable Floating Compare Action Bar */}
+      {selectedTeamNums.length > 0 && (
+        <div className="fixed bottom-16 sm:bottom-6 left-1/2 -translate-x-1/2 z-45 bg-slate-900 border border-blue-500/60 shadow-2xl rounded-2xl p-3 px-5 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => onNavigate('compare', undefined, selectedTeamNums)}
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono font-black text-xs uppercase shadow-lg transition-all cursor-pointer"
+          >
+            COMPARE ({selectedTeamNums.length})
+          </button>
         </div>
       )}
     </div>

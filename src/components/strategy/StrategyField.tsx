@@ -19,9 +19,10 @@ import {
 
 interface StrategyFieldProps {
   onNavigate: (view: string, teamNumber?: number) => void;
+  onBack: () => void;
 }
 
-export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
+export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate, onBack }) => {
   const [teams, setTeams] = useState<TeamProfile[]>([]);
   const [blueTeams, setBlueTeams] = useState<number[]>([0, 0, 0]);
   const [redTeams, setRedTeams] = useState<number[]>([0, 0, 0]);
@@ -32,6 +33,7 @@ export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
   // Overlay toggles (clean slate by default)
   const [showAutoPaths, setShowAutoPaths] = useState<boolean>(false);
   const [showShootingZones, setShowShootingZones] = useState<boolean>(false);
+  const [showShootingRange, setShowShootingRange] = useState<boolean>(false);
 
   // Drawing tool
   const [activeTool, setActiveTool] = useState<'draw' | 'tokens'>('tokens');
@@ -118,6 +120,7 @@ export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
   const handleTokenPointerDown = (tokenId: string, e: React.PointerEvent<SVGElement>) => {
     e.stopPropagation();
     e.preventDefault();
+    setActiveTool('tokens');
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {}
@@ -330,6 +333,15 @@ export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
               </g>
             );
           })}
+
+        {/* OVERLAY: Shooting Range Circles */}
+        {showShootingRange && (
+          <g className="pointer-events-none">
+            <circle cx="250" cy="500" r="70" fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.8" />
+            <circle cx="250" cy="500" r="140" fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.6" />
+            <circle cx="250" cy="500" r="210" fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 4" opacity="0.4" />
+          </g>
+        )}
 
         {/* User whiteboard drawings with smooth quadratic curves */}
         {drawings.map((d) => (
@@ -712,6 +724,15 @@ export const StrategyField: React.FC<StrategyFieldProps> = ({ onNavigate }) => {
             }`}
           >
             Zones
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowShootingRange(!showShootingRange)}
+            className={`px-2 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer ${
+              showShootingRange ? 'bg-amber-500 text-slate-950 font-bold border border-amber-400' : 'text-slate-500 hover:text-slate-300'
+            }`}
+          >
+            Range
           </button>
         </div>
       </div>

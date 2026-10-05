@@ -8,14 +8,17 @@ import {
   ChevronRight, 
   Target, 
   CheckCircle2, 
-  ArrowUpDown
+  ArrowUpDown,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 
 interface TeamListProps {
-  onNavigate: (view: string, teamNumber?: number) => void;
+  onNavigate: (view: string, teamNumber?: number, extraParam?: any) => void;
+  onBack: () => void;
 }
 
-export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
+export const TeamList: React.FC<TeamListProps> = ({ onNavigate, onBack }) => {
   const [teams, setTeams] = useState<TeamProfile[]>([]);
   const [matches, setMatches] = useState<MatchScoutingRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,6 +30,7 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
 
   const [filterAssignedOnly, setFilterAssignedOnly] = useState<boolean>(false);
   const [assignedTeams, setAssignedTeams] = useState<number[]>([]);
+  const [selectedTeamNums, setSelectedTeamNums] = useState<number[]>([]);
 
   useEffect(() => {
     loadData();
@@ -68,6 +72,19 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
     onNavigate('pit-scout', num);
   };
 
+  const toggleSelectTeam = (teamNum: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (selectedTeamNums.includes(teamNum)) {
+      setSelectedTeamNums(selectedTeamNums.filter((n) => n !== teamNum));
+    } else {
+      if (selectedTeamNums.length < 4) {
+        setSelectedTeamNums([...selectedTeamNums, teamNum]);
+      } else {
+        setSelectedTeamNums([...selectedTeamNums.slice(1), teamNum]);
+      }
+    }
+  };
+
   const matchCountMap = new Map<number, number>();
   matches.forEach((m) => {
     matchCountMap.set(m.teamNumber, (matchCountMap.get(m.teamNumber) || 0) + 1);
@@ -91,7 +108,7 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
       }
 
       if (filterCapability === 'TRENCH') {
-        if (t.pit?.bumpTrench !== 'BOTH' && t.pit?.bumpTrench !== 'TRENCH ONLY') return false;
+        if (t.pit?.bumpTrench !== 'BUMP AND TRENCH' && t.pit?.bumpTrench !== 'BOTH' && t.pit?.bumpTrench !== 'TRENCH ONLY') return false;
       } else if (filterCapability === 'TURRET') {
         if (!t.pit?.shooter?.includes('TURRET')) return false;
       } else if (filterCapability === 'AUTO') {
@@ -116,7 +133,8 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
           if (t.pit?.reliability === 'VERY RELIABLE') return 4;
           if (t.pit?.reliability === 'MOSTLY RELIABLE') return 3;
           if (t.pit?.reliability === 'SOMEWHAT RELIABLE') return 2;
-          return 1;
+          if (t.pit?.reliability === 'UNRELIABLE') return 1;
+          return 0;
         };
         return score(b) - score(a);
       } else if (sortBy === 'scouted') {
@@ -132,7 +150,7 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
     });
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-5 pb-28 flex flex-col gap-4">
+    <div className="max-w-4xl mx-auto px-4 py-5 pb-32 flex flex-col gap-4">
       {/* Top Header */}
       <div className="flex items-center justify-between pb-2 border-b border-slate-800">
         <div>
@@ -164,7 +182,7 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
         {searchQuery && (
           <button
             type="submit"
-            className="absolute right-1.5 top-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold"
+            className="absolute right-1.5 top-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold cursor-pointer"
           >
             Open
           </button>
@@ -227,7 +245,7 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
-            className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 text-xs focus:outline-none"
+            className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-slate-300 text-xs focus:outline-none cursor-pointer"
           >
             <option value="number">Team #</option>
             <option value="scouted">Scouted Status</option>
@@ -245,14 +263,31 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
             const pit = t.pit;
             const hasPit = pit && Object.keys(pit).length > 0;
             const isFullyScouted = hasPit && mCount > 0;
+            const isSelected = selectedTeamNums.includes(t.teamNumber);
 
             return (
               <div
                 key={t.teamNumber}
                 onClick={() => onNavigate('team-profile', t.teamNumber)}
-                className="p-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-850 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 group ${
+                  isSelected ? 'bg-slate-850/60 border-blue-500/50' : 'bg-slate-900/80 hover:bg-slate-850 border-slate-800 hover:border-slate-700'
+                }`}
               >
                 <div className="flex items-start sm:items-center gap-3">
+                  {/* Compare Checkbox */}
+                  <button
+                    type="button"
+                    onClick={(e) => toggleSelectTeam(t.teamNumber, e)}
+                    className="p-1 rounded text-slate-400 hover:text-white cursor-pointer self-center"
+                    title="Select for comparison"
+                  >
+                    {isSelected ? (
+                      <CheckSquare className="w-5 h-5 text-blue-400" />
+                    ) : (
+                      <Square className="w-5 h-5 text-slate-600" />
+                    )}
+                  </button>
+
                   <div className={`w-12 h-11 rounded-xl border flex items-center justify-center font-mono font-black text-base shrink-0 ${
                     isFullyScouted 
                       ? 'bg-slate-950 border-emerald-500/50 text-emerald-400' 
@@ -275,7 +310,12 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
                         </div>
                       )}
                       {pit?.reliability && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                          pit.reliability === 'UNRELIABLE' ? 'bg-rose-950/80 text-rose-300 border-rose-700' :
+                          pit.reliability === 'SOMEWHAT RELIABLE' ? 'bg-amber-950/60 text-amber-300 border-amber-800' :
+                          pit.reliability === 'MOSTLY RELIABLE' ? 'bg-blue-950/60 text-blue-300 border-blue-800' :
+                          'bg-emerald-950/60 text-emerald-300 border-emerald-800'
+                        }`}>
                           {pit.reliability}
                         </span>
                       )}
@@ -347,6 +387,19 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate }) => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Floating Compare Action Bar */}
+      {selectedTeamNums.length > 0 && (
+        <div className="fixed bottom-16 sm:bottom-6 left-1/2 -translate-x-1/2 z-45 bg-slate-900 border border-blue-500/60 shadow-2xl rounded-2xl p-3 px-5 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => onNavigate('compare', undefined, selectedTeamNums)}
+            className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-mono font-black text-xs uppercase shadow-lg transition-all cursor-pointer"
+          >
+            COMPARE ({selectedTeamNums.length})
+          </button>
         </div>
       )}
     </div>

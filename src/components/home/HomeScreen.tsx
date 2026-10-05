@@ -4,10 +4,11 @@ import { ScoutDashboard } from '../scout/ScoutDashboard';
 
 interface HomeScreenProps {
   onNavigate: (view: string, teamNumber?: number, extraParam?: any, allianceParam?: 'red' | 'blue') => void;
+  onBack: () => void;
   appMode: 'captain' | 'scout';
 }
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate, appMode }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate, onBack, appMode }) => {
   return appMode === 'captain' ? (
     <CaptainDashboard onNavigate={onNavigate} />
   ) : (

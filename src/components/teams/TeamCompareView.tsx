@@ -6,11 +6,13 @@ import { ArrowLeft, Users, Trophy, Plus, X } from 'lucide-react';
 interface TeamCompareViewProps {
   initialSelectedTeams?: number[];
   onNavigate: (view: string, teamNumber?: number) => void;
+  onBack: () => void;
 }
 
 export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
   initialSelectedTeams = [],
   onNavigate,
+  onBack,
 }) => {
   const [allTeams, setAllTeams] = useState<TeamProfile[]>([]);
   const [allMatches, setAllMatches] = useState<MatchScoutingRecord[]>([]);
@@ -72,9 +74,16 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
     const majorIssuesCount = matches.filter((m) => m.robotIssues === 'MAJOR' || m.robotIssues === 'DISABLED').length;
     const minorIssuesCount = matches.filter((m) => m.robotIssues === 'MINOR').length;
 
-    let reliabilityLabel = 'HIGH';
-    if (majorIssuesCount >= 2) reliabilityLabel = 'LOW';
-    else if (majorIssuesCount === 1 || minorIssuesCount >= 2) reliabilityLabel = 'MED';
+    let reliabilityLabel = '—';
+    if (count > 0) {
+      if (majorIssuesCount >= 2) {
+        reliabilityLabel = 'LOW';
+      } else if (majorIssuesCount === 1 || minorIssuesCount >= 2) {
+        reliabilityLabel = 'MED';
+      } else {
+        reliabilityLabel = 'HIGH';
+      }
+    }
 
     const defenseMatches = matches.filter((m) => m.playedDefense);
     let defenseLabel = 'NONE';
@@ -282,6 +291,15 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
                     <span className="px-2 py-0.5 rounded text-xs bg-slate-900 border border-slate-800 text-slate-300">
                       {s.reliabilityLabel}
                     </span>
+                  </td>
+                ))}
+              </tr>
+
+              <tr>
+                <td className="p-3 font-semibold text-slate-400">Reported Reliability</td>
+                {comparedStats.map((s) => (
+                  <td key={s.teamNum} className="p-3 text-center text-xs text-slate-300">
+                    {s.team?.pit?.reliability || '—'}
                   </td>
                 ))}
               </tr>

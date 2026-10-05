@@ -17,9 +17,10 @@ import {
 
 interface DataManagementProps {
   onNavigate: (view: string, teamNumber?: number) => void;
+  onBack: () => void;
 }
 
-export const DataManagement: React.FC<DataManagementProps> = ({ onNavigate }) => {
+export const DataManagement: React.FC<DataManagementProps> = ({ onNavigate, onBack }) => {
   const [exportStats, setExportStats] = useState<{ teams: number; matches: number } | null>(null);
   const [importResult, setImportResult] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);

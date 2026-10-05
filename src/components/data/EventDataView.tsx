@@ -15,9 +15,10 @@ import {
 
 interface EventDataViewProps {
   onNavigate: (view: string, teamNumber?: number) => void;
+  onBack: () => void;
 }
 
-export const EventDataView: React.FC<EventDataViewProps> = ({ onNavigate }) => {
+export const EventDataView: React.FC<EventDataViewProps> = ({ onNavigate, onBack }) => {
   const [matches, setMatches] = useState<MatchScoutingRecord[]>([]);
   const [filterTeam, setFilterTeam] = useState<string>('');
   const [filterAlliance, setFilterAlliance] = useState<'ALL' | 'RED' | 'BLUE'>('ALL');
