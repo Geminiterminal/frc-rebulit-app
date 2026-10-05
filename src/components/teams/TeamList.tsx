@@ -86,8 +86,11 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate, onBack }) => {
   };
 
   const matchCountMap = new Map<number, number>();
+  const teamAccuracyMap = new Map<number, string>();
   matches.forEach((m) => {
     matchCountMap.set(m.teamNumber, (matchCountMap.get(m.teamNumber) || 0) + 1);
+    const acc = m.shootingAccuracy || (typeof m.shooterAccuracy === 'string' ? m.shooterAccuracy : undefined);
+    if (acc) teamAccuracyMap.set(m.teamNumber, acc);
   });
 
   const filteredTeams = teams
@@ -325,7 +328,7 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate, onBack }) => {
                       <span>Drive: <strong className="text-slate-200">{pit?.drivetrain || '—'}</strong></span>
                       <span>Shooter: <strong className="text-slate-200">{pit?.shooter?.join('/') || '—'}</strong></span>
                       <span>Hopper: <strong className="text-slate-200">{pit?.hopperCapacity ?? '—'}</strong></span>
-                      <span>Accuracy: <strong className="text-slate-200">{pit?.shootingAccuracy || '—'}</strong></span>
+                      <span>Accuracy: <strong className="text-slate-200">{pit?.shootingAccuracy || teamAccuracyMap.get(t.teamNumber) || '—'}</strong></span>
                     </div>
                   </div>
                 </div>

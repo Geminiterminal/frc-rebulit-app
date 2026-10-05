@@ -27,6 +27,7 @@ interface PicklistViewProps {
 export type SortOption = 
   | 'preferenceRank'
   | 'officialRank'
+  | 'stateRank'
   | 'totalFuel' 
   | 'autoFuel' 
   | 'matchesScouted';
@@ -42,6 +43,7 @@ interface EnrichedTeam {
   avgAutoFuel: number;
   hopperCapacity: number | string;
   officialRank?: number;
+  stateRank?: number;
   customPicklistRank?: number;
   isUnavailable: boolean;
 }
@@ -57,7 +59,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
 
   // Manual rank editing state
   const [editingRankTeamNum, setEditingRankTeamNum] = useState<number | null>(null);
-  const [editingRankType, setEditingRankType] = useState<'official' | 'preference' | null>(null);
+  const [editingRankType, setEditingRankType] = useState<'official' | 'state' | 'preference' | null>(null);
   const [tempRankValue, setTempRankValue] = useState<string>('');
 
   // Drag and drop state
@@ -66,22 +68,57 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
   // Live Rankings Sync State
   const [isSyncingRankings, setIsSyncingRankings] = useState(false);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+  const [showEventCodeModal, setShowEventCodeModal] = useState(false);
+  const [inputEventCode, setInputEventCode] = useState('');
 
   useEffect(() => {
     loadData();
   }, []);
 
   const handleSyncRankings = async () => {
+    setSyncStatusMsg(null);
+    let code = (localStorage.getItem('frc_active_event_code') || '').trim();
+    if (!code) {
+      code = (await scoutingDB.getSetting<string>('eventCode', '')).trim();
+    }
+    // Clean up if it was previously set to 2025micmp by default
+    if (code === '2025micmp') {
+      localStorage.removeItem('frc_active_event_code');
+      await scoutingDB.setSetting('eventCode', '');
+      code = '';
+    }
+
+    if (!code) {
+      setInputEventCode('');
+      setShowEventCodeModal(true);
+      return;
+    }
+
+    await performSync(code);
+  };
+
+  const performSync = async (codeToSync: string) => {
     setIsSyncingRankings(true);
     setSyncStatusMsg(null);
-    const code = localStorage.getItem('frc_active_event_code') || '2025micmp';
     const key = localStorage.getItem('frc_tba_auth_key') || (await scoutingDB.getSetting<string>('tbaApiKey', ''));
 
-    const res = await tbaApi.fetchEventTeams(code, key);
+    const res = await tbaApi.fetchEventTeams(codeToSync, key);
     setSyncStatusMsg(res.message);
     setIsSyncingRankings(false);
     await loadData();
     setTimeout(() => setSyncStatusMsg(null), 4000);
+  };
+
+  const handleSaveCodeAndSync = async () => {
+    const trimmed = inputEventCode.trim().toLowerCase();
+    if (!trimmed) {
+      setSyncStatusMsg('Please enter a valid event code.');
+      return;
+    }
+    localStorage.setItem('frc_active_event_code', trimmed);
+    await scoutingDB.setSetting('eventCode', trimmed);
+    setShowEventCodeModal(false);
+    await performSync(trimmed);
   };
 
   const loadData = async () => {
@@ -218,7 +255,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
     await scoutingDB.saveTeamsBatch(reindexed);
   };
 
-  const handleSaveManualRank = async (teamNum: number, rankType: 'official') => {
+  const handleSaveManualRank = async (teamNum: number, rankType: 'official' | 'state') => {
     const targetTeam = teams.find((t) => t.teamNumber === teamNum);
     if (!targetTeam) return;
 
@@ -227,7 +264,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
 
     const updated = {
       ...targetTeam,
-      officialRank: newRank,
+      ...(rankType === 'official' ? { officialRank: newRank } : { stateRank: newRank }),
       updatedAt: Date.now(),
     };
 
@@ -275,6 +312,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
       avgAutoFuel,
       hopperCapacity,
       officialRank: team.officialRank,
+      stateRank: team.stateRank,
       customPicklistRank: team.customPicklistRank,
       isUnavailable: !!team.isUnavailable,
     };
@@ -298,6 +336,11 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
         const rB = b.officialRank !== undefined ? b.officialRank : 999;
         return rA - rB;
       }
+      case 'stateRank': {
+        const sA = a.stateRank !== undefined ? a.stateRank : 9999;
+        const sB = b.stateRank !== undefined ? b.stateRank : 9999;
+        return sA - sB;
+      }
       default:
         return (a.customPicklistRank ?? 9999) - (b.customPicklistRank ?? 9999);
     }
@@ -318,6 +361,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
   const renderTeamRow = (item: EnrichedTeam, displayIndex: number, isUnavailableSection: boolean = false) => {
     const isSelected = selectedTeamNums.includes(item.teamNumber);
     const isEditingOfficial = editingRankTeamNum === item.teamNumber && editingRankType === 'official';
+    const isEditingState = editingRankTeamNum === item.teamNumber && editingRankType === 'state';
     const isEditingPref = editingRankTeamNum === item.teamNumber && editingRankType === 'preference';
 
     const rowUnavailable = item.isUnavailable;
@@ -371,6 +415,56 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
               <Square className="w-4 h-4 text-slate-600" />
             )}
           </button>
+        </td>
+
+        {/* Pick # (Custom Picklist Rank) */}
+        <td className="p-2 sm:p-3 text-center">
+          {isEditingPref ? (
+            <div className="flex items-center justify-center gap-1">
+              <input
+                type="number"
+                value={tempRankValue}
+                onChange={(e) => setTempRankValue(e.target.value)}
+                placeholder="#"
+                autoFocus
+                className="w-12 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-center font-mono text-xs text-white focus:outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSetCustomRank(item.teamNumber, tempRankValue);
+                  if (e.key === 'Escape') setEditingRankTeamNum(null);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => handleSetCustomRank(item.teamNumber, tempRankValue)}
+                className="p-1 rounded bg-slate-800 text-white cursor-pointer"
+              >
+                <Check className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-1">
+              {sortBy === 'preferenceRank' && !rowUnavailable && (
+                <div className="flex items-center gap-0.5 text-slate-500 mr-0.5">
+                  <GripVertical className="w-3.5 h-3.5 text-slate-600 cursor-grab hidden sm:inline" />
+                </div>
+              )}
+              <span
+                onClick={() => {
+                  setEditingRankTeamNum(item.teamNumber);
+                  setEditingRankType('preference');
+                  setTempRankValue(item.customPicklistRank ? item.customPicklistRank.toString() : '');
+                }}
+                className={`font-mono font-bold text-xs px-2 py-0.5 rounded cursor-pointer transition-colors ${
+                  rowUnavailable
+                    ? 'text-slate-500 bg-slate-900 line-through'
+                    : 'text-amber-400 bg-slate-900/80 hover:bg-slate-800'
+                }`}
+                title="Click to edit custom rank"
+              >
+                #{item.customPicklistRank ?? displayIndex + 1}
+              </span>
+            </div>
+          )}
         </td>
 
         {/* Team Number and Name */}
@@ -486,51 +580,47 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
           )}
         </td>
 
-        {/* FRC Rank (Custom Picklist Rank) */}
-        <td className="p-2 sm:p-3 text-center">
-          {isEditingPref ? (
+        {/* FRC Rank (State / District Ranking) */}
+        <td className="p-2 sm:p-3 text-center font-mono font-bold">
+          {isEditingState ? (
             <div className="flex items-center justify-center gap-1">
               <input
                 type="number"
                 value={tempRankValue}
                 onChange={(e) => setTempRankValue(e.target.value)}
-                placeholder="#"
+                placeholder="Rank #"
                 autoFocus
-                className="w-12 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-center font-mono text-xs text-white focus:outline-none"
+                className="w-14 bg-slate-900 border border-slate-600 rounded px-1 py-0.5 text-center font-mono text-xs text-white focus:outline-none"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSetCustomRank(item.teamNumber, tempRankValue);
+                  if (e.key === 'Enter') handleSaveManualRank(item.teamNumber, 'state');
                   if (e.key === 'Escape') setEditingRankTeamNum(null);
                 }}
               />
               <button
                 type="button"
-                onClick={() => handleSetCustomRank(item.teamNumber, tempRankValue)}
+                onClick={() => handleSaveManualRank(item.teamNumber, 'state')}
                 className="p-1 rounded bg-slate-800 text-white cursor-pointer"
               >
                 <Check className="w-3 h-3" />
               </button>
             </div>
           ) : (
-            <div className="flex items-center justify-center gap-1">
-              {sortBy === 'preferenceRank' && !rowUnavailable && (
-                <div className="flex items-center gap-0.5 text-slate-500 mr-0.5">
-                  <GripVertical className="w-3.5 h-3.5 text-slate-600 cursor-grab hidden sm:inline" />
-                </div>
-              )}
-              <span
+            <div className="flex items-center justify-center gap-1 group">
+              <span className={item.stateRank ? 'text-slate-200 font-bold' : 'text-slate-500 font-bold'}>
+                {item.stateRank ? `#${item.stateRank}` : '—'}
+              </span>
+              <button
+                type="button"
                 onClick={() => {
                   setEditingRankTeamNum(item.teamNumber);
-                  setEditingRankType('preference');
-                  setTempRankValue(item.customPicklistRank ? item.customPicklistRank.toString() : '');
+                  setEditingRankType('state');
+                  setTempRankValue(item.stateRank ? item.stateRank.toString() : '');
                 }}
-                className={`font-mono font-bold text-xs px-2 py-0.5 rounded cursor-pointer transition-colors ${
-                  rowUnavailable
-                    ? 'text-slate-500 bg-slate-900 line-through'
-                    : 'text-amber-400 bg-slate-900/80 hover:bg-slate-800'
-                }`}
+                className="opacity-40 group-hover:opacity-100 p-1 text-slate-400 hover:text-white transition-opacity cursor-pointer"
+                title="Edit FRC State/District Rank"
               >
-                #{item.customPicklistRank ?? displayIndex + 1}
-              </span>
+                <Edit3 className="w-3 h-3" />
+              </button>
             </div>
           )}
         </td>
@@ -583,6 +673,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
           >
             <option value="preferenceRank">Custom Rank</option>
             <option value="officialRank">Official Event Rank</option>
+            <option value="stateRank">FRC State/District Rank</option>
             <option value="totalFuel">Average Fuel (Total)</option>
             <option value="autoFuel">Auto Fuel</option>
             <option value="matchesScouted">Matches Scouted</option>
@@ -648,6 +739,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
             <tr className="bg-slate-900/90 border-b border-slate-800 font-mono font-bold text-slate-400 text-[11px] uppercase whitespace-nowrap">
               <th className="p-2 sm:p-3 w-10 text-center">Cross Off</th>
               <th className="p-2 sm:p-3 w-10 text-center">Compare</th>
+              <th className="p-2 sm:p-3 w-16 text-center">Pick #</th>
               <th className="p-2 sm:p-3 min-w-[90px]">Team</th>
               <th className="p-2 sm:p-3 text-center">Matches</th>
               <th className="p-2 sm:p-3 text-center">Highest Fuel</th>
@@ -664,7 +756,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
           <tbody className="divide-y divide-slate-850">
             {(!separateUnavailable ? unifiedTeams : availableTeams).length === 0 ? (
               <tr>
-                <td colSpan={12} className="p-8 text-center text-slate-500 font-mono text-xs">
+                <td colSpan={13} className="p-8 text-center text-slate-500 font-mono text-xs">
                   No teams found.
                 </td>
               </tr>
@@ -702,6 +794,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
                 <tr className="bg-slate-900/70 border-b border-slate-800 font-mono font-bold text-slate-500 text-[11px] uppercase whitespace-nowrap">
                   <th className="p-2 sm:p-3 w-10 text-center">Restore</th>
                   <th className="p-2 sm:p-3 w-10 text-center">Compare</th>
+                  <th className="p-2 sm:p-3 w-16 text-center">Pick #</th>
                   <th className="p-2 sm:p-3 min-w-[90px]">Team</th>
                   <th className="p-2 sm:p-3 text-center">Matches</th>
                   <th className="p-2 sm:p-3 text-center">Highest Fuel</th>
@@ -732,6 +825,44 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
           >
             COMPARE ({selectedTeamNums.length})
           </button>
+        </div>
+      )}
+
+      {/* Event Code Input Modal when syncing with no event code set */}
+      {showEventCodeModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-3 font-mono">
+            <h3 className="font-bold text-sm text-slate-100 uppercase tracking-wider">
+              Enter Competition Event Code
+            </h3>
+            <p className="text-xs text-slate-400">
+              No event code is currently configured. Enter an event code (e.g. 2026mifor) to sync rankings from The Blue Alliance.
+            </p>
+            <input
+              type="text"
+              placeholder="e.g. 2026mifor"
+              value={inputEventCode}
+              onChange={(e) => setInputEventCode(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-slate-600 uppercase"
+              autoFocus
+            />
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowEventCodeModal(false)}
+                className="flex-1 py-2 rounded-xl bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold text-xs cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCodeAndSync}
+                className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-white font-bold text-xs cursor-pointer shadow"
+              >
+                Sync
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

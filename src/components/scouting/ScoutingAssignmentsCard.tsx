@@ -16,7 +16,6 @@ import {
   ScoutProfile 
 } from '../../db/scoutingAssignments';
 import { cloudSync } from '../../db/cloudSync';
-import { p2pSync } from '../../db/p2pSync';
 
 interface ScoutingAssignmentsCardProps {
   onSelectTeam?: (teamNumber: number) => void;
@@ -105,7 +104,6 @@ export function ScoutingAssignmentsCard({ onSelectTeam, onNavigate }: ScoutingAs
     setSyncFeedback(null);
     try {
       await cloudSync.pushLocalDataToCloud().catch(() => null);
-      await p2pSync.pushLocalData().catch(() => null);
       setSyncFeedback('Pushed');
       loadData();
     } catch {
@@ -121,7 +119,6 @@ export function ScoutingAssignmentsCard({ onSelectTeam, onNavigate }: ScoutingAs
     setSyncFeedback(null);
     try {
       await cloudSync.pullRemoteUpdates().catch(() => null);
-      await p2pSync.pullRemoteData().catch(() => null);
       setSyncFeedback('Pulled');
       loadData();
     } catch {

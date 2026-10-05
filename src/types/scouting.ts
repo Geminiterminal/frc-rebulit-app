@@ -110,10 +110,12 @@ export interface MatchScoutingRecord {
   autoWorked: boolean;
   autoFuelScored: number;
 
-  // 2. SCORING
+  // 2. SCORING & SHOOTING
   teleopFuelScored: number;
-  shooterAccuracy?: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXCELLENT';
-  canShootAnywhere?: boolean;
+  shootingAccuracy?: ShootingAccuracy;
+  shootingRange?: string;
+  shooterAccuracy?: ShootingAccuracy | 'LOW' | 'MEDIUM' | 'HIGH' | 'EXCELLENT';
+  canShootAnywhere?: string | boolean;
 
   // 3. FIELD ROUTE
   fieldRoute: FieldRouteType;

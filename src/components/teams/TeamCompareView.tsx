@@ -105,8 +105,9 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
     const pit = team?.pit;
     const drivetrain = pit?.drivetrain || 'Unknown';
     const shooter = pit?.shooter?.join(', ') || 'Unknown';
-    const hopper = pit?.hopperCapacity ? `${pit.hopperCapacity}` : 'N/A';
-    const accuracy = pit?.shootingAccuracy || 'N/A';
+    const hopper = pit?.hopperCapacity ? `${pit.hopperCapacity}` : '—';
+    const matchAccuracy = matches.map((m) => m.shootingAccuracy || (typeof m.shooterAccuracy === 'string' ? m.shooterAccuracy : undefined)).filter(Boolean)[0];
+    const accuracy = pit?.shootingAccuracy || matchAccuracy || '—';
     const autoRoutines = pit?.autoRoutinesCount || (pit?.hasAutonomous === 'YES' ? '1+' : '0');
 
     return {

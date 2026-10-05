@@ -4,7 +4,8 @@ import {
   MatchScoutingRecord, 
   FieldRouteType, 
   RobotIssuesType,
-  EventScheduleMatch 
+  EventScheduleMatch,
+  ShootingAccuracy
 } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
 import { scoutingAssignments } from '../../db/scoutingAssignments';
@@ -34,6 +35,21 @@ interface MatchScoutFormProps {
   onBack: () => void;
 }
 
+const ACCURACY_OPTIONS: ShootingAccuracy[] = [
+  '<50%',
+  '50–69%',
+  '70–84%',
+  '85–94%',
+  '95%+',
+];
+
+const SHOOT_FROM_OPTIONS = [
+  'ANYWHERE',
+  'MOST OF FIELD',
+  'LIMITED AREA',
+  'FIXED SPOT',
+];
+
 export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
   initialTeamNumber,
   initialMatchNumber = 1,
@@ -55,6 +71,10 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
   // TELEOP
   const [teleopFuelScored, setTeleopFuelScored] = useState<number>(0);
+
+  // SHOOTING ACCURACY & RANGE
+  const [shootingAccuracy, setShootingAccuracy] = useState<ShootingAccuracy | null>(null);
+  const [shootingRange, setShootingRange] = useState<string | null>(null);
 
   // ROUTE
   const [fieldRoute, setFieldRoute] = useState<FieldRouteType | null>(null);
@@ -127,6 +147,8 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           setAutoFuelScored(existing.autoFuelScored || existing.autoHighScored || 0);
           setTeleopFuelScored(existing.teleopFuelScored || existing.teleopHighScored || 0);
           setFieldRoute(existing.fieldRoute || null);
+          setShootingAccuracy((existing.shootingAccuracy as ShootingAccuracy) || (existing.shooterAccuracy as ShootingAccuracy) || null);
+          setShootingRange(existing.shootingRange || (typeof existing.canShootAnywhere === 'string' ? existing.canShootAnywhere : (existing.canShootAnywhere ? 'ANYWHERE' : null)));
           setRobotIssues(existing.robotIssues || null);
           setWhatHappenedNote(existing.whatHappenedNote || '');
           setQuickNote(existing.quickNote || existing.notes || '');
@@ -140,6 +162,8 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           setAutoFuelScored(0);
           setTeleopFuelScored(0);
           setFieldRoute(null);
+          setShootingAccuracy(null);
+          setShootingRange(null);
           setRobotIssues(null);
           setWhatHappenedNote('');
           setQuickNote('');
@@ -175,6 +199,10 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       autoWorked: autoWorked !== null ? autoWorked : false,
       autoFuelScored,
       teleopFuelScored,
+      shootingAccuracy: shootingAccuracy || undefined,
+      shooterAccuracy: shootingAccuracy || undefined,
+      shootingRange: shootingRange || undefined,
+      canShootAnywhere: shootingRange || undefined,
       fieldRoute: fieldRoute || 'NEITHER',
       playedDefense: defenseLevel !== 'NONE',
       defenseEffectiveness: defenseLevel !== 'NONE' ? (defenseLevel === 'HIGH' ? 'HIGH' : defenseLevel === 'LOW' ? 'LOW' : 'MEDIUM') : undefined,
@@ -217,6 +245,8 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       setAutoWorked(null);
       setAutoFuelScored(0);
       setTeleopFuelScored(0);
+      setShootingAccuracy(null);
+      setShootingRange(null);
       setFieldRoute(null);
       setRobotIssues(null);
       setWhatHappenedNote('');
@@ -251,6 +281,10 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       autoWorked: autoWorked !== null ? autoWorked : false,
       autoFuelScored,
       teleopFuelScored,
+      shootingAccuracy: shootingAccuracy || undefined,
+      shooterAccuracy: shootingAccuracy || undefined,
+      shootingRange: shootingRange || undefined,
+      canShootAnywhere: shootingRange || undefined,
       fieldRoute: fieldRoute || 'NEITHER',
       playedDefense: defenseLevel !== 'NONE',
       defenseEffectiveness: defenseLevel !== 'NONE' ? (defenseLevel === 'HIGH' ? 'HIGH' : defenseLevel === 'LOW' ? 'LOW' : 'MEDIUM') : undefined,
@@ -615,6 +649,66 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
             >
               +20
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* SHOOTING CAPABILITY */}
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
+        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+          <Target className="w-3.5 h-3.5 text-slate-400" />
+          <span>SHOOTING CAPABILITY</span>
+        </div>
+
+        {/* 1. Shooting Accuracy */}
+        <div>
+          <label className="text-[11px] font-mono font-semibold uppercase text-slate-400 block mb-1.5">
+            About what is your shooting accuracy?
+          </label>
+          <div className="grid grid-cols-5 gap-1.5">
+            {ACCURACY_OPTIONS.map((opt) => {
+              const isSelected = shootingAccuracy === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setShootingAccuracy(shootingAccuracy === opt ? null : opt)}
+                  className={`py-2 px-1 rounded-xl text-xs font-mono font-bold uppercase transition-all cursor-pointer text-center ${
+                    isSelected
+                      ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
+                      : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 2. Where can you shoot from? */}
+        <div className="pt-2 border-t border-slate-800/80">
+          <label className="text-[11px] font-mono font-semibold uppercase text-slate-400 block mb-1.5">
+            Where can you shoot from?
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            {SHOOT_FROM_OPTIONS.map((opt) => {
+              const isSelected = shootingRange === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => setShootingRange(shootingRange === opt ? null : opt)}
+                  className={`py-2 px-1.5 rounded-xl text-xs font-mono font-bold uppercase transition-all cursor-pointer text-center ${
+                    isSelected
+                      ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
+                      : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
+                  }`}
+                >
+                  {opt}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

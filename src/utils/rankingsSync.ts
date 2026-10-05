@@ -14,9 +14,10 @@ export interface SyncRankingsResult {
 export function normalizeEventCode(code: string): string {
   let clean = code.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
   if (!clean) return '';
-  // If no year prefix, add default current year 2025
+  // If no year prefix, add default current year
   if (!/^\d{4}/.test(clean)) {
-    clean = `2025${clean}`;
+    const currentYear = new Date().getFullYear();
+    clean = `${currentYear}${clean}`;
   }
   return clean;
 }
@@ -51,13 +52,13 @@ async function fetchTbaData(endpointUrl: string, apiKey: string): Promise<any> {
   return null;
 }
 
-export async function importEventRosterAndRankings(eventCodeInput: string = '2025micmp'): Promise<SyncRankingsResult> {
+export async function importEventRosterAndRankings(eventCodeInput: string = ''): Promise<SyncRankingsResult> {
   try {
     const cleanCode = normalizeEventCode(eventCodeInput);
     if (!cleanCode) {
       return {
         success: false,
-        message: 'Please enter a valid competition event code (e.g. 2025micmp, 2024cmp, 2025mifor).',
+        message: 'Please enter a valid competition event code.',
         teamsUpdatedCount: 0,
       };
     }

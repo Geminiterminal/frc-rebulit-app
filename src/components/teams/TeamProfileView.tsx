@@ -79,8 +79,32 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
   const avgAutoFuel = autoMetrics.avg;
   const avgTeleopFuel = teleopMetrics.avg;
   const hopperCapacity = pit?.hopperCapacity !== undefined ? pit.hopperCapacity : '—';
-  const shootingRange = pit?.canShootAnywhere || (matches.some((m) => m.canShootAnywhere) ? 'Anywhere' : '—');
-  const shootingAccuracy = pit?.shootingAccuracy || (matches.find((m) => m.shooterAccuracy)?.shooterAccuracy || '—');
+
+  // Helper to determine the observed value across matches (most frequent, latest on tie)
+  const getObservedMatchValue = (values: (string | undefined)[]) => {
+    const valid = values.filter((v): v is string => Boolean(v && v.trim() && v !== '—'));
+    if (valid.length === 0) return null;
+    const counts: Record<string, number> = {};
+    for (const v of valid) {
+      counts[v] = (counts[v] || 0) + 1;
+    }
+    const sorted = [...valid].reverse().sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
+    return sorted[0] || null;
+  };
+
+  const matchRanges = matches.map((m) => 
+    m.shootingRange || (typeof m.canShootAnywhere === 'string' ? m.canShootAnywhere : (m.canShootAnywhere ? 'ANYWHERE' : undefined))
+  );
+  const matchAccuracies = matches.map((m) => 
+    m.shootingAccuracy || (typeof m.shooterAccuracy === 'string' ? m.shooterAccuracy : undefined)
+  );
+
+  const observedRange = getObservedMatchValue(matchRanges);
+  const observedAccuracy = getObservedMatchValue(matchAccuracies);
+
+  // Match scout data takes precedence in match/scoring analysis, falling back to pit scout data, or '—'
+  const shootingRange = observedRange || pit?.canShootAnywhere || '—';
+  const shootingAccuracy = observedAccuracy || pit?.shootingAccuracy || '—';
 
   // Reliability metrics
   const autoWorkedCount = matches.filter((m) => m.autoWorked).length;
@@ -158,7 +182,7 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
         </div>
         <div className="text-right flex flex-col gap-0.5 text-[11px] font-mono">
           <div><span className="text-slate-500">Event Rank:</span> <strong className="text-amber-400">{team.officialRank ? `#${team.officialRank}` : '—'}</strong></div>
-          <div><span className="text-slate-500">FRC Rank:</span> <strong className="text-amber-400">{team.officialRank ? `#${team.officialRank}` : '—'}</strong></div>
+          <div><span className="text-slate-500">FRC Rank:</span> <strong className="text-amber-400">{team.stateRank ? `#${team.stateRank}` : '—'}</strong></div>
           <div><span className="text-slate-500">Our Rank:</span> <strong className="text-emerald-400">{team.customPicklistRank ? `#${team.customPicklistRank}` : '—'}</strong></div>
         </div>
       </div>
@@ -215,9 +239,21 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
               </div>
             </div>
 
-            <div className="pt-2 border-t border-slate-800/50 flex items-center justify-between text-xs font-bold text-slate-300">
-              <div>RANGE: <span className="text-amber-400">{shootingRange}</span></div>
-              <div>ACCURACY: <span className="text-emerald-400">{shootingAccuracy}</span></div>
+            <div className="pt-2 border-t border-slate-800/50 flex flex-wrap items-center justify-between gap-2 text-xs font-bold text-slate-300">
+              <div>
+                <span>RANGE: </span>
+                <span className="text-amber-400">{shootingRange}</span>
+                {observedRange && pit?.canShootAnywhere && observedRange !== pit.canShootAnywhere && (
+                  <span className="text-[10px] text-slate-400 font-normal ml-1.5">(Pit: {pit.canShootAnywhere})</span>
+                )}
+              </div>
+              <div>
+                <span>ACCURACY: </span>
+                <span className="text-emerald-400">{shootingAccuracy}</span>
+                {observedAccuracy && pit?.shootingAccuracy && observedAccuracy !== pit.shootingAccuracy && (
+                  <span className="text-[10px] text-slate-400 font-normal ml-1.5">(Pit: {pit.shootingAccuracy})</span>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -352,7 +388,21 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
             </div>
             <div className="flex items-center justify-between py-1 border-b border-slate-900">
               <span className="text-slate-400">Shooting Range</span>
-              <span className="font-bold text-slate-100">{shootingRange}</span>
+              <span className="font-bold text-slate-100">
+                {shootingRange}
+                {observedRange && pit?.canShootAnywhere && observedRange !== pit.canShootAnywhere && (
+                  <span className="text-xs text-slate-400 font-normal ml-1.5">(Pit: {pit.canShootAnywhere})</span>
+                )}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1 border-b border-slate-900">
+              <span className="text-slate-400">Shooting Accuracy</span>
+              <span className="font-bold text-slate-100">
+                {shootingAccuracy}
+                {observedAccuracy && pit?.shootingAccuracy && observedAccuracy !== pit.shootingAccuracy && (
+                  <span className="text-xs text-slate-400 font-normal ml-1.5">(Pit: {pit.shootingAccuracy})</span>
+                )}
+              </span>
             </div>
             <div className="flex items-center justify-between py-1">
               <span className="text-slate-400">Hopper Capacity</span>

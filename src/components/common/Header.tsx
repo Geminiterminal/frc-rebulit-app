@@ -1,7 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { PWAInstallButton } from './PWAInstallButton';
-import { DistributeModal } from './DistributeModal';
-import { TeamRoomSyncModal } from '../sync/TeamRoomSyncModal';
 import { PantherLogo } from './PantherLogo';
 import { 
   Menu, 
@@ -27,8 +25,6 @@ export const Header: React.FC<HeaderProps> = ({
   onAppModeChange,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [showDistributeModal, setShowDistributeModal] = useState(false);
-  const [showSyncModal, setShowSyncModal] = useState(false);
   const isOnline = useOnlineStatus();
   const [searchInput, setSearchInput] = useState('');
 
@@ -169,16 +165,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         )}
       </header>
-
-      <DistributeModal
-        isOpen={showDistributeModal}
-        onClose={() => setShowDistributeModal(false)}
-      />
-
-      <TeamRoomSyncModal
-        isOpen={showSyncModal}
-        onClose={() => setShowSyncModal(false)}
-      />
     </>
   );
 };

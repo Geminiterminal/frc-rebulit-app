@@ -261,8 +261,8 @@ export const qrTransferEngine = {
       aw: matchRecord.autoWorked ? 1 : 0,
       af: matchRecord.autoFuelScored || matchRecord.autoHighScored || 0,
       tf: matchRecord.teleopFuelScored || matchRecord.teleopHighScored || 0,
-      sac: matchRecord.shooterAccuracy || undefined,
-      csa: matchRecord.canShootAnywhere ? 1 : 0,
+      sac: matchRecord.shootingAccuracy || matchRecord.shooterAccuracy || undefined,
+      csa: matchRecord.shootingRange || (typeof matchRecord.canShootAnywhere === 'string' ? matchRecord.canShootAnywhere : (matchRecord.canShootAnywhere ? 'ANYWHERE' : undefined)),
       fr: matchRecord.fieldRoute,
       de: matchRecord.defenseEffectiveness,
       ri: matchRecord.robotIssues,
@@ -403,8 +403,9 @@ export const qrTransferEngine = {
           const autoFuelScored = d.af !== undefined ? Number(d.af) : Number(d.autoFuelScored || d.autoHighScored || 0);
           const teleopFuelScored = d.tf !== undefined ? Number(d.tf) : Number(d.teleopFuelScored || d.teleopHighScored || 0);
 
-          const shooterAccuracy = d.sac || d.shooterAccuracy;
-          const canShootAnywhere = d.csa !== undefined ? (d.csa === 1 || d.csa === true) : Boolean(d.canShootAnywhere);
+          const shooterAccuracy = d.sac || d.shooterAccuracy || d.shootingAccuracy;
+          const shootingRange = (typeof d.csa === 'string' ? d.csa : (d.csa === 1 || d.csa === true ? 'ANYWHERE' : undefined)) || d.shootingRange || (typeof d.canShootAnywhere === 'string' ? d.canShootAnywhere : (d.canShootAnywhere ? 'ANYWHERE' : undefined));
+          const canShootAnywhere = shootingRange || Boolean(d.canShootAnywhere);
           const defenseEffectiveness = d.de || d.defenseEffectiveness;
           const parseRating = (val: any): 1 | 2 | 3 | 4 | 5 | undefined => {
             const n = Number(val);
@@ -437,7 +438,9 @@ export const qrTransferEngine = {
             autoWorked,
             autoFuelScored,
             teleopFuelScored,
+            shootingAccuracy: shooterAccuracy as any,
             shooterAccuracy,
+            shootingRange,
             canShootAnywhere,
             fieldRoute,
             defenseEffectiveness,

@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/common/Header';
-import { OfflineIndicator } from './components/common/OfflineIndicator';
 import { HomeScreen } from './components/home/HomeScreen';
 import { PitScoutForm } from './components/pit/PitScoutForm';
 import { MatchScoutForm } from './components/match/MatchScoutForm';
@@ -97,8 +96,6 @@ export default function App() {
     setCurrentView(last.view);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-
-  const hasHistory = navStack.length > 0;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-slate-700 selection:text-white">

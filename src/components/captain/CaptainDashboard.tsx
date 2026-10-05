@@ -36,7 +36,14 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
   const [teamSchedulesMap, setTeamSchedulesMap] = useState<Record<number, EventScheduleMatch[]>>({});
 
   // TBA Setup
-  const [eventCode, setEventCode] = useState<string>(() => localStorage.getItem('frc_active_event_code') || '');
+  const [eventCode, setEventCode] = useState<string>(() => {
+    const saved = localStorage.getItem('frc_active_event_code') || '';
+    if (saved === '2025micmp') {
+      localStorage.removeItem('frc_active_event_code');
+      return '';
+    }
+    return saved;
+  });
   const [isFetchingTba, setIsFetchingTba] = useState<boolean>(false);
   const [tbaStatusMsg, setTbaStatusMsg] = useState<string | null>(null);
 

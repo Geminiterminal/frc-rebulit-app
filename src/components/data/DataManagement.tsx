@@ -9,8 +9,6 @@ import {
   Check, 
   AlertTriangle,
   QrCode,
-  Wifi,
-  Radio,
   Copy,
   X
 } from 'lucide-react';

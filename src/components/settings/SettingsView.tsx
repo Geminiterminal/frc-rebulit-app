@@ -28,13 +28,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate, onBack }
   const [isClearing, setIsClearing] = useState(false);
   const [tbaStatusMsg, setTbaStatusMsg] = useState<string | null>(null);
   const [isFetchingTba, setIsFetchingTba] = useState(false);
+  const [isClearingUnscouted, setIsClearingUnscouted] = useState(false);
+  const [unscoutedResultMsg, setUnscoutedResultMsg] = useState<string | null>(null);
 
   useEffect(() => {
     loadSettings();
   }, []);
 
   const loadSettings = async () => {
-    const code = await scoutingDB.getSetting<string>('eventCode', '');
+    let code = await scoutingDB.getSetting<string>('eventCode', '');
+    if (code === '2025micmp') {
+      await scoutingDB.setSetting('eventCode', '');
+      localStorage.removeItem('frc_active_event_code');
+      code = '';
+    }
     const key = await scoutingDB.getSetting<string>('tbaApiKey', '');
     setEventCode(code);
     setTbaApiKey(key);
@@ -43,6 +50,33 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate, onBack }
     const matches = await scoutingDB.getAllMatches();
     setTeamCount(teams.length);
     setMatchCount(matches.length);
+  };
+
+  const handleClearUnscoutedTeams = async () => {
+    setIsClearingUnscouted(true);
+    setUnscoutedResultMsg(null);
+    try {
+      const allTeams = await scoutingDB.getAllTeams();
+      const allMatches = await scoutingDB.getAllMatches();
+      const teamNumsWithMatches = new Set(allMatches.map((m) => m.teamNumber));
+
+      let deletedCount = 0;
+      for (const t of allTeams) {
+        const hasPit = t.pit && (t.pit.drivetrain || t.pit.reliability || t.pit.lastUpdated || (t.pit.photos && t.pit.photos.length > 0));
+        const hasMatches = teamNumsWithMatches.has(t.teamNumber);
+        if (!hasPit && !hasMatches) {
+          await scoutingDB.deleteTeam(t.teamNumber);
+          deletedCount++;
+        }
+      }
+      setUnscoutedResultMsg(`Removed ${deletedCount} unscouted teams from roster.`);
+      await loadSettings();
+      setTimeout(() => setUnscoutedResultMsg(null), 3500);
+    } catch {
+      setUnscoutedResultMsg('Failed to clear unscouted teams.');
+    } finally {
+      setIsClearingUnscouted(false);
+    }
   };
 
   const handleClearAll = async () => {
@@ -180,6 +214,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate, onBack }
             {teamCount} Teams • {matchCount} Matches
           </span>
         </div>
+      </div>
+
+      {/* Manage Teams Data */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2">
+        <button
+          type="button"
+          disabled={isClearingUnscouted}
+          onClick={handleClearUnscoutedTeams}
+          className="w-full py-2.5 px-4 rounded-xl bg-slate-950 hover:bg-slate-850 border border-slate-800 text-slate-200 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 font-mono"
+        >
+          <Trash2 className="w-4 h-4 text-slate-400" />
+          <span>{isClearingUnscouted ? 'Clearing...' : 'Clear Unscouted Teams Roster'}</span>
+        </button>
+        {unscoutedResultMsg && (
+          <div className="p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 font-mono text-center">
+            {unscoutedResultMsg}
+          </div>
+        )}
       </div>
 
       {/* Erase All Data */}
