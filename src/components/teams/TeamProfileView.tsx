@@ -67,20 +67,33 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
   const pit = team.pit;
   const matchCount = matches.length;
 
-  // Helper to parse numeric score safely
-  const parseScore = (val: any): number => {
-    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+  // Helper to parse numeric score safely without fallback
+  const parseScore = (val: any): number | null => {
+    if (typeof val === 'number') return isNaN(val) ? null : val;
     if (typeof val === 'string') {
       const p = parseFloat(val);
-      return isNaN(p) ? 0 : p;
+      return isNaN(p) ? null : p;
     }
-    return 0;
+    return null;
   };
 
-  // Scoring metrics using valid match data
-  const autoScores = matches.map((m) => parseScore(m.autoFuelScored ?? m.autoHighScored ?? 0));
-  const teleopScores = matches.map((m) => parseScore(m.teleopFuelScored ?? m.teleopHighScored ?? 0));
-  const totalScores = matches.map((m) => parseScore(m.autoFuelScored ?? m.autoHighScored ?? 0) + parseScore(m.teleopFuelScored ?? m.teleopHighScored ?? 0));
+  // Scoring metrics using valid match data (no fallback 0 for unanswered scores)
+  const validAutoScores = matches
+    .map((m) => parseScore(m.autoFuelScored ?? m.autoHighScored))
+    .filter((v): v is number => v !== null);
+
+  const validTeleopScores = matches
+    .map((m) => parseScore(m.teleopFuelScored ?? m.teleopHighScored))
+    .filter((v): v is number => v !== null);
+
+  const validTotalScores = matches
+    .map((m) => {
+      const a = parseScore(m.autoFuelScored ?? m.autoHighScored);
+      const t = parseScore(m.teleopFuelScored ?? m.teleopHighScored);
+      if (a === null && t === null) return null;
+      return (a ?? 0) + (t ?? 0);
+    })
+    .filter((v): v is number => v !== null);
 
   const getMetrics = (scores: number[]) => {
     const avg = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : '—';
@@ -89,9 +102,9 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
     return { avg, high, low };
   };
 
-  const autoMetrics = getMetrics(autoScores);
-  const teleopMetrics = getMetrics(teleopScores);
-  const totalMetrics = getMetrics(totalScores);
+  const autoMetrics = getMetrics(validAutoScores);
+  const teleopMetrics = getMetrics(validTeleopScores);
+  const totalMetrics = getMetrics(validTotalScores);
 
   const avgAutoFuel = autoMetrics.avg;
   const avgTeleopFuel = teleopMetrics.avg;
@@ -124,14 +137,17 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
   const shootingRange = observedRange || pit?.canShootAnywhere || '—';
   const shootingAccuracy = observedAccuracy || pit?.shootingAccuracy || '—';
 
-  // Reliability metrics
-  const autoWorkedCount = matches.filter((m) => m.autoWorked).length;
-  const noIssueCount = matches.filter((m) => m.robotIssues === 'NONE').length;
-  const minorCount = matches.filter((m) => m.robotIssues === 'MINOR').length;
-  const majorCount = matches.filter((m) => m.robotIssues === 'MAJOR').length;
-  const disabledCount = matches.filter((m) => m.robotIssues === 'DISABLED').length;
+  // Reliability metrics: count only answered entries, no default fallback data
+  const answeredAutoWorked = matches.filter((m) => typeof m.autoWorked === 'boolean');
+  const autoWorkedCount = answeredAutoWorked.filter((m) => m.autoWorked).length;
 
-  // Compact list of issues gathered from notes of every Match Scout submission
+  const matchesWithIssuesScouted = matches.filter((m) => m.robotIssues !== undefined);
+  const noIssueCount = matchesWithIssuesScouted.filter((m) => m.robotIssues === 'NONE').length;
+  const minorCount = matchesWithIssuesScouted.filter((m) => m.robotIssues === 'MINOR').length;
+  const majorCount = matchesWithIssuesScouted.filter((m) => m.robotIssues === 'MAJOR').length;
+  const disabledCount = matchesWithIssuesScouted.filter((m) => m.robotIssues === 'DISABLED').length;
+
+  // List of robot issues: ONLY includes input text that appears after clicking minor, major, or disable
   interface MatchIssueItem {
     matchNumber: number;
     issueType: RobotIssuesType;
@@ -140,27 +156,29 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
   }
 
   const matchIssuesList: MatchIssueItem[] = matches
-    .filter((m) => {
-      const hasRobotIssue = m.robotIssues && m.robotIssues !== 'NONE';
-      const hasWhatHappened = Boolean(m.whatHappenedNote && m.whatHappenedNote.trim());
-      const hasQuickNote = Boolean(m.quickNote && m.quickNote.trim());
-      const hasGeneralNotes = Boolean(m.notes && m.notes.trim());
-      return hasRobotIssue || hasWhatHappened || hasQuickNote || hasGeneralNotes;
-    })
-    .map((m) => {
-      const parts = [
-        m.whatHappenedNote?.trim(),
-        m.quickNote?.trim(),
-        (m.notes && m.notes !== m.quickNote) ? m.notes.trim() : null
-      ].filter(Boolean);
-      const note = parts.join(' | ') || (m.robotIssues && m.robotIssues !== 'NONE' ? `${m.robotIssues} issue reported` : 'Note logged');
-      return {
-        matchNumber: m.matchNumber,
-        issueType: m.robotIssues || 'NONE',
-        note,
-        alliance: m.alliance,
-      };
-    })
+    .filter((m) => m.robotIssues && m.robotIssues !== 'NONE')
+    .map((m) => ({
+      matchNumber: m.matchNumber,
+      issueType: m.robotIssues as RobotIssuesType,
+      note: m.whatHappenedNote?.trim() || '',
+      alliance: m.alliance,
+    }))
+    .sort((a, b) => b.matchNumber - a.matchNumber);
+
+  // Overall match notes: ONLY gathered from the comment/note at the very bottom of the match scout form
+  interface MatchCommentItem {
+    matchNumber: number;
+    note: string;
+    alliance?: 'red' | 'blue';
+  }
+
+  const overallMatchNotes: MatchCommentItem[] = matches
+    .filter((m) => Boolean((m.quickNote && m.quickNote.trim()) || (m.notes && m.notes.trim())))
+    .map((m) => ({
+      matchNumber: m.matchNumber,
+      note: (m.quickNote?.trim() || m.notes?.trim() || ''),
+      alliance: m.alliance,
+    }))
     .sort((a, b) => b.matchNumber - a.matchNumber);
 
   // Problematic / Bad Matches logic based on reliability problems, not just low scores
@@ -194,8 +212,8 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
         reasons.push('Autonomous Routine Failed');
       }
 
-      // 3. Issue keywords in notes indicating reliability breakdown
-      const textToScan = `${m.whatHappenedNote || ''} ${m.quickNote || ''} ${m.notes || ''}`.toLowerCase();
+      // 3. Issue keywords in notes indicating reliability breakdown (only checking robot issue input text)
+      const textToScan = `${m.whatHappenedNote || ''}`.toLowerCase();
       if (/disconnect|lost comms|lost radio|brownout|no comms/.test(textToScan)) {
         reasons.push('Connection / Comms Failure');
         if ((severity as string) !== 'CRITICAL') severity = 'MAJOR';
@@ -216,8 +234,8 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
         reasons.push('Auto Rated 1/5');
       }
 
-      const autoScore = parseScore(m.autoFuelScored ?? m.autoHighScored ?? 0);
-      const teleopScore = parseScore(m.teleopFuelScored ?? m.teleopHighScored ?? 0);
+      const autoScore = parseScore(m.autoFuelScored ?? m.autoHighScored) ?? 0;
+      const teleopScore = parseScore(m.teleopFuelScored ?? m.teleopHighScored) ?? 0;
       const totalScore = autoScore + teleopScore;
 
       // Only flag based on reliability problems, not just low scores!
@@ -456,42 +474,44 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
               <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-850">
                 <div className="text-slate-500 text-[10px] uppercase font-bold">AUTO WORKED</div>
                 <div className="text-base sm:text-lg font-black text-blue-400 mt-0.5">
-                  {matchCount > 0 ? `${autoWorkedCount} / ${matchCount}` : '—'}
+                  {answeredAutoWorked.length > 0 ? `${autoWorkedCount} / ${answeredAutoWorked.length}` : '—'}
                 </div>
               </div>
               <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-850">
                 <div className="text-slate-500 text-[10px] uppercase font-bold">NO ISSUE</div>
                 <div className="text-base sm:text-lg font-black text-emerald-400 mt-0.5">
-                  {matchCount > 0 ? `${noIssueCount} / ${matchCount}` : '—'}
+                  {matchesWithIssuesScouted.length > 0 ? `${noIssueCount} / ${matchesWithIssuesScouted.length}` : '—'}
                 </div>
               </div>
               <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-850">
                 <div className="text-slate-500 text-[10px] uppercase font-bold">MINOR</div>
                 <div className="text-base sm:text-lg font-black text-yellow-400 mt-0.5">
-                  {matchCount > 0 ? minorCount : '—'}
+                  {matchesWithIssuesScouted.length > 0 ? minorCount : '—'}
                 </div>
               </div>
               <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-850">
                 <div className="text-slate-500 text-[10px] uppercase font-bold">MAJOR</div>
                 <div className="text-base sm:text-lg font-black text-rose-400 mt-0.5">
-                  {matchCount > 0 ? majorCount : '—'}
+                  {matchesWithIssuesScouted.length > 0 ? majorCount : '—'}
                 </div>
               </div>
             </div>
 
             <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-slate-300 font-bold">
-              <div>DISABLED: <span className="text-rose-400">{matchCount > 0 ? disabledCount : '—'}</span></div>
+              <div>DISABLED: <span className="text-rose-400">{matchesWithIssuesScouted.length > 0 ? disabledCount : '—'}</span></div>
               <div>PIT BIGGEST ISSUE: <span className="text-rose-400 font-normal">{biggestIssue}</span></div>
             </div>
 
-            {/* COMPACT LIST OF ISSUES GATHERED FROM NOTES OF EVERY MATCH SCOUT SUBMISSION */}
+            {/* LIST OF ROBOT ISSUES: ONLY INCLUDES INPUT TEXT ENTERED FOR MINOR, MAJOR, OR DISABLED */}
             <div className="pt-2 border-t border-slate-800/80 space-y-2">
               <div className="flex items-center justify-between text-xs font-bold text-slate-300">
                 <span className="flex items-center gap-1.5 text-amber-400">
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                  <span>RELIABILITY — BIGGEST ISSUES (MATCH NOTES):</span>
+                  <span>ROBOT ISSUES REPORTED:</span>
                 </span>
-                <span className="text-[10px] text-slate-500 font-normal">{matchIssuesList.length} notes found</span>
+                <span className="text-[10px] text-slate-500 font-normal">
+                  {matchIssuesList.length} {matchIssuesList.length === 1 ? 'issue' : 'issues'}
+                </span>
               </div>
 
               {matchIssuesList.length > 0 ? (
@@ -515,15 +535,21 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
                           </span>
                         )}
                       </div>
-                      <span className="text-slate-300 break-words flex-1 font-mono">
-                        "{item.note}"
-                      </span>
+                      {item.note ? (
+                        <span className="text-slate-300 break-words flex-1 font-mono">
+                          "{item.note}"
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 italic text-[10px]">
+                          No issue details entered
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
               ) : (
                 <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-850 text-[11px] text-slate-400 font-mono italic text-center">
-                  No issues or problem notes recorded across match scout submissions.
+                  No robot issues recorded across match scout submissions.
                 </div>
               )}
             </div>
@@ -661,15 +687,22 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
         )}
       </div>
 
-      {/* 6. NOTES */}
+      {/* 6. NOTES (OVERALL MATCH COMMENTS & PIT NOTES) */}
       <div className="rounded-xl bg-slate-900/80 border border-slate-800 overflow-hidden shadow">
         <div 
           onClick={() => setNotesOpen(!notesOpen)}
           className="p-3.5 px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between cursor-pointer select-none hover:bg-slate-850"
         >
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
-            NOTES
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+              NOTES & MATCH COMMENTS
+            </span>
+            {overallMatchNotes.length > 0 && (
+              <span className="px-2 py-0.2 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-[10px] font-bold">
+                {overallMatchNotes.length}
+              </span>
+            )}
+          </div>
           <button type="button" className="text-slate-400 hover:text-white">
             {notesOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
@@ -677,12 +710,52 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
 
         {notesOpen && (
           <div className="p-4 space-y-3 text-xs font-mono">
-            <div className="text-slate-300 font-bold">
-              Biggest Issue: <span className="text-rose-400 font-normal">{biggestIssue}</span>
-            </div>
-            <p className="text-slate-300 leading-relaxed italic">
-              "{noteText}"
-            </p>
+            {overallMatchNotes.length > 0 ? (
+              <div className="space-y-2">
+                <div className="text-[11px] text-slate-400">
+                  Comments and notes logged on the overall match at the bottom of the match scout form:
+                </div>
+                {overallMatchNotes.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-xl bg-slate-950 border border-slate-850 space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-amber-400 font-black text-xs">
+                          Qual {item.matchNumber}
+                        </span>
+                        {item.alliance && (
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                            item.alliance === 'red' ? 'bg-rose-950 text-rose-300 border-rose-800' : 'bg-sky-950 text-sky-300 border-sky-800'
+                          }`}>
+                            {item.alliance}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-slate-200 leading-relaxed text-xs italic pl-0.5">
+                      "{item.note}"
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-850 text-slate-500 italic text-center">
+                No match notes recorded.
+              </div>
+            )}
+
+            {pit?.notes && (
+              <div className="pt-2 border-t border-slate-800/80 space-y-1">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Pit Scout Notes:
+                </span>
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-850 text-slate-300 italic text-xs leading-relaxed">
+                  "{pit.notes}"
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -776,10 +849,10 @@ export const TeamProfileView: React.FC<TeamProfileViewProps> = ({
                       ))}
                     </div>
 
-                    {/* Scout Notes / What happened */}
-                    {(m.whatHappenedNote || m.quickNote || m.notes) && (
+                    {/* Robot issue details entered */}
+                    {m.whatHappenedNote && (
                       <div className="p-2 rounded-lg bg-slate-950/90 border border-slate-850 text-[11px] text-slate-300 italic">
-                        "{m.whatHappenedNote || m.quickNote || m.notes}"
+                        "{m.whatHappenedNote}"
                       </div>
                     )}
                   </div>

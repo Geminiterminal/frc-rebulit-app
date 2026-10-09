@@ -170,8 +170,8 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           setRateHopper(existing.rateHopper || null);
         } else {
           setAutoWorked(null);
-          setAutoFuelScored(0);
-          setTeleopFuelScored(0);
+          setAutoFuelScored(null);
+          setTeleopFuelScored(null);
           setFieldRoute(null);
           setShootingAccuracy(null);
           setShootingRange(null);
@@ -365,51 +365,51 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
       {/* MATCH SETUP */}
       {isScoutMode ? (
-        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-3">
+        <div className="p-4 sm:p-5 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-3.5">
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-300">
+            <span className="text-sm sm:text-base font-mono font-bold uppercase tracking-wider text-slate-100">
               Match Setup
             </span>
-            <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700/80 text-[10px] font-mono text-amber-400 font-bold uppercase tracking-wide">
+            <span className="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700/80 text-xs font-mono text-amber-400 font-bold uppercase tracking-wide">
               Assigned Scout
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
             {/* Match Number Read-Only */}
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
-              <span className="text-xs font-mono font-bold uppercase text-slate-400">
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 sm:p-4 flex flex-col justify-between">
+              <span className="text-xs sm:text-sm font-mono font-bold uppercase text-slate-400">
                 Match #
               </span>
-              <div className="text-xl sm:text-2xl font-mono font-black text-slate-100 mt-1">
+              <div className="text-2xl sm:text-3xl font-mono font-black text-slate-100 mt-1">
                 Qual {matchNumber}
               </div>
             </div>
 
             {/* Team Number Read-Only */}
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
-              <span className="text-xs font-mono font-bold uppercase text-slate-400">
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 sm:p-4 flex flex-col justify-between">
+              <span className="text-xs sm:text-sm font-mono font-bold uppercase text-slate-400">
                 Team #
               </span>
-              <div className="text-xl sm:text-2xl font-mono font-black text-slate-100 mt-1">
+              <div className="text-2xl sm:text-3xl font-mono font-black text-slate-100 mt-1">
                 {teamNumber ? `Team ${teamNumber}` : '—'}
               </div>
             </div>
           </div>
 
           {/* Alliance Read-Only */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
-            <span className="text-xs font-mono font-bold uppercase text-slate-400">
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3.5 sm:p-4 flex items-center justify-between">
+            <span className="text-xs sm:text-sm font-mono font-bold uppercase text-slate-400">
               Alliance
             </span>
-            <div className={`px-3 py-1.5 rounded-xl font-mono font-black text-xs uppercase flex items-center gap-2 border ${
+            <div className={`px-3.5 py-2 rounded-xl font-mono font-black text-xs sm:text-sm uppercase flex items-center gap-2 border ${
               alliance === 'red'
                 ? 'bg-rose-950/80 text-rose-300 border-rose-600 shadow-sm'
                 : alliance === 'blue'
                 ? 'bg-sky-950/80 text-sky-300 border-sky-600 shadow-sm'
                 : 'bg-slate-900 text-slate-400 border-slate-800'
             }`}>
-              <span className={`w-2.5 h-2.5 rounded-full ${
+              <span className={`w-3 h-3 rounded-full ${
                 alliance === 'red' ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]' :
                 alliance === 'blue' ? 'bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.8)]' :
                 'bg-slate-600'
@@ -420,15 +420,15 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
           {/* Assigned Matches Quick Switcher (only matches this scout is assigned to) */}
           {teamSchedule.length > 1 && (
-            <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-mono font-bold uppercase text-slate-400">
+            <div className="pt-2 border-t border-slate-800/80 space-y-2">
+              <div className="flex items-center justify-between text-xs sm:text-sm font-mono font-bold uppercase text-slate-400">
                 <span className="flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                  <Calendar className="w-4 h-4 text-amber-400" />
                   <span>Your Assigned Matches</span>
                 </span>
-                <span className="text-[10px] text-slate-500">{teamSchedule.length} found</span>
+                <span className="text-xs text-slate-500">{teamSchedule.length} found</span>
               </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 {teamSchedule.map((m) => {
                   const isSelected = matchNumber === m.matchNumber;
                   const isRed = m.redTeams.includes(parseInt(teamNumber, 10));
@@ -438,7 +438,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
                       key={m.key}
                       type="button"
                       onClick={() => setMatchNumber(m.matchNumber)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${
+                      className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-mono font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${
                         isSelected
                           ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm font-black'
                           : `bg-slate-950 hover:bg-slate-850 text-slate-300 ${allianceBadge}`
@@ -454,22 +454,22 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           )}
         </div>
       ) : (
-        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
-          <div className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-300">
+        <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3.5">
+          <div className="text-sm sm:text-base font-mono font-bold uppercase tracking-wider text-slate-100">
             Match Setup
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-3.5">
             {/* Match Counter */}
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between gap-1.5">
-              <span className="text-xs font-mono font-bold uppercase text-slate-400">
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 sm:p-3.5 flex flex-col justify-between gap-2">
+              <span className="text-xs sm:text-sm font-mono font-bold uppercase text-slate-400">
                 Match #
               </span>
               <div className="flex items-center justify-between gap-1">
                 <button
                   type="button"
                   onClick={() => setMatchNumber((prev) => Math.max(1, prev - 1))}
-                  className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-sm cursor-pointer border border-slate-700"
+                  className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-base cursor-pointer border border-slate-700"
                 >
                   −
                 </button>
@@ -479,12 +479,12 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
                   required
                   value={matchNumber}
                   onChange={(e) => setMatchNumber(parseInt(e.target.value, 10) || 1)}
-                  className="w-12 text-center text-lg font-mono font-bold bg-transparent text-slate-200 focus:outline-none"
+                  className="w-14 text-center text-xl font-mono font-bold bg-transparent text-slate-200 focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setMatchNumber((prev) => prev + 1)}
-                  className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-sm cursor-pointer border border-slate-700"
+                  className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-base cursor-pointer border border-slate-700"
                 >
                   +
                 </button>
@@ -492,8 +492,8 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
             </div>
 
             {/* Team Number */}
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between gap-1.5">
-              <span className="text-xs font-mono font-bold uppercase text-slate-400">
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 sm:p-3.5 flex flex-col justify-between gap-2">
+              <span className="text-xs sm:text-sm font-mono font-bold uppercase text-slate-400">
                 Team #
               </span>
               <input
@@ -502,21 +502,21 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
                 placeholder="Team Number"
                 value={teamNumber}
                 onChange={(e) => setTeamNumber(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 px-2.5 text-base font-mono font-bold text-white placeholder-slate-600 focus:outline-none focus:border-slate-600"
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg py-2 px-3 text-lg font-mono font-bold text-white placeholder-slate-600 focus:outline-none focus:border-slate-600"
               />
             </div>
           </div>
 
           {/* Alliance Selector */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 space-y-1.5">
-            <span className="text-xs font-mono font-bold uppercase text-slate-400 block">
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 sm:p-3.5 space-y-2">
+            <span className="text-xs sm:text-sm font-mono font-bold uppercase text-slate-400 block">
               Alliance
             </span>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setAlliance('red')}
-                className={`py-2 rounded-lg font-mono font-bold text-xs uppercase cursor-pointer border transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-2.5 rounded-lg font-mono font-bold text-xs sm:text-sm uppercase cursor-pointer border transition-all flex items-center justify-center gap-2 ${
                   alliance === 'red'
                     ? 'bg-rose-950 text-rose-200 border-rose-500 shadow font-black'
                     : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
@@ -529,7 +529,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
               <button
                 type="button"
                 onClick={() => setAlliance('blue')}
-                className={`py-2 rounded-lg font-mono font-bold text-xs uppercase cursor-pointer border transition-all flex items-center justify-center gap-1.5 ${
+                className={`py-2.5 rounded-lg font-mono font-bold text-xs sm:text-sm uppercase cursor-pointer border transition-all flex items-center justify-center gap-2 ${
                   alliance === 'blue'
                     ? 'bg-sky-950 text-sky-200 border-sky-500 shadow font-black'
                     : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
@@ -543,15 +543,15 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
           {/* Scheduled Matches Quick Selector */}
           {teamSchedule.length > 0 && (
-            <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-mono font-bold uppercase text-slate-400">
+            <div className="pt-2 border-t border-slate-800/80 space-y-2">
+              <div className="flex items-center justify-between text-xs sm:text-sm font-mono font-bold uppercase text-slate-400">
                 <span className="flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                  <Calendar className="w-4 h-4 text-amber-400" />
                   <span>Scheduled Matches for Team {teamNumber}</span>
                 </span>
-                <span className="text-[10px] text-slate-500">{teamSchedule.length} found</span>
+                <span className="text-xs text-slate-500">{teamSchedule.length} found</span>
               </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 {teamSchedule.map((m) => {
                   const isSelected = matchNumber === m.matchNumber;
                   const isRed = m.redTeams.includes(parseInt(teamNumber, 10));
@@ -561,7 +561,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
                       key={m.key}
                       type="button"
                       onClick={() => setMatchNumber(m.matchNumber)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${
+                      className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-mono font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${
                         isSelected
                           ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm font-black'
                           : `bg-slate-950 hover:bg-slate-850 text-slate-300 ${allianceBadge}`
@@ -579,69 +579,69 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       )}
 
       {/* AUTO WORKED & AUTO SCORED */}
-      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3.5">
         {/* Auto Worked? */}
         <div>
-          <span className="block text-xs sm:text-sm font-mono font-bold text-slate-200 mb-1.5">
+          <span className="block text-sm sm:text-base font-mono font-bold text-slate-100 mb-2">
             Auto Worked?
           </span>
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => setAutoWorked(true)}
-              className={`py-2 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              className={`py-2.5 sm:py-3 rounded-xl font-mono font-bold text-xs sm:text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
                 autoWorked === true
                   ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
                   : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
               }`}
             >
-              {autoWorked === true && <Check className="w-3.5 h-3.5 text-emerald-400" />}
+              {autoWorked === true && <Check className="w-4 h-4 text-emerald-400" />}
               <span>YES</span>
             </button>
 
             <button
               type="button"
               onClick={() => setAutoWorked(false)}
-              className={`py-2 rounded-xl font-mono font-bold text-xs uppercase transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              className={`py-2.5 sm:py-3 rounded-xl font-mono font-bold text-xs sm:text-sm uppercase transition-all cursor-pointer flex items-center justify-center gap-2 ${
                 autoWorked === false
                   ? 'bg-slate-800 text-slate-100 border border-slate-600 shadow-sm'
                   : 'bg-slate-950 text-slate-400 border border-slate-850 hover:bg-slate-900'
               }`}
             >
-              {autoWorked === false && <Check className="w-3.5 h-3.5 text-rose-400" />}
+              {autoWorked === false && <Check className="w-4 h-4 text-rose-400" />}
               <span>NO</span>
             </button>
           </div>
         </div>
 
         {/* Auto Scored Counter */}
-        <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
-          <div className="flex items-center justify-between text-xs sm:text-sm font-mono font-bold text-slate-200">
+        <div className="space-y-2 pt-2 border-t border-slate-800/80">
+          <div className="flex items-center justify-between text-sm sm:text-base font-mono font-bold text-slate-100">
             <span>Auto Scored</span>
-            <span className="text-base font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-100">
+            <span className="text-xl sm:text-2xl font-mono font-black px-4 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-amber-400 min-w-[4rem] text-center shadow-inner">
               {autoFuelScored !== null ? autoFuelScored : '—'}
             </span>
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5 pt-1">
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, -20))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-800 text-slate-300 font-mono font-bold text-xs sm:text-sm border border-slate-850 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
             >
               −20
             </button>
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, -5))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-800 text-slate-300 font-mono font-bold text-xs sm:text-sm border border-slate-850 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
             >
               −5
             </button>
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, -1))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-800 text-slate-300 font-mono font-bold text-xs sm:text-sm border border-slate-850 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
             >
               −1
             </button>
@@ -649,7 +649,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
             <button
               type="button"
               onClick={() => setAutoFuelScored(0)}
-              className="py-2 rounded-lg bg-slate-900 text-slate-100 font-mono font-bold text-xs border border-slate-800 flex items-center justify-center cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-100 font-mono font-bold text-xs sm:text-sm border border-slate-750 flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all"
             >
               0
             </button>
@@ -657,21 +657,21 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, 1))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-800 text-emerald-300 hover:text-emerald-200 font-mono font-bold text-xs sm:text-sm border border-slate-850 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
             >
               +1
             </button>
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, 5))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-800 text-emerald-300 hover:text-emerald-200 font-mono font-bold text-xs sm:text-sm border border-slate-850 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
             >
               +5
             </button>
             <button
               type="button"
               onClick={() => setAutoFuelScored((val) => adjustValue(val, 20))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-800 text-emerald-300 hover:text-emerald-200 font-mono font-bold text-xs sm:text-sm border border-slate-850 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
             >
               +20
             </button>
@@ -680,34 +680,34 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       </div>
 
       {/* TELEOP SCORED */}
-      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs sm:text-sm font-mono font-bold text-slate-200">
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm sm:text-base font-mono font-bold text-slate-100">
             <span>Teleop Scored</span>
-            <span className="text-base font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-100">
+            <span className="text-xl sm:text-2xl font-mono font-black px-4 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-amber-400 min-w-[4rem] text-center shadow-inner">
               {teleopFuelScored !== null ? teleopFuelScored : '—'}
             </span>
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-1 sm:gap-1.5 pt-1">
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, -20))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-800 text-slate-300 font-mono font-bold text-xs sm:text-sm border border-slate-850 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
             >
               −20
             </button>
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, -5))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-800 text-slate-300 font-mono font-bold text-xs sm:text-sm border border-slate-850 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
             >
               −5
             </button>
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, -1))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-400 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-800 text-slate-300 font-mono font-bold text-xs sm:text-sm border border-slate-850 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
             >
               −1
             </button>
@@ -715,7 +715,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
             <button
               type="button"
               onClick={() => setTeleopFuelScored(0)}
-              className="py-2 rounded-lg bg-slate-900 text-slate-100 font-mono font-bold text-xs border border-slate-800 flex items-center justify-center cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-100 font-mono font-bold text-xs sm:text-sm border border-slate-750 flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-all"
             >
               0
             </button>
@@ -723,21 +723,21 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, 1))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-800 text-emerald-300 hover:text-emerald-200 font-mono font-bold text-xs sm:text-sm border border-slate-850 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
             >
               +1
             </button>
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, 5))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-800 text-emerald-300 hover:text-emerald-200 font-mono font-bold text-xs sm:text-sm border border-slate-850 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
             >
               +5
             </button>
             <button
               type="button"
               onClick={() => setTeleopFuelScored((val) => adjustValue(val, 20))}
-              className="py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-200 font-mono font-bold text-xs border border-slate-850 cursor-pointer"
+              className="py-3 sm:py-3.5 min-h-[44px] sm:min-h-[48px] rounded-xl bg-slate-950 hover:bg-slate-800 active:bg-slate-800 text-emerald-300 hover:text-emerald-200 font-mono font-bold text-xs sm:text-sm border border-slate-850 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
             >
               +20
             </button>
@@ -749,7 +749,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
         {/* 1. Shooting Accuracy of the Robot */}
         <div>
-          <label className="text-xs sm:text-sm font-mono font-bold text-slate-200 block mb-1.5">
+          <label className="text-sm sm:text-[15px] font-mono font-bold text-slate-100 block mb-2">
             Shooting Accuracy of the Robot
           </label>
           <div className="grid grid-cols-5 gap-1.5">
@@ -774,8 +774,8 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         </div>
 
         {/* 2. Can Shoot From… */}
-        <div className="pt-2 border-t border-slate-800/80">
-          <label className="text-xs sm:text-sm font-mono font-bold text-slate-200 block mb-1.5">
+        <div className="pt-2.5 border-t border-slate-800/80">
+          <label className="text-sm sm:text-[15px] font-mono font-bold text-slate-100 block mb-2">
             Can Shoot From…
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
@@ -802,7 +802,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
       {/* ROUTE */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2.5">
-        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-200">
+        <div className="flex items-center gap-1.5 text-sm sm:text-[15px] font-mono font-bold uppercase tracking-wider text-slate-100">
           <Route className="w-4 h-4 text-slate-400" />
           <span>Field Route</span>
         </div>
@@ -827,7 +827,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
       {/* DEFENSE */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2.5">
-        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-200">
+        <div className="flex items-center gap-1.5 text-sm sm:text-[15px] font-mono font-bold uppercase tracking-wider text-slate-100">
           <Shield className="w-4 h-4 text-slate-400" />
           <span>Played Defense?</span>
         </div>
@@ -852,7 +852,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
       {/* ROBOT ISSUE */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2.5">
-        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-200">
+        <div className="flex items-center gap-1.5 text-sm sm:text-[15px] font-mono font-bold uppercase tracking-wider text-slate-100">
           <AlertTriangle className="w-4 h-4 text-slate-400" />
           <span>Robot Issues / Reliability</span>
         </div>
@@ -889,7 +889,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
       {/* MATCH RATING */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
-        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-200">
+        <div className="flex items-center gap-1.5 text-sm sm:text-[15px] font-mono font-bold uppercase tracking-wider text-slate-100">
           <Star className="w-4 h-4 text-amber-400" />
           <span>Match Rating (1–5)</span>
         </div>
@@ -994,7 +994,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
       {/* NOTES */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
-        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-200">
+        <div className="flex items-center gap-1.5 text-sm sm:text-[15px] font-mono font-bold uppercase tracking-wider text-slate-100">
           <MessageSquare className="w-4 h-4 text-slate-400" />
           <span>Scout Notes</span>
         </div>

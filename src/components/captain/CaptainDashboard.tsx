@@ -281,9 +281,6 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
               <span className="text-sm font-bold text-white uppercase tracking-wider block">
                 RANKING & PICKLIST
               </span>
-              <span className="text-[11px] text-slate-400 font-normal">
-                Alliance selection & custom ordered list
-              </span>
             </div>
           </div>
           <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
@@ -301,9 +298,6 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
             <div>
               <span className="text-sm font-bold text-white uppercase tracking-wider block">
                 STRATEGY BOARD
-              </span>
-              <span className="text-[11px] text-slate-400 font-normal">
-                Interactive field mapping & match planning
               </span>
             </div>
           </div>

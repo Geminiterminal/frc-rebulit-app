@@ -37,10 +37,10 @@ interface EnrichedTeam {
   teamNumber: number;
   teamName: string;
   matchesCount: number;
-  highestFuel: number;
-  lowestFuel: number;
-  avgTotalFuel: number;
-  avgAutoFuel: number;
+  highestFuel: number | null;
+  lowestFuel: number | null;
+  avgTotalFuel: number | null;
+  avgAutoFuel: number | null;
   hopperCapacity: number | string;
   officialRank?: number;
   stateRank?: number;
@@ -266,13 +266,23 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
     const teamMatches = matches.filter((m) => m.teamNumber === team.teamNumber);
     const count = teamMatches.length;
 
-    const totalFuelValues = teamMatches.map((m) => (Number(m.autoFuelScored ?? m.autoHighScored ?? 0)) + (Number(m.teleopFuelScored ?? m.teleopHighScored ?? 0)));
-    const autoFuelValues = teamMatches.map((m) => Number(m.autoFuelScored ?? m.autoHighScored ?? 0));
+    const totalFuelValues = teamMatches
+      .map((m) => {
+        const a = typeof m.autoFuelScored === 'number' ? m.autoFuelScored : typeof m.autoHighScored === 'number' ? m.autoHighScored : null;
+        const t = typeof m.teleopFuelScored === 'number' ? m.teleopFuelScored : typeof m.teleopHighScored === 'number' ? m.teleopHighScored : null;
+        if (a === null && t === null) return null;
+        return (a ?? 0) + (t ?? 0);
+      })
+      .filter((v): v is number => v !== null);
 
-    const highestFuel = count > 0 ? Math.max(...totalFuelValues) : 0;
-    const lowestFuel = count > 0 ? Math.min(...totalFuelValues) : 0;
-    const avgTotalFuel = count > 0 ? totalFuelValues.reduce((a, b) => a + b, 0) / count : 0;
-    const avgAutoFuel = count > 0 ? autoFuelValues.reduce((a, b) => a + b, 0) / count : 0;
+    const autoFuelValues = teamMatches
+      .map((m) => (typeof m.autoFuelScored === 'number' ? m.autoFuelScored : typeof m.autoHighScored === 'number' ? m.autoHighScored : null))
+      .filter((v): v is number => v !== null);
+
+    const highestFuel = totalFuelValues.length > 0 ? Math.max(...totalFuelValues) : null;
+    const lowestFuel = totalFuelValues.length > 0 ? Math.min(...totalFuelValues) : null;
+    const avgTotalFuel = totalFuelValues.length > 0 ? totalFuelValues.reduce((a, b) => a + b, 0) / totalFuelValues.length : null;
+    const avgAutoFuel = autoFuelValues.length > 0 ? autoFuelValues.reduce((a, b) => a + b, 0) / autoFuelValues.length : null;
 
     const hopperCapacity = team.pit?.hopperCapacity !== undefined ? team.pit.hopperCapacity : '—';
 
@@ -300,10 +310,16 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
         const pB = b.customPicklistRank ?? 9999;
         return pA - pB;
       }
-      case 'totalFuel':
-        return b.avgTotalFuel - a.avgTotalFuel;
-      case 'autoFuel':
-        return b.avgAutoFuel - a.avgAutoFuel;
+      case 'totalFuel': {
+        const tA = a.avgTotalFuel !== null ? a.avgTotalFuel : -1;
+        const tB = b.avgTotalFuel !== null ? b.avgTotalFuel : -1;
+        return tB - tA;
+      }
+      case 'autoFuel': {
+        const uA = a.avgAutoFuel !== null ? a.avgAutoFuel : -1;
+        const uB = b.avgAutoFuel !== null ? b.avgAutoFuel : -1;
+        return uB - uA;
+      }
       case 'matchesScouted':
         return b.matchesCount - a.matchesCount;
       case 'officialRank': {
@@ -479,28 +495,28 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
         {/* Highest Fuel */}
         <td className="p-2 sm:p-3 text-center font-mono font-bold text-emerald-400">
           <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
-            {item.highestFuel}
+            {item.highestFuel !== null ? item.highestFuel : '—'}
           </span>
         </td>
 
         {/* Lowest Fuel */}
         <td className="p-2 sm:p-3 text-center font-mono font-bold text-amber-400">
           <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
-            {item.lowestFuel}
+            {item.lowestFuel !== null ? item.lowestFuel : '—'}
           </span>
         </td>
 
         {/* Avg Fuel */}
         <td className="p-2 sm:p-3 text-center font-mono font-bold text-slate-100 text-sm">
           <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
-            {item.avgTotalFuel.toFixed(1)}
+            {item.avgTotalFuel !== null ? item.avgTotalFuel.toFixed(1) : '—'}
           </span>
         </td>
 
         {/* Avg Auto Fuel */}
         <td className="p-2 sm:p-3 text-center font-mono font-bold text-blue-400">
           <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
-            {item.avgAutoFuel.toFixed(1)}
+            {item.avgAutoFuel !== null ? item.avgAutoFuel.toFixed(1) : '—'}
           </span>
         </td>
 
