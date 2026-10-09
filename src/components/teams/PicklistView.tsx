@@ -26,21 +26,22 @@ interface PicklistViewProps {
 
 export type SortOption = 
   | 'preferenceRank'
-  | 'officialRank'
-  | 'stateRank'
-  | 'totalFuel' 
-  | 'autoFuel' 
-  | 'matchesScouted';
+  | 'highestScore'
+  | 'lowestScore'
+  | 'hopperCapacity'
+  | 'avgScore'
+  | 'eventRank'
+  | 'frcRank';
 
 interface EnrichedTeam {
   team: TeamProfile;
   teamNumber: number;
   teamName: string;
   matchesCount: number;
-  highestFuel: number | null;
-  lowestFuel: number | null;
-  avgTotalFuel: number | null;
-  avgAutoFuel: number | null;
+  highestFuel: number;
+  lowestFuel: number;
+  avgTotalFuel: number;
+  highestAutoFuel: number;
   hopperCapacity: number | string;
   officialRank?: number;
   stateRank?: number;
@@ -266,23 +267,13 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
     const teamMatches = matches.filter((m) => m.teamNumber === team.teamNumber);
     const count = teamMatches.length;
 
-    const totalFuelValues = teamMatches
-      .map((m) => {
-        const a = typeof m.autoFuelScored === 'number' ? m.autoFuelScored : typeof m.autoHighScored === 'number' ? m.autoHighScored : null;
-        const t = typeof m.teleopFuelScored === 'number' ? m.teleopFuelScored : typeof m.teleopHighScored === 'number' ? m.teleopHighScored : null;
-        if (a === null && t === null) return null;
-        return (a ?? 0) + (t ?? 0);
-      })
-      .filter((v): v is number => v !== null);
+    const totalFuelValues = teamMatches.map((m) => (Number(m.autoFuelScored ?? m.autoHighScored ?? 0)) + (Number(m.teleopFuelScored ?? m.teleopHighScored ?? 0)));
+    const autoFuelValues = teamMatches.map((m) => Number(m.autoFuelScored ?? m.autoHighScored ?? 0));
 
-    const autoFuelValues = teamMatches
-      .map((m) => (typeof m.autoFuelScored === 'number' ? m.autoFuelScored : typeof m.autoHighScored === 'number' ? m.autoHighScored : null))
-      .filter((v): v is number => v !== null);
-
-    const highestFuel = totalFuelValues.length > 0 ? Math.max(...totalFuelValues) : null;
-    const lowestFuel = totalFuelValues.length > 0 ? Math.min(...totalFuelValues) : null;
-    const avgTotalFuel = totalFuelValues.length > 0 ? totalFuelValues.reduce((a, b) => a + b, 0) / totalFuelValues.length : null;
-    const avgAutoFuel = autoFuelValues.length > 0 ? autoFuelValues.reduce((a, b) => a + b, 0) / autoFuelValues.length : null;
+    const highestFuel = count > 0 ? Math.max(...totalFuelValues) : 0;
+    const lowestFuel = count > 0 ? Math.min(...totalFuelValues) : 0;
+    const avgTotalFuel = count > 0 ? totalFuelValues.reduce((a, b) => a + b, 0) / count : 0;
+    const highestAutoFuel = count > 0 ? Math.max(...autoFuelValues) : 0;
 
     const hopperCapacity = team.pit?.hopperCapacity !== undefined ? team.pit.hopperCapacity : '—';
 
@@ -294,7 +285,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
       highestFuel,
       lowestFuel,
       avgTotalFuel,
-      avgAutoFuel,
+      highestAutoFuel,
       hopperCapacity,
       officialRank: team.officialRank,
       stateRank: team.stateRank,
@@ -310,24 +301,23 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
         const pB = b.customPicklistRank ?? 9999;
         return pA - pB;
       }
-      case 'totalFuel': {
-        const tA = a.avgTotalFuel !== null ? a.avgTotalFuel : -1;
-        const tB = b.avgTotalFuel !== null ? b.avgTotalFuel : -1;
-        return tB - tA;
+      case 'highestScore':
+        return b.highestFuel - a.highestFuel;
+      case 'lowestScore':
+        return a.lowestFuel - b.lowestFuel;
+      case 'hopperCapacity': {
+        const hA = typeof a.hopperCapacity === 'number' ? a.hopperCapacity : 0;
+        const hB = typeof b.hopperCapacity === 'number' ? b.hopperCapacity : 0;
+        return hB - hA;
       }
-      case 'autoFuel': {
-        const uA = a.avgAutoFuel !== null ? a.avgAutoFuel : -1;
-        const uB = b.avgAutoFuel !== null ? b.avgAutoFuel : -1;
-        return uB - uA;
-      }
-      case 'matchesScouted':
-        return b.matchesCount - a.matchesCount;
-      case 'officialRank': {
+      case 'avgScore':
+        return b.avgTotalFuel - a.avgTotalFuel;
+      case 'eventRank': {
         const rA = a.officialRank !== undefined ? a.officialRank : 999;
         const rB = b.officialRank !== undefined ? b.officialRank : 999;
         return rA - rB;
       }
-      case 'stateRank': {
+      case 'frcRank': {
         const sA = a.stateRank !== undefined ? a.stateRank : 9999;
         const sB = b.stateRank !== undefined ? b.stateRank : 9999;
         return sA - sB;
@@ -495,28 +485,28 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
         {/* Highest Fuel */}
         <td className="p-2 sm:p-3 text-center font-mono font-bold text-emerald-400">
           <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
-            {item.highestFuel !== null ? item.highestFuel : '—'}
+            {item.highestFuel}
           </span>
         </td>
 
         {/* Lowest Fuel */}
         <td className="p-2 sm:p-3 text-center font-mono font-bold text-amber-400">
           <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
-            {item.lowestFuel !== null ? item.lowestFuel : '—'}
+            {item.lowestFuel}
           </span>
         </td>
 
         {/* Avg Fuel */}
         <td className="p-2 sm:p-3 text-center font-mono font-bold text-slate-100 text-sm">
           <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
-            {item.avgTotalFuel !== null ? item.avgTotalFuel.toFixed(1) : '—'}
+            {item.avgTotalFuel.toFixed(1)}
           </span>
         </td>
 
         {/* Avg Auto Fuel */}
         <td className="p-2 sm:p-3 text-center font-mono font-bold text-blue-400">
           <span className={rowUnavailable ? 'line-through text-slate-600' : ''}>
-            {item.avgAutoFuel !== null ? item.avgAutoFuel.toFixed(1) : '—'}
+            {item.highestAutoFuel}
           </span>
         </td>
 
@@ -664,11 +654,12 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
             className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-slate-200 focus:outline-none focus:border-slate-600 cursor-pointer w-full sm:w-auto"
           >
             <option value="preferenceRank">Custom Rank</option>
-            <option value="officialRank">Official Event Rank</option>
-            <option value="stateRank">FRC State/District Rank</option>
-            <option value="totalFuel">Average Score (Total)</option>
-            <option value="autoFuel">Auto Scored</option>
-            <option value="matchesScouted">Matches Scouted</option>
+            <option value="highestScore">Highest Score</option>
+            <option value="lowestScore">Lowest Score</option>
+            <option value="hopperCapacity">Hooper Capacity</option>
+            <option value="avgScore">Avg Score</option>
+            <option value="eventRank">Event Rank</option>
+            <option value="frcRank">FRC Rank</option>
           </select>
         </div>
 
@@ -737,7 +728,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
               <th className="p-2 sm:p-3 text-center">High Scored</th>
               <th className="p-2 sm:p-3 text-center">Low Scored</th>
               <th className="p-2 sm:p-3 text-center">Avg Score</th>
-              <th className="p-2 sm:p-3 text-center">Avg Auto Scored</th>
+              <th className="p-2 sm:p-3 text-center">Highest Auto</th>
               <th className="p-2 sm:p-3 text-center">Hopper Capacity</th>
               <th className="p-2 sm:p-3 text-center">Event Rank</th>
               <th className="p-2 sm:p-3 text-center">FRC Rank</th>
@@ -792,7 +783,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
                   <th className="p-2 sm:p-3 text-center">High Scored</th>
                   <th className="p-2 sm:p-3 text-center">Low Scored</th>
                   <th className="p-2 sm:p-3 text-center">Avg Score</th>
-                  <th className="p-2 sm:p-3 text-center">Avg Auto Scored</th>
+                  <th className="p-2 sm:p-3 text-center">Highest Auto</th>
                   <th className="p-2 sm:p-3 text-center">Hopper Capacity</th>
                   <th className="p-2 sm:p-3 text-center">Event Rank</th>
                   <th className="p-2 sm:p-3 text-center">FRC Rank</th>
