@@ -277,7 +277,7 @@ export const TeamCompareView: React.FC<TeamCompareViewProps> = ({
               </tr>
 
               <tr>
-                <td className="p-3 font-semibold text-slate-400">Avg Total Fuel</td>
+                <td className="p-3 font-semibold text-slate-400">Average Score</td>
                 {comparedStats.map((s) => (
                   <td key={s.teamNum} className="p-3 text-center font-bold text-slate-100 text-sm">
                     {s.avgTotalFuel}

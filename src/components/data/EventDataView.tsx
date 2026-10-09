@@ -184,10 +184,10 @@ export const EventDataView: React.FC<EventDataViewProps> = ({ onNavigate, onBack
 
                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300 pt-1">
                   <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono">
-                    Auto Fuel: <strong className="text-blue-400">{m.autoFuelScored ?? m.autoHighScored ?? 0}</strong>
+                    Auto Scored: <strong className="text-blue-400">{m.autoFuelScored ?? m.autoHighScored ?? 0}</strong>
                   </span>
                   <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono">
-                    Teleop Fuel: <strong className="text-emerald-400">{m.teleopFuelScored ?? m.teleopHighScored ?? 0}</strong>
+                    Teleop Scored: <strong className="text-emerald-400">{m.teleopFuelScored ?? m.teleopHighScored ?? 0}</strong>
                   </span>
                   {m.fieldRoute && (
                     <span className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 font-mono text-purple-300">

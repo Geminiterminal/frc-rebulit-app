@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { 
   Trophy, 
-  Map, 
+  Map as MapIcon, 
   ChevronRight, 
   Users, 
   TrendingUp, 
@@ -68,10 +68,13 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
   }, []);
 
   const loadData = async () => {
-    const teams = await scoutingDB.getAllTeams();
+    const [teams, matches, allSchedule] = await Promise.all([
+      scoutingDB.getAllTeams(),
+      scoutingDB.getAllMatches(),
+      scoutingDB.getSchedule(),
+    ]);
     setAllTeams(teams);
 
-    const matches = await scoutingDB.getAllMatches();
     const teamNumsWithMatches = new Set(matches.map((m) => m.teamNumber));
 
     const filtered = teams.filter((t) => {
@@ -86,9 +89,20 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
     });
     setScoutedTeams(filtered);
 
+    // Compute schedule map synchronously in-memory to eliminate sequential DB calls
     const schedMap: Record<number, EventScheduleMatch[]> = {};
     for (const t of teams) {
-      schedMap[t.teamNumber] = await scoutingDB.getScheduleForTeam(t.teamNumber);
+      const teamNum = t.teamNumber;
+      const teamMatches = allSchedule.filter(
+        (m) => m.redTeams.includes(teamNum) || m.blueTeams.includes(teamNum)
+      );
+      const map = new Map<number, EventScheduleMatch>();
+      for (const m of teamMatches) {
+        if (!map.has(m.matchNumber) || m.compLevel === 'qm') {
+          map.set(m.matchNumber, m);
+        }
+      }
+      schedMap[teamNum] = Array.from(map.values()).sort((a, b) => a.matchNumber - b.matchNumber);
     }
     setTeamSchedulesMap(schedMap);
 
@@ -257,33 +271,43 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
         <button
           type="button"
           onClick={() => onNavigate('picklist')}
-          className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-left cursor-pointer flex items-center justify-between shadow-sm transition-all group"
+          className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-left cursor-pointer flex items-center justify-between shadow-sm transition-all group active:scale-[0.99]"
         >
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-slate-850 border border-slate-800 text-slate-200 flex items-center justify-center shrink-0">
-              <Trophy className="w-5 h-5 text-slate-200" />
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <Trophy className="w-5 h-5 text-amber-400" />
             </div>
-            <span className="text-sm font-bold text-white uppercase tracking-wider">
-              RANKING
-            </span>
+            <div>
+              <span className="text-sm font-bold text-white uppercase tracking-wider block">
+                RANKING & PICKLIST
+              </span>
+              <span className="text-[11px] text-slate-400 font-normal">
+                Alliance selection & custom ordered list
+              </span>
+            </div>
           </div>
-          <ChevronRight className="w-5 h-5 text-slate-500 group-hover:translate-x-1 transition-transform" />
+          <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
         </button>
 
         <button
           type="button"
           onClick={() => onNavigate('strategy-field')}
-          className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-left cursor-pointer flex items-center justify-between shadow-sm transition-all group"
+          className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-left cursor-pointer flex items-center justify-between shadow-sm transition-all group active:scale-[0.99]"
         >
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-slate-850 border border-slate-800 text-slate-200 flex items-center justify-center shrink-0">
-              <Map className="w-5 h-5 text-slate-200" />
+            <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+              <MapIcon className="w-5 h-5 text-sky-400" />
             </div>
-            <span className="text-sm font-bold text-white uppercase tracking-wider">
-              STRATEGY
-            </span>
+            <div>
+              <span className="text-sm font-bold text-white uppercase tracking-wider block">
+                STRATEGY BOARD
+              </span>
+              <span className="text-[11px] text-slate-400 font-normal">
+                Interactive field mapping & match planning
+              </span>
+            </div>
           </div>
-          <ChevronRight className="w-5 h-5 text-slate-500 group-hover:translate-x-1 transition-transform" />
+          <ChevronRight className="w-5 h-5 text-slate-500 group-hover:text-sky-400 group-hover:translate-x-1 transition-all" />
         </button>
       </div>
 
@@ -503,7 +527,7 @@ export const CaptainDashboard: React.FC<CaptainDashboardProps> = ({ onNavigate }
           className="p-3 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white font-bold text-xs flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-colors"
         >
           <FolderDown className="w-4 h-4 text-slate-400" />
-          <span className="text-[10px] truncate max-w-full">Export/Sy_</span>
+          <span className="text-[10px] truncate max-w-full">Sync / Backup</span>
         </button>
 
         <button

@@ -31,10 +31,6 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
   const [teamScoutedMatchesMap, setTeamScoutedMatchesMap] = useState<Record<number, number[]>>({});
   const [expandedTeams, setExpandedTeams] = useState<Set<number>>(new Set());
 
-  const [manualTeamInput, setManualTeamInput] = useState<string>('');
-  const [manualMatchInput, setManualMatchInput] = useState<string>('');
-
-  // Scanner Modal state
   const [isScanAssignmentOpen, setIsScanAssignmentOpen] = useState<boolean>(false);
   const [scanAssignmentMsg, setScanAssignmentMsg] = useState<string | null>(null);
 
@@ -44,8 +40,28 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
 
   useEffect(() => {
     loadScoutData();
-    const interval = setInterval(loadScoutData, 4000);
-    return () => clearInterval(interval);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadScoutData();
+      }
+    };
+
+    window.addEventListener('focus', loadScoutData);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Efficient interval that only runs when document is visible
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        loadScoutData();
+      }
+    }, 10000);
+
+    return () => {
+      window.removeEventListener('focus', loadScoutData);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(interval);
+    };
   }, []);
 
   const loadScoutData = async () => {
@@ -60,19 +76,44 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
 
     const allTeamNums = Array.from(new Set([...teams, ...matchTargets.map((m) => m.teamNumber)]));
 
+    // Batch query IndexedDB in parallel once to eliminate repeated per-team DB lookups
+    const [allDbTeams, allDbMatches, fullSchedule] = await Promise.all([
+      scoutingDB.getAllTeams(),
+      scoutingDB.getAllMatches(),
+      scoutingDB.getSchedule(),
+    ]);
+
     const statuses: Record<number, { isPitScouted: boolean; matchCount: number; isMatchScouted: boolean }> = {};
     const schedMap: Record<number, EventScheduleMatch[]> = {};
     const scoutedMatchesMap: Record<number, number[]> = {};
 
     for (const t of allTeamNums) {
-      const st = await scoutingAssignments.getTeamStatus(t);
+      const teamProfile = allDbTeams.find((tm) => tm.teamNumber === t);
+      const matches = allDbMatches.filter((m) => m.teamNumber === t);
+      const isPitScouted = Boolean(
+        teamProfile && (
+          teamProfile.pit?.drivetrain || 
+          teamProfile.pit?.shooter?.length || 
+          teamProfile.pit?.notes || 
+          teamProfile.pit?.photos?.length ||
+          teamProfile.pit?.lastUpdated
+        )
+      );
+
       statuses[t] = {
-        isPitScouted: st.isPitScouted,
-        matchCount: st.matchCount,
-        isMatchScouted: st.matchCount > 0,
+        isPitScouted,
+        matchCount: matches.length,
+        isMatchScouted: matches.length > 0,
       };
-      schedMap[t] = await scoutingDB.getScheduleForTeam(t);
-      const matches: MatchScoutingRecord[] = await scoutingDB.getMatchesForTeam(t);
+
+      const teamMatches = fullSchedule.filter((m) => m.redTeams.includes(t) || m.blueTeams.includes(t));
+      const map = new Map<number, EventScheduleMatch>();
+      for (const m of teamMatches) {
+        if (!map.has(m.matchNumber) || m.compLevel === 'qm') {
+          map.set(m.matchNumber, m);
+        }
+      }
+      schedMap[t] = Array.from(map.values()).sort((a, b) => a.matchNumber - b.matchNumber);
       scoutedMatchesMap[t] = matches.map((m) => m.matchNumber);
     }
 
@@ -139,24 +180,6 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
     }
   };
 
-  const handleAddManualTeam = (e: React.FormEvent) => {
-    e.preventDefault();
-    const num = parseInt(manualTeamInput.trim(), 10);
-    const matchNum = parseInt(manualMatchInput.trim(), 10);
-
-    if (num > 0) {
-      if (!isPitMode && matchNum > 0) {
-        const updated = [...myMatchTargets, { matchNumber: matchNum, teamNumber: num }];
-        scoutingAssignments.setMyMatchTargets(updated);
-      } else if (isPitMode || isNaN(matchNum)) {
-        scoutingAssignments.addTeamToTarget(num);
-      }
-      setExpandedTeams((prev) => new Set(prev).add(num));
-      setManualTeamInput('');
-      setManualMatchInput('');
-      loadScoutData();
-    }
-  };
 
   const isPitMode = scoutProfile.position === 'PIT_SCOUT' || (!scoutProfile.position.includes('MATCH') && !scoutProfile.name.toLowerCase().includes('match'));
 
@@ -167,9 +190,9 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
         <button
           type="button"
           onClick={() => setIsScanAssignmentOpen(true)}
-          className="w-full py-3 px-3 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-100 border border-slate-800 font-bold text-xs uppercase cursor-pointer flex items-center justify-center gap-2 transition-colors shadow-sm animate-pulse"
+          className="w-full py-4 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-100 border-2 border-amber-500 font-black text-sm uppercase cursor-pointer flex items-center justify-center gap-2 transition-all shadow-lg ring-2 ring-amber-500/30"
         >
-          <Camera className="w-4 h-4 text-slate-300" />
+          <Camera className="w-5 h-5 text-amber-400" />
           <span>Scan Assignment QR</span>
         </button>
       </div>
@@ -356,43 +379,10 @@ export const ScoutDashboard: React.FC<ScoutDashboardProps> = ({ onNavigate }) =>
           <HelpCircle className="w-8 h-8 text-slate-500 mx-auto" />
           <p className="font-bold text-white uppercase text-xs">No active assignments found</p>
           <p className="text-[11px] text-slate-500 leading-normal">
-            Scan a Pit or Match assignment QR code from your team captain, or manually add targets below.
+            Scan a Pit or Match assignment QR code from your team captain to get started.
           </p>
         </div>
       )}
-
-      {/* 4. MANUAL TARGET / MATCH ENROLLER */}
-      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 space-y-2.5">
-        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block font-mono">
-          Enroll Custom Team / Match Target
-        </span>
-        <form onSubmit={handleAddManualTeam} className="flex items-center gap-2">
-          <input
-            type="number"
-            placeholder="Team #"
-            value={manualTeamInput}
-            onChange={(e) => setManualTeamInput(e.target.value)}
-            className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono"
-            min={1}
-            required
-          />
-          <input
-            type="number"
-            placeholder="Match # (Optional)"
-            value={manualMatchInput}
-            onChange={(e) => setManualMatchInput(e.target.value)}
-            className="w-32 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600 font-mono"
-            min={1}
-          />
-          <button
-            type="submit"
-            className="py-1.5 px-3 bg-slate-850 hover:bg-slate-800 text-slate-200 rounded-xl text-xs font-bold cursor-pointer transition-colors border border-slate-750 flex items-center gap-1 font-mono uppercase"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add</span>
-          </button>
-        </form>
-      </div>
 
       {/* SCAN ASSIGNMENT QR MODAL */}
       <QrScannerModal

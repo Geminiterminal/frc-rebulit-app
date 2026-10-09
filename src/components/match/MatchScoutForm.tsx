@@ -33,6 +33,7 @@ interface MatchScoutFormProps {
   initialAlliance?: 'red' | 'blue';
   onNavigate: (view: string, teamNumber?: number, extraParam?: any, allianceParam?: 'red' | 'blue') => void;
   onBack: () => void;
+  appMode?: 'captain' | 'scout';
 }
 
 const ACCURACY_OPTIONS: ShootingAccuracy[] = [
@@ -56,7 +57,9 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
   initialAlliance,
   onNavigate,
   onBack,
+  appMode,
 }) => {
+  const isScoutMode = appMode === 'scout';
   // MATCH SETUP
   const [matchNumber, setMatchNumber] = useState<number>(initialMatchNumber);
   const [teamNumber, setTeamNumber] = useState<string>(
@@ -67,10 +70,10 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
   // AUTO
   const [autoWorked, setAutoWorked] = useState<boolean | null>(null);
-  const [autoFuelScored, setAutoFuelScored] = useState<number>(0);
+  const [autoFuelScored, setAutoFuelScored] = useState<number | null>(null);
 
   // TELEOP
-  const [teleopFuelScored, setTeleopFuelScored] = useState<number>(0);
+  const [teleopFuelScored, setTeleopFuelScored] = useState<number | null>(null);
 
   // SHOOTING ACCURACY & RANGE
   const [shootingAccuracy, setShootingAccuracy] = useState<ShootingAccuracy | null>(null);
@@ -122,7 +125,15 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
     const teamNum = parseInt(teamNumber, 10);
     if (!isNaN(teamNum) && teamNum > 0) {
       scoutingDB.getScheduleForTeam(teamNum).then((sched) => {
-        setTeamSchedule(sched);
+        if (isScoutMode) {
+          const myMatchNumbers = scoutingAssignments.getMyMatchTasks()
+            .filter((t) => t.teamNumber === teamNum)
+            .map((t) => t.matchNumber);
+          const filtered = sched.filter((m) => myMatchNumbers.includes(m.matchNumber));
+          setTeamSchedule(filtered);
+        } else {
+          setTeamSchedule(sched);
+        }
         if (matchNumber > 0 && sched.length > 0) {
           const m = sched.find((s) => s.matchNumber === matchNumber);
           if (m) {
@@ -134,7 +145,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
     } else {
       setTeamSchedule([]);
     }
-  }, [teamNumber, matchNumber]);
+  }, [teamNumber, matchNumber, isScoutMode]);
 
   useEffect(() => {
     const teamNum = parseInt(teamNumber, 10);
@@ -143,9 +154,9 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         const existing = records.find((r) => r.matchNumber === matchNumber);
         if (existing) {
           if (existing.alliance) setAlliance(existing.alliance);
-          setAutoWorked(existing.autoWorked);
-          setAutoFuelScored(existing.autoFuelScored || existing.autoHighScored || 0);
-          setTeleopFuelScored(existing.teleopFuelScored || existing.teleopHighScored || 0);
+          setAutoWorked(existing.autoWorked !== undefined ? existing.autoWorked : null);
+          setAutoFuelScored(existing.autoFuelScored !== undefined ? existing.autoFuelScored : null);
+          setTeleopFuelScored(existing.teleopFuelScored !== undefined ? existing.teleopFuelScored : null);
           setFieldRoute(existing.fieldRoute || null);
           setShootingAccuracy((existing.shootingAccuracy as ShootingAccuracy) || (existing.shooterAccuracy as ShootingAccuracy) || null);
           setShootingRange(existing.shootingRange || (typeof existing.canShootAnywhere === 'string' ? existing.canShootAnywhere : (existing.canShootAnywhere ? 'ANYWHERE' : null)));
@@ -177,8 +188,8 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
     }
   }, [teamNumber, matchNumber]);
 
-  const adjustValue = (current: number, delta: number) => {
-    return Math.max(0, current + delta);
+  const adjustValue = (current: number | null, delta: number) => {
+    return Math.max(0, (current || 0) + delta);
   };
 
   const handleSaveMatch = async (e: React.FormEvent) => {
@@ -196,21 +207,21 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       matchNumber,
       alliance: alliance || undefined,
       timestamp: Date.now(),
-      autoWorked: autoWorked !== null ? autoWorked : false,
-      autoFuelScored,
-      teleopFuelScored,
+      autoWorked: autoWorked !== null ? autoWorked : undefined,
+      autoFuelScored: autoFuelScored !== null ? autoFuelScored : undefined,
+      teleopFuelScored: teleopFuelScored !== null ? teleopFuelScored : undefined,
       shootingAccuracy: shootingAccuracy || undefined,
       shooterAccuracy: shootingAccuracy || undefined,
       shootingRange: shootingRange || undefined,
       canShootAnywhere: shootingRange || undefined,
-      fieldRoute: fieldRoute || 'NEITHER',
-      playedDefense: defenseLevel !== 'NONE',
-      defenseEffectiveness: defenseLevel !== 'NONE' ? (defenseLevel === 'HIGH' ? 'HIGH' : defenseLevel === 'LOW' ? 'LOW' : 'MEDIUM') : undefined,
-      robotIssues: robotIssues || 'NONE',
+      fieldRoute: fieldRoute || undefined,
+      playedDefense: defenseLevel !== null ? (defenseLevel !== 'NONE') : undefined,
+      defenseEffectiveness: (defenseLevel !== null && defenseLevel !== 'NONE') ? (defenseLevel === 'HIGH' ? 'HIGH' : defenseLevel === 'LOW' ? 'LOW' : 'MEDIUM') : undefined,
+      robotIssues: robotIssues || undefined,
       whatHappenedNote: (robotIssues && robotIssues !== 'NONE') ? whatHappenedNote : undefined,
       quickNote: quickNote.trim() || undefined,
-      autoHighScored: autoFuelScored,
-      teleopHighScored: teleopFuelScored,
+      autoHighScored: autoFuelScored !== null ? autoFuelScored : undefined,
+      teleopHighScored: teleopFuelScored !== null ? teleopFuelScored : undefined,
       notes: quickNote,
       rateAuto: rateAuto as any,
       rateDriving: rateDriving as any,
@@ -243,19 +254,19 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       setMatchNumber((prev) => prev + 1);
       setTeamNumber('');
       setAutoWorked(null);
-      setAutoFuelScored(0);
-      setTeleopFuelScored(0);
+      setAutoFuelScored(null);
+      setTeleopFuelScored(null);
       setShootingAccuracy(null);
       setShootingRange(null);
       setFieldRoute(null);
       setRobotIssues(null);
       setWhatHappenedNote('');
       setQuickNote('');
-      setRateAuto(3);
-      setRateDriving(3);
-      setRateShooting(3);
-      setRateIntake(3);
-      setRateHopper(3);
+      setRateAuto(null);
+      setRateDriving(null);
+      setRateShooting(null);
+      setRateIntake(null);
+      setRateHopper(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       onNavigate('home');
     }, 1000);
@@ -278,17 +289,17 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       matchNumber,
       alliance: alliance || undefined,
       timestamp: Date.now(),
-      autoWorked: autoWorked !== null ? autoWorked : false,
-      autoFuelScored,
-      teleopFuelScored,
+      autoWorked: autoWorked !== null ? autoWorked : undefined,
+      autoFuelScored: autoFuelScored !== null ? autoFuelScored : undefined,
+      teleopFuelScored: teleopFuelScored !== null ? teleopFuelScored : undefined,
       shootingAccuracy: shootingAccuracy || undefined,
       shooterAccuracy: shootingAccuracy || undefined,
       shootingRange: shootingRange || undefined,
       canShootAnywhere: shootingRange || undefined,
-      fieldRoute: fieldRoute || 'NEITHER',
-      playedDefense: defenseLevel !== 'NONE',
-      defenseEffectiveness: defenseLevel !== 'NONE' ? (defenseLevel === 'HIGH' ? 'HIGH' : defenseLevel === 'LOW' ? 'LOW' : 'MEDIUM') : undefined,
-      robotIssues: robotIssues || 'NONE',
+      fieldRoute: fieldRoute || undefined,
+      playedDefense: defenseLevel !== null ? (defenseLevel !== 'NONE') : undefined,
+      defenseEffectiveness: (defenseLevel !== null && defenseLevel !== 'NONE') ? (defenseLevel === 'HIGH' ? 'HIGH' : defenseLevel === 'LOW' ? 'LOW' : 'MEDIUM') : undefined,
+      robotIssues: robotIssues || undefined,
       whatHappenedNote: (robotIssues && robotIssues !== 'NONE') ? whatHappenedNote : undefined,
       quickNote: quickNote.trim() || undefined,
       rateAuto: rateAuto as any,
@@ -353,139 +364,225 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       </div>
 
       {/* MATCH SETUP */}
-      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
-        <div className="text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
-          Match Setup
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          {/* Match Counter */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between gap-1.5">
-            <span className="text-[11px] font-mono font-bold uppercase text-slate-400">
-              Match #
+      {isScoutMode ? (
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-300">
+              Match Setup
             </span>
-            <div className="flex items-center justify-between gap-1">
-              <button
-                type="button"
-                onClick={() => setMatchNumber((prev) => Math.max(1, prev - 1))}
-                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-sm cursor-pointer border border-slate-700"
-              >
-                −
-              </button>
+            <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700/80 text-[10px] font-mono text-amber-400 font-bold uppercase tracking-wide">
+              Assigned Scout
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Match Number Read-Only */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+              <span className="text-xs font-mono font-bold uppercase text-slate-400">
+                Match #
+              </span>
+              <div className="text-xl sm:text-2xl font-mono font-black text-slate-100 mt-1">
+                Qual {matchNumber}
+              </div>
+            </div>
+
+            {/* Team Number Read-Only */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+              <span className="text-xs font-mono font-bold uppercase text-slate-400">
+                Team #
+              </span>
+              <div className="text-xl sm:text-2xl font-mono font-black text-slate-100 mt-1">
+                {teamNumber ? `Team ${teamNumber}` : '—'}
+              </div>
+            </div>
+          </div>
+
+          {/* Alliance Read-Only */}
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+            <span className="text-xs font-mono font-bold uppercase text-slate-400">
+              Alliance
+            </span>
+            <div className={`px-3 py-1.5 rounded-xl font-mono font-black text-xs uppercase flex items-center gap-2 border ${
+              alliance === 'red'
+                ? 'bg-rose-950/80 text-rose-300 border-rose-600 shadow-sm'
+                : alliance === 'blue'
+                ? 'bg-sky-950/80 text-sky-300 border-sky-600 shadow-sm'
+                : 'bg-slate-900 text-slate-400 border-slate-800'
+            }`}>
+              <span className={`w-2.5 h-2.5 rounded-full ${
+                alliance === 'red' ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]' :
+                alliance === 'blue' ? 'bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.8)]' :
+                'bg-slate-600'
+              }`} />
+              <span>{alliance ? `${alliance.toUpperCase()} ALLIANCE` : 'NO ALLIANCE ASSIGNED'}</span>
+            </div>
+          </div>
+
+          {/* Assigned Matches Quick Switcher (only matches this scout is assigned to) */}
+          {teamSchedule.length > 1 && (
+            <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-mono font-bold uppercase text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Your Assigned Matches</span>
+                </span>
+                <span className="text-[10px] text-slate-500">{teamSchedule.length} found</span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {teamSchedule.map((m) => {
+                  const isSelected = matchNumber === m.matchNumber;
+                  const isRed = m.redTeams.includes(parseInt(teamNumber, 10));
+                  const allianceBadge = isRed ? 'border-rose-900/80 text-rose-300' : 'border-sky-900/80 text-sky-300';
+                  return (
+                    <button
+                      key={m.key}
+                      type="button"
+                      onClick={() => setMatchNumber(m.matchNumber)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${
+                        isSelected
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm font-black'
+                          : `bg-slate-950 hover:bg-slate-850 text-slate-300 ${allianceBadge}`
+                      }`}
+                    >
+                      <span>Qual {m.matchNumber}</span>
+                      <span className={`w-2 h-2 rounded-full ${isRed ? 'bg-rose-500' : 'bg-sky-500'}`} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
+          <div className="text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-300">
+            Match Setup
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Match Counter */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between gap-1.5">
+              <span className="text-xs font-mono font-bold uppercase text-slate-400">
+                Match #
+              </span>
+              <div className="flex items-center justify-between gap-1">
+                <button
+                  type="button"
+                  onClick={() => setMatchNumber((prev) => Math.max(1, prev - 1))}
+                  className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-sm cursor-pointer border border-slate-700"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  value={matchNumber}
+                  onChange={(e) => setMatchNumber(parseInt(e.target.value, 10) || 1)}
+                  className="w-12 text-center text-lg font-mono font-bold bg-transparent text-slate-200 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setMatchNumber((prev) => prev + 1)}
+                  className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-sm cursor-pointer border border-slate-700"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {/* Team Number */}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between gap-1.5">
+              <span className="text-xs font-mono font-bold uppercase text-slate-400">
+                Team #
+              </span>
               <input
                 type="number"
-                min="1"
                 required
-                value={matchNumber}
-                onChange={(e) => setMatchNumber(parseInt(e.target.value, 10) || 1)}
-                className="w-12 text-center text-lg font-mono font-bold bg-transparent text-slate-200 focus:outline-none"
+                placeholder="Team Number"
+                value={teamNumber}
+                onChange={(e) => setTeamNumber(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 px-2.5 text-base font-mono font-bold text-white placeholder-slate-600 focus:outline-none focus:border-slate-600"
               />
+            </div>
+          </div>
+
+          {/* Alliance Selector */}
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 space-y-1.5">
+            <span className="text-xs font-mono font-bold uppercase text-slate-400 block">
+              Alliance
+            </span>
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setMatchNumber((prev) => prev + 1)}
-                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center font-bold text-sm cursor-pointer border border-slate-700"
+                onClick={() => setAlliance('red')}
+                className={`py-2 rounded-lg font-mono font-bold text-xs uppercase cursor-pointer border transition-all flex items-center justify-center gap-1.5 ${
+                  alliance === 'red'
+                    ? 'bg-rose-950 text-rose-200 border-rose-500 shadow font-black'
+                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                }`}
               >
-                +
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+                <span>RED</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAlliance('blue')}
+                className={`py-2 rounded-lg font-mono font-bold text-xs uppercase cursor-pointer border transition-all flex items-center justify-center gap-1.5 ${
+                  alliance === 'blue'
+                    ? 'bg-sky-950 text-sky-200 border-sky-500 shadow font-black'
+                    : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                }`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block" />
+                <span>BLUE</span>
               </button>
             </div>
           </div>
 
-          {/* Team Number */}
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 flex flex-col justify-between gap-1.5">
-            <span className="text-[11px] font-mono font-bold uppercase text-slate-400">
-              Team #
-            </span>
-            <input
-              type="number"
-              required
-              placeholder="Team Number"
-              value={teamNumber}
-              onChange={(e) => setTeamNumber(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg py-1.5 px-2.5 text-base font-mono font-bold text-white placeholder-slate-600 focus:outline-none focus:border-slate-600"
-            />
-          </div>
-        </div>
-
-        {/* Alliance Selector */}
-        <div className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 space-y-1.5">
-          <span className="text-[11px] font-mono font-bold uppercase text-slate-400 block">
-            Alliance
-          </span>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setAlliance('red')}
-              className={`py-2 rounded-lg font-mono font-bold text-xs uppercase cursor-pointer border transition-all flex items-center justify-center gap-1.5 ${
-                alliance === 'red'
-                  ? 'bg-rose-950 text-rose-200 border-rose-500 shadow font-black'
-                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
-              }`}
-            >
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
-              <span>RED</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setAlliance('blue')}
-              className={`py-2 rounded-lg font-mono font-bold text-xs uppercase cursor-pointer border transition-all flex items-center justify-center gap-1.5 ${
-                alliance === 'blue'
-                  ? 'bg-sky-950 text-sky-200 border-sky-500 shadow font-black'
-                  : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
-              }`}
-            >
-              <span className="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block" />
-              <span>BLUE</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Scheduled Matches Quick Selector */}
-        {teamSchedule.length > 0 && (
-          <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] font-mono font-bold uppercase text-slate-400">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                <span>Scheduled Matches for Team {teamNumber}</span>
-              </span>
-              <span className="text-[10px] text-slate-500">{teamSchedule.length} found</span>
+          {/* Scheduled Matches Quick Selector */}
+          {teamSchedule.length > 0 && (
+            <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-mono font-bold uppercase text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Scheduled Matches for Team {teamNumber}</span>
+                </span>
+                <span className="text-[10px] text-slate-500">{teamSchedule.length} found</span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {teamSchedule.map((m) => {
+                  const isSelected = matchNumber === m.matchNumber;
+                  const isRed = m.redTeams.includes(parseInt(teamNumber, 10));
+                  const allianceBadge = isRed ? 'border-rose-900/80 text-rose-300' : 'border-sky-900/80 text-sky-300';
+                  return (
+                    <button
+                      key={m.key}
+                      type="button"
+                      onClick={() => setMatchNumber(m.matchNumber)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${
+                        isSelected
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm font-black'
+                          : `bg-slate-950 hover:bg-slate-850 text-slate-300 ${allianceBadge}`
+                      }`}
+                    >
+                      <span>Qual {m.matchNumber}</span>
+                      <span className={`w-2 h-2 rounded-full ${isRed ? 'bg-rose-500' : 'bg-sky-500'}`} />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {teamSchedule.map((m) => {
-                const isSelected = matchNumber === m.matchNumber;
-                const isRed = m.redTeams.includes(parseInt(teamNumber, 10));
-                const allianceBadge = isRed ? 'border-rose-900/80 text-rose-300' : 'border-sky-900/80 text-sky-300';
-                return (
-                  <button
-                    key={m.key}
-                    type="button"
-                    onClick={() => setMatchNumber(m.matchNumber)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold cursor-pointer transition-all flex items-center gap-1.5 border ${
-                      isSelected
-                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
-                        : `bg-slate-950 hover:bg-slate-850 text-slate-300 ${allianceBadge}`
-                    }`}
-                  >
-                    <span>Qual {m.matchNumber}</span>
-                    <span className={`w-2 h-2 rounded-full ${isRed ? 'bg-rose-500' : 'bg-sky-500'}`} />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
-      {/* AUTO */}
+      {/* AUTO WORKED & AUTO SCORED */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
-        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-          <Zap className="w-3.5 h-3.5 text-slate-400" />
-          <span>AUTO</span>
-        </div>
-
         {/* Auto Worked? */}
         <div>
-          <span className="block text-[11px] font-mono font-semibold uppercase text-slate-400 mb-1.5">
+          <span className="block text-xs sm:text-sm font-mono font-bold text-slate-200 mb-1.5">
             Auto Worked?
           </span>
           <div className="grid grid-cols-2 gap-2">
@@ -517,12 +614,12 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           </div>
         </div>
 
-        {/* Auto Fuel Counter */}
+        {/* Auto Scored Counter */}
         <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
-          <div className="flex items-center justify-between text-xs font-mono text-slate-300">
-            <span>Auto Fuel</span>
+          <div className="flex items-center justify-between text-xs sm:text-sm font-mono font-bold text-slate-200">
+            <span>Auto Scored</span>
             <span className="text-base font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-100">
-              {autoFuelScored}
+              {autoFuelScored !== null ? autoFuelScored : '—'}
             </span>
           </div>
 
@@ -582,18 +679,13 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         </div>
       </div>
 
-      {/* TELEOP */}
+      {/* TELEOP SCORED */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
-        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-          <Target className="w-3.5 h-3.5 text-slate-400" />
-          <span>TELEOP</span>
-        </div>
-
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-xs font-mono text-slate-300">
-            <span>Fuel Scored</span>
+          <div className="flex items-center justify-between text-xs sm:text-sm font-mono font-bold text-slate-200">
+            <span>Teleop Scored</span>
             <span className="text-base font-bold px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-100">
-              {teleopFuelScored}
+              {teleopFuelScored !== null ? teleopFuelScored : '—'}
             </span>
           </div>
 
@@ -653,17 +745,12 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
         </div>
       </div>
 
-      {/* SHOOTING CAPABILITY */}
+      {/* SHOOTING QUESTIONS */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
-        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-          <Target className="w-3.5 h-3.5 text-slate-400" />
-          <span>SHOOTING CAPABILITY</span>
-        </div>
-
-        {/* 1. Shooting Accuracy */}
+        {/* 1. Shooting Accuracy of the Robot */}
         <div>
-          <label className="text-[11px] font-mono font-semibold uppercase text-slate-400 block mb-1.5">
-            About what is your shooting accuracy?
+          <label className="text-xs sm:text-sm font-mono font-bold text-slate-200 block mb-1.5">
+            Shooting Accuracy of the Robot
           </label>
           <div className="grid grid-cols-5 gap-1.5">
             {ACCURACY_OPTIONS.map((opt) => {
@@ -686,10 +773,10 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           </div>
         </div>
 
-        {/* 2. Where can you shoot from? */}
+        {/* 2. Can Shoot From… */}
         <div className="pt-2 border-t border-slate-800/80">
-          <label className="text-[11px] font-mono font-semibold uppercase text-slate-400 block mb-1.5">
-            Where can you shoot from?
+          <label className="text-xs sm:text-sm font-mono font-bold text-slate-200 block mb-1.5">
+            Can Shoot From…
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
             {SHOOT_FROM_OPTIONS.map((opt) => {
@@ -714,10 +801,10 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       </div>
 
       {/* ROUTE */}
-      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
-        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-          <Route className="w-3.5 h-3.5 text-slate-400" />
-          <span>ROUTE</span>
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2.5">
+        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-200">
+          <Route className="w-4 h-4 text-slate-400" />
+          <span>Field Route</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -739,10 +826,10 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
       </div>
 
       {/* DEFENSE */}
-      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
-        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-          <Shield className="w-3.5 h-3.5 text-slate-400" />
-          <span>DEFENSE</span>
+      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2.5">
+        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-200">
+          <Shield className="w-4 h-4 text-slate-400" />
+          <span>Played Defense?</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -765,9 +852,9 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
       {/* ROBOT ISSUE */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2.5">
-        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-          <AlertTriangle className="w-3.5 h-3.5 text-slate-400" />
-          <span>ROBOT ISSUE</span>
+        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-200">
+          <AlertTriangle className="w-4 h-4 text-slate-400" />
+          <span>Robot Issues / Reliability</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -791,7 +878,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
           <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
             <input
               type="text"
-              placeholder="Issue details..."
+              placeholder="What happened / issue details..."
               value={whatHappenedNote}
               onChange={(e) => setWhatHappenedNote(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600"
@@ -802,15 +889,15 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
       {/* MATCH RATING */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-3">
-        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-          <Star className="w-3.5 h-3.5 text-amber-400" />
-          <span>MATCH RATING</span>
+        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-200">
+          <Star className="w-4 h-4 text-amber-400" />
+          <span>Match Rating (1–5)</span>
         </div>
 
-        <div className="space-y-3 text-xs font-mono">
+        <div className="space-y-3 text-xs sm:text-[13px] font-mono">
           {/* Rate Auto */}
           <div className="flex items-center justify-between">
-            <span className="text-slate-300 uppercase font-bold">Rate Auto</span>
+            <span className="text-slate-300 font-bold">Rate Auto</span>
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
@@ -829,7 +916,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
           {/* Rate Driving */}
           <div className="flex items-center justify-between">
-            <span className="text-slate-300 uppercase font-bold">Rate Driving</span>
+            <span className="text-slate-300 font-bold">Rate Driving</span>
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
@@ -848,7 +935,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
           {/* Rate Shooting */}
           <div className="flex items-center justify-between">
-            <span className="text-slate-300 uppercase font-bold">Rate Shooting</span>
+            <span className="text-slate-300 font-bold">Rate Shooting</span>
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
@@ -867,7 +954,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
           {/* Rate Intake */}
           <div className="flex items-center justify-between">
-            <span className="text-slate-300 uppercase font-bold">Rate Intake</span>
+            <span className="text-slate-300 font-bold">Rate Intake</span>
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
@@ -886,7 +973,7 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
           {/* Rate Hopper */}
           <div className="flex items-center justify-between">
-            <span className="text-slate-300 uppercase font-bold">Rate Hopper</span>
+            <span className="text-slate-300 font-bold">Rate Hopper</span>
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((n) => (
                 <button
@@ -907,17 +994,17 @@ export const MatchScoutForm: React.FC<MatchScoutFormProps> = ({
 
       {/* NOTES */}
       <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-sm space-y-2">
-        <div className="flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
-          <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
-          <span>Notes</span>
+        <div className="flex items-center gap-1.5 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-200">
+          <MessageSquare className="w-4 h-4 text-slate-400" />
+          <span>Scout Notes</span>
         </div>
 
         <textarea
           rows={2}
-          placeholder="Quick note..."
+          placeholder="Quick note about match performance..."
           value={quickNote}
           onChange={(e) => setQuickNote(e.target.value)}
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600 resize-none font-mono"
+          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs sm:text-[13px] text-slate-100 placeholder-slate-500 focus:outline-none focus:border-slate-600 resize-none font-mono"
         />
       </div>
 

@@ -107,25 +107,25 @@ export interface MatchScoutingRecord {
   timestamp: number;
 
   // 1. AUTONOMOUS
-  autoWorked: boolean;
-  autoFuelScored: number;
+  autoWorked?: boolean;
+  autoFuelScored?: number;
 
   // 2. SCORING & SHOOTING
-  teleopFuelScored: number;
+  teleopFuelScored?: number;
   shootingAccuracy?: ShootingAccuracy;
   shootingRange?: string;
   shooterAccuracy?: ShootingAccuracy | 'LOW' | 'MEDIUM' | 'HIGH' | 'EXCELLENT';
   canShootAnywhere?: string | boolean;
 
   // 3. FIELD ROUTE
-  fieldRoute: FieldRouteType;
+  fieldRoute?: FieldRouteType;
 
   // 4. DEFENSE
-  playedDefense: boolean;
+  playedDefense?: boolean;
   defenseEffectiveness?: DefenseEffectivenessType;
 
   // 5. ROBOT RELIABILITY
-  robotIssues: RobotIssuesType;
+  robotIssues?: RobotIssuesType;
   whatHappenedNote?: string;
 
   // 6. QUICK OBSERVATION

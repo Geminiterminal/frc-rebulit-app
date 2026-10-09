@@ -63,7 +63,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
   const [tempRankValue, setTempRankValue] = useState<string>('');
 
   // Drag and drop state
-  const [draggedTeamNum, setDraggedTeamNum] = useState<number | null>(null);
+  // Drag and drop state removed in favor of tap-to-reorder
 
   // Live Rankings Sync State
   const [isSyncingRankings, setIsSyncingRankings] = useState(false);
@@ -186,12 +186,18 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
     const currentRank = currentTeam.customPicklistRank ?? currentIndex + 1;
     const targetRank = targetTeam.customPicklistRank ?? targetIndex + 1;
 
-    currentTeam.customPicklistRank = targetRank;
-    targetTeam.customPicklistRank = currentRank;
+    // Create new objects to ensure reactivity
+    const updated = teams.map(t => {
+      if (t.teamNumber === currentTeam.teamNumber) return { ...t, customPicklistRank: targetRank };
+      if (t.teamNumber === targetTeam.teamNumber) return { ...t, customPicklistRank: currentRank };
+      return t;
+    });
 
-    const updated = [...teams];
     setTeams(updated);
-    await scoutingDB.saveTeamsBatch([currentTeam, targetTeam]);
+    await scoutingDB.saveTeamsBatch([
+        { ...currentTeam, customPicklistRank: targetRank },
+        { ...targetTeam, customPicklistRank: currentRank }
+    ]);
   };
 
   const handleSetCustomRank = async (teamNum: number, newRankStr: string) => {
@@ -222,38 +228,7 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
     await scoutingDB.saveTeamsBatch(reindexed);
   };
 
-  const handleDragStart = (e: React.DragEvent, teamNum: number) => {
-    e.dataTransfer.setData('text/plain', teamNum.toString());
-    setDraggedTeamNum(teamNum);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetTeamNum: number) => {
-    e.preventDefault();
-    const sourceTeamNum = draggedTeamNum;
-    setDraggedTeamNum(null);
-
-    if (!sourceTeamNum || sourceTeamNum === targetTeamNum) return;
-
-    const sorted = [...teams].sort((a, b) => (a.customPicklistRank ?? 9999) - (b.customPicklistRank ?? 9999));
-    const sourceIdx = sorted.findIndex((t) => t.teamNumber === sourceTeamNum);
-    const targetIdx = sorted.findIndex((t) => t.teamNumber === targetTeamNum);
-    if (sourceIdx === -1 || targetIdx === -1) return;
-
-    const [moved] = sorted.splice(sourceIdx, 1);
-    sorted.splice(targetIdx, 0, moved);
-
-    const reindexed = sorted.map((t, idx) => ({
-      ...t,
-      customPicklistRank: idx + 1,
-    }));
-
-    setTeams(reindexed);
-    await scoutingDB.saveTeamsBatch(reindexed);
-  };
+  // handleDragStart, handleDragOver, handleDrop removed in favor of tap-to-reorder
 
   const handleSaveManualRank = async (teamNum: number, rankType: 'official' | 'state') => {
     const targetTeam = teams.find((t) => t.teamNumber === teamNum);
@@ -291,8 +266,8 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
     const teamMatches = matches.filter((m) => m.teamNumber === team.teamNumber);
     const count = teamMatches.length;
 
-    const totalFuelValues = teamMatches.map((m) => (m.autoFuelScored ?? m.autoHighScored ?? 0) + (m.teleopFuelScored ?? m.teleopHighScored ?? 0));
-    const autoFuelValues = teamMatches.map((m) => m.autoFuelScored ?? m.autoHighScored ?? 0);
+    const totalFuelValues = teamMatches.map((m) => (Number(m.autoFuelScored ?? m.autoHighScored ?? 0)) + (Number(m.teleopFuelScored ?? m.teleopHighScored ?? 0)));
+    const autoFuelValues = teamMatches.map((m) => Number(m.autoFuelScored ?? m.autoHighScored ?? 0));
 
     const highestFuel = count > 0 ? Math.max(...totalFuelValues) : 0;
     const lowestFuel = count > 0 ? Math.min(...totalFuelValues) : 0;
@@ -369,17 +344,13 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
     return (
       <tr
         key={item.teamNumber}
-        draggable={!rowUnavailable && sortBy === 'preferenceRank'}
-        onDragStart={(e) => handleDragStart(e, item.teamNumber)}
-        onDragOver={handleDragOver}
-        onDrop={(e) => handleDrop(e, item.teamNumber)}
         className={`transition-colors select-none ${
           rowUnavailable 
             ? 'bg-slate-950/40 opacity-55 hover:opacity-75' 
             : isSelected 
               ? 'bg-slate-850/60 border-l-2 border-l-slate-400' 
               : 'hover:bg-slate-900/60'
-        } ${draggedTeamNum === item.teamNumber ? 'opacity-30 border-2 border-dashed border-slate-500' : ''}`}
+        }`}
       >
         {/* Availability Cross-off */}
         <td className="p-2 sm:p-3 text-center">
@@ -442,11 +413,11 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
               </button>
             </div>
           ) : (
-            <div className="flex items-center justify-center gap-1">
+            <div className="flex flex-col items-center gap-0.5">
               {sortBy === 'preferenceRank' && !rowUnavailable && (
-                <div className="flex items-center gap-0.5 text-slate-500 mr-0.5">
-                  <GripVertical className="w-3.5 h-3.5 text-slate-600 cursor-grab hidden sm:inline" />
-                </div>
+                  <button type="button" onClick={() => handleMovePreference(item.teamNumber, 'UP')} className="p-0.5 text-slate-500 hover:text-slate-200">
+                    <ChevronUp className="w-3.5 h-3.5" />
+                  </button>
               )}
               <span
                 onClick={() => {
@@ -463,6 +434,11 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
               >
                 #{item.customPicklistRank ?? displayIndex + 1}
               </span>
+              {sortBy === 'preferenceRank' && !rowUnavailable && (
+                  <button type="button" onClick={() => handleMovePreference(item.teamNumber, 'DOWN')} className="p-0.5 text-slate-500 hover:text-slate-200">
+                    <ChevronDown className="w-3.5 h-3.5" />
+                  </button>
+              )}
             </div>
           )}
         </td>
@@ -674,8 +650,8 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
             <option value="preferenceRank">Custom Rank</option>
             <option value="officialRank">Official Event Rank</option>
             <option value="stateRank">FRC State/District Rank</option>
-            <option value="totalFuel">Average Fuel (Total)</option>
-            <option value="autoFuel">Auto Fuel</option>
+            <option value="totalFuel">Average Score (Total)</option>
+            <option value="autoFuel">Auto Scored</option>
             <option value="matchesScouted">Matches Scouted</option>
           </select>
         </div>
@@ -742,10 +718,10 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
               <th className="p-2 sm:p-3 w-16 text-center">Pick #</th>
               <th className="p-2 sm:p-3 min-w-[90px]">Team</th>
               <th className="p-2 sm:p-3 text-center">Matches</th>
-              <th className="p-2 sm:p-3 text-center">Highest Fuel</th>
-              <th className="p-2 sm:p-3 text-center">Lowest Fuel</th>
-              <th className="p-2 sm:p-3 text-center">Avg Fuel</th>
-              <th className="p-2 sm:p-3 text-center">Avg Auto Fuel</th>
+              <th className="p-2 sm:p-3 text-center">High Scored</th>
+              <th className="p-2 sm:p-3 text-center">Low Scored</th>
+              <th className="p-2 sm:p-3 text-center">Avg Score</th>
+              <th className="p-2 sm:p-3 text-center">Avg Auto Scored</th>
               <th className="p-2 sm:p-3 text-center">Hopper Capacity</th>
               <th className="p-2 sm:p-3 text-center">Event Rank</th>
               <th className="p-2 sm:p-3 text-center">FRC Rank</th>
@@ -797,10 +773,10 @@ export const PicklistView: React.FC<PicklistViewProps> = ({ onNavigate, onBack }
                   <th className="p-2 sm:p-3 w-16 text-center">Pick #</th>
                   <th className="p-2 sm:p-3 min-w-[90px]">Team</th>
                   <th className="p-2 sm:p-3 text-center">Matches</th>
-                  <th className="p-2 sm:p-3 text-center">Highest Fuel</th>
-                  <th className="p-2 sm:p-3 text-center">Lowest Fuel</th>
-                  <th className="p-2 sm:p-3 text-center">Avg Fuel</th>
-                  <th className="p-2 sm:p-3 text-center">Avg Auto Fuel</th>
+                  <th className="p-2 sm:p-3 text-center">High Scored</th>
+                  <th className="p-2 sm:p-3 text-center">Low Scored</th>
+                  <th className="p-2 sm:p-3 text-center">Avg Score</th>
+                  <th className="p-2 sm:p-3 text-center">Avg Auto Scored</th>
                   <th className="p-2 sm:p-3 text-center">Hopper Capacity</th>
                   <th className="p-2 sm:p-3 text-center">Event Rank</th>
                   <th className="p-2 sm:p-3 text-center">FRC Rank</th>

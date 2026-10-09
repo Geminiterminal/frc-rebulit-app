@@ -5,7 +5,15 @@ import {
   Menu, 
   X, 
   Search, 
-  WifiOff, 
+  WifiOff,
+  Home,
+  Trophy,
+  Users,
+  Map,
+  TrendingUp,
+  FolderDown,
+  Settings,
+  Scale
 } from 'lucide-react';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 
@@ -14,15 +22,11 @@ interface HeaderProps {
   onNavigate: (view: string, teamNumber?: number) => void;
   quickSearchTeam?: string;
   onSearchChange?: (val: string) => void;
-  appMode?: 'captain' | 'scout';
-  onAppModeChange?: (mode: 'captain' | 'scout') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   currentView,
   onNavigate,
-  appMode,
-  onAppModeChange,
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const isOnline = useOnlineStatus();
@@ -39,13 +43,14 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const navItems = [
-    { id: 'home', label: 'Home' },
-    { id: 'picklist', label: 'Ranking' },
-    { id: 'compare', label: 'Compare' },
-    { id: 'teams', label: 'Teams' },
-    { id: 'event-data', label: 'Matches' },
-    { id: 'import-export', label: 'Backup / Sync' },
-    { id: 'settings', label: 'Settings' },
+    { id: 'home', label: 'Home', icon: Home },
+    { id: 'picklist', label: 'Ranking', icon: Trophy },
+    { id: 'strategy-field', label: 'Strategy', icon: Map },
+    { id: 'teams', label: 'Teams', icon: Users },
+    { id: 'compare', label: 'Compare', icon: Scale },
+    { id: 'event-data', label: 'Matches', icon: TrendingUp },
+    { id: 'import-export', label: 'Backup / Sync', icon: FolderDown },
+    { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
@@ -79,34 +84,6 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-950/80 text-amber-300 border border-amber-800/80 font-mono">
                 <WifiOff className="w-3 h-3" />
                 <span>Offline</span>
-              </div>
-            )}
-
-            {/* Mode Switcher pill matching exact image */}
-            {appMode && onAppModeChange && (
-              <div className="p-0.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center text-xs shrink-0">
-                <button
-                  type="button"
-                  onClick={() => onAppModeChange('captain')}
-                  className={`px-3 py-1 rounded-lg font-black transition-all cursor-pointer ${
-                    appMode === 'captain'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200 font-bold'
-                  }`}
-                >
-                  Captain
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onAppModeChange('scout')}
-                  className={`px-3 py-1 rounded-lg font-black transition-all cursor-pointer ${
-                    appMode === 'scout'
-                      ? 'bg-amber-500 text-slate-950 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200 font-bold'
-                  }`}
-                >
-                  Scout
-                </button>
               </div>
             )}
 
@@ -144,22 +121,27 @@ export const Header: React.FC<HeaderProps> = ({
               </form>
 
               <div className="grid grid-cols-2 gap-1.5">
-                {navItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      onNavigate(item.id);
-                      setMenuOpen(false);
-                    }}
-                    className={`p-2.5 rounded-xl text-xs font-bold text-left transition-colors cursor-pointer ${
-                      currentView === item.id
-                        ? 'bg-slate-800 text-white border border-slate-700'
-                        : 'bg-slate-900 hover:bg-slate-850 text-slate-300 border border-slate-800/80'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = currentView === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        onNavigate(item.id);
+                        setMenuOpen(false);
+                      }}
+                      className={`p-2.5 rounded-xl text-xs font-bold text-left transition-all cursor-pointer flex items-center gap-2 ${
+                        isActive
+                          ? 'bg-amber-500/15 text-amber-300 border border-amber-500/40 shadow-sm'
+                          : 'bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800/80 hover:border-slate-700'
+                      }`}
+                    >
+                      <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

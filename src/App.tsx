@@ -22,7 +22,9 @@ import {
   ClipboardList, 
   Gamepad2, 
   Trophy, 
-  Users 
+  Users,
+  Map,
+  Settings
 } from 'lucide-react';
 
 export default function App() {
@@ -33,7 +35,7 @@ export default function App() {
   const [compareTeamNums, setCompareTeamNums] = useState<number[]>([]);
   const [isDbLoaded, setIsDbLoaded] = useState<boolean>(false);
   const [appMode, setAppMode] = useState<'captain' | 'scout'>(() => {
-    return (localStorage.getItem('frc_app_mode') as 'captain' | 'scout') || 'captain';
+    return (localStorage.getItem('frc_app_mode') as 'captain' | 'scout') || 'scout';
   });
 
   const handleModeChange = (mode: 'captain' | 'scout') => {
@@ -103,8 +105,6 @@ export default function App() {
       <Header
         currentView={currentView}
         onNavigate={handleNavigate}
-        appMode={appMode}
-        onAppModeChange={handleModeChange}
       />
 
       {/* Main Content Area */}
@@ -137,6 +137,7 @@ export default function App() {
                 initialAlliance={selectedAlliance}
                 onNavigate={handleNavigate}
                 onBack={handleBack}
+                appMode={appMode}
               />
             )}
 
@@ -145,7 +146,7 @@ export default function App() {
             )}
 
             {currentView === 'teams' && (
-              <TeamList onNavigate={handleNavigate} onBack={handleBack} />
+              <TeamList onNavigate={handleNavigate} onBack={handleBack} appMode={appMode} />
             )}
 
             {currentView === 'picklist' && (
@@ -177,69 +178,65 @@ export default function App() {
             )}
 
             {currentView === 'settings' && (
-              <SettingsView onNavigate={handleNavigate} onBack={handleBack} />
+              <SettingsView 
+                onNavigate={handleNavigate} 
+                onBack={handleBack} 
+                appMode={appMode} 
+                onAppModeChange={handleModeChange} 
+              />
             )}
           </>
         )}
       </main>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/95 border-t border-slate-800/90 backdrop-blur-md px-2 py-1.5 flex items-center justify-around">
-        <button
-          type="button"
-          onClick={() => handleNavigate('home')}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'home' ? 'text-slate-100 font-bold bg-slate-900' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Home className="w-4 h-4" />
-          <span className="text-[10px]">Home</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleNavigate('picklist')}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'picklist' || currentView === 'compare' ? 'text-amber-400 font-bold bg-slate-900' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Trophy className="w-4 h-4" />
-          <span className="text-[10px]">Ranking</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleNavigate('pit-scout')}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'pit-scout' ? 'text-slate-100 font-bold bg-slate-900' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <ClipboardList className="w-4 h-4" />
-          <span className="text-[10px]">Pit</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleNavigate('match-scout')}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'match-scout' ? 'text-slate-100 font-bold bg-slate-900' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Gamepad2 className="w-4 h-4" />
-          <span className="text-[10px]">Match</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleNavigate('teams')}
-          className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg transition-colors cursor-pointer ${
-            currentView === 'teams' ? 'text-slate-100 font-bold bg-slate-900' : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span className="text-[10px]">Teams</span>
-        </button>
-      </nav>
+      {appMode === 'captain' && (
+        <nav className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-950/85 border-t border-slate-800/80 backdrop-blur-xl px-1.5 py-1 flex items-center justify-around shadow-2xl select-none">
+          {[
+            { id: 'home', label: 'Home', icon: Home, isActive: currentView === 'home' },
+            { id: 'picklist', label: 'Ranking', icon: Trophy, isActive: currentView === 'picklist' || currentView === 'compare' },
+            { id: 'teams', label: 'Teams', icon: Users, isActive: currentView === 'teams' },
+            { id: 'strategy-field', label: 'Strategy', icon: Map, isActive: currentView === 'strategy-field' },
+            { id: 'settings', label: 'Settings', icon: Settings, isActive: currentView === 'settings' },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleNavigate(tab.id)}
+                className="no-active-scale relative flex-1 flex flex-col items-center justify-center py-1 px-1 rounded-xl cursor-pointer group focus:outline-none"
+              >
+                {/* Smooth pill background without abrupt layout shifts */}
+                <div
+                  className={`absolute inset-0 rounded-xl transition-all duration-200 pointer-events-none ${
+                    tab.isActive
+                      ? 'bg-amber-400/10 border border-amber-400/25 shadow-sm'
+                      : 'bg-transparent border border-transparent'
+                  }`}
+                />
+                
+                <Icon
+                  className={`relative w-4 h-4 transition-colors duration-200 ${
+                    tab.isActive
+                      ? 'text-amber-400'
+                      : 'text-slate-400 group-hover:text-slate-200'
+                  }`}
+                />
+                <span
+                  className={`relative text-[10px] tracking-tight transition-colors duration-200 ${
+                    tab.isActive
+                      ? 'text-amber-400 font-bold'
+                      : 'text-slate-400 font-medium group-hover:text-slate-200'
+                  }`}
+                >
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
     </div>
   );
 }

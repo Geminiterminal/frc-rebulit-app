@@ -218,10 +218,28 @@ class ScoutingDB {
   // --- MATCHES ---
   async saveMatch(record: MatchScoutingRecord): Promise<void> {
     await this.init();
+
+    // Ensure valid numerical scoring fields
+    record.autoFuelScored = Number(record.autoFuelScored ?? record.autoHighScored ?? 0);
+    record.teleopFuelScored = Number(record.teleopFuelScored ?? record.teleopHighScored ?? 0);
+    record.timestamp = record.timestamp || Date.now();
+
     onSaveHook?.('match', record);
 
     if (!this.db) {
       try {
+        // Remove older duplicates for same team & match
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key?.startsWith('match_')) {
+            try {
+              const existing: MatchScoutingRecord = JSON.parse(localStorage.getItem(key)!);
+              if (existing.teamNumber === record.teamNumber && existing.matchNumber === record.matchNumber && existing.id !== record.id) {
+                localStorage.removeItem(key);
+              }
+            } catch {}
+          }
+        }
         localStorage.setItem(`match_${record.id}`, JSON.stringify(record));
       } catch {}
       return;
@@ -231,9 +249,23 @@ class ScoutingDB {
       try {
         const tx = this.db!.transaction('matches', 'readwrite');
         const store = tx.objectStore('matches');
-        const req = store.put(record);
-        req.onsuccess = () => resolve();
-        req.onerror = () => resolve();
+        
+        // Check for existing match for this team and matchNumber to avoid duplicate entries
+        const reqAll = store.getAll();
+        reqAll.onsuccess = () => {
+          const all: MatchScoutingRecord[] = reqAll.result || [];
+          for (const m of all) {
+            if (m.teamNumber === record.teamNumber && m.matchNumber === record.matchNumber && m.id !== record.id) {
+              store.delete(m.id);
+            }
+          }
+          store.put(record);
+        };
+        reqAll.onerror = () => {
+          store.put(record);
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
       } catch {
         resolve();
       }
@@ -291,7 +323,20 @@ class ScoutingDB {
 
   async getMatchesForTeam(teamNumber: number): Promise<MatchScoutingRecord[]> {
     const all = await this.getAllMatches();
-    return all.filter((m) => m.teamNumber === teamNumber);
+    const teamMatches = all.filter((m) => m.teamNumber === teamNumber);
+    // Deduplicate by matchNumber, keeping the most recent timestamp
+    const dedupedMap = new Map<number, MatchScoutingRecord>();
+    for (const m of teamMatches) {
+      if (!dedupedMap.has(m.matchNumber)) {
+        dedupedMap.set(m.matchNumber, m);
+      } else {
+        const current = dedupedMap.get(m.matchNumber)!;
+        if (m.timestamp > current.timestamp) {
+          dedupedMap.set(m.matchNumber, m);
+        }
+      }
+    }
+    return Array.from(dedupedMap.values()).sort((a, b) => a.matchNumber - b.matchNumber);
   }
 
   async deleteMatch(id: string): Promise<void> {

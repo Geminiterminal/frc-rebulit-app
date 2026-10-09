@@ -15,9 +15,16 @@ import {
 interface SettingsViewProps {
   onNavigate: (view: string) => void;
   onBack: () => void;
+  appMode?: 'captain' | 'scout';
+  onAppModeChange?: (mode: 'captain' | 'scout') => void;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate, onBack }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ 
+  onNavigate, 
+  onBack, 
+  appMode, 
+  onAppModeChange 
+}) => {
   const [eventCode, setEventCode] = useState('');
   const [tbaApiKey, setTbaApiKey] = useState('');
   const [bulkInput, setBulkInput] = useState('');
@@ -207,6 +214,37 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigate, onBack }
           </div>
           <PWAInstallButton />
         </div>
+
+        {/* Mode Switcher */}
+        {appMode && onAppModeChange && (
+          <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
+            <span>App Mode</span>
+            <div className="p-0.5 bg-slate-950 border border-slate-800 rounded-xl flex items-center text-xs">
+              <button
+                type="button"
+                onClick={() => onAppModeChange('captain')}
+                className={`px-3 py-1 rounded-lg font-black transition-all cursor-pointer ${
+                  appMode === 'captain'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 font-bold'
+                }`}
+              >
+                Captain
+              </button>
+              <button
+                type="button"
+                onClick={() => onAppModeChange('scout')}
+                className={`px-3 py-1 rounded-lg font-black transition-all cursor-pointer ${
+                  appMode === 'scout'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 font-bold'
+                }`}
+              >
+                Scout
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
           <span>Local Storage:</span>

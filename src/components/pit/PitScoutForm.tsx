@@ -127,7 +127,6 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
   const [biggestIssueOther, setBiggestIssueOther] = useState<string>('');
 
   const [reliability, setReliability] = useState<ReliabilityRating | null>(null);
-  const [notes, setNotes] = useState<string>('');
 
   const [saveToast, setSaveToast] = useState<string | null>(null);
   const [isSingleQrOpen, setIsSingleQrOpen] = useState<boolean>(false);
@@ -149,7 +148,6 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
     setBiggestIssues([]);
     setBiggestIssueOther('');
     setReliability(null);
-    setNotes('');
   };
 
   useEffect(() => {
@@ -193,7 +191,6 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       setBiggestIssues(t.pit.biggestIssues || []);
       setBiggestIssueOther(t.pit.biggestIssueOther || '');
       setReliability(t.pit.reliability || null);
-      setNotes(t.pit.notes || '');
     } else {
       resetToBlankState();
       setTeamName(t.teamName || '');
@@ -247,7 +244,6 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       biggestIssues: biggestIssues.length > 0 ? biggestIssues : undefined,
       biggestIssueOther: biggestIssues.includes('OTHER') ? biggestIssueOther : undefined,
       reliability: reliability || undefined,
-      notes,
       lastUpdated: Date.now(),
     };
 
@@ -291,7 +287,6 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
       biggestIssues: biggestIssues.length > 0 ? biggestIssues : undefined,
       biggestIssueOther: biggestIssues.includes('OTHER') ? biggestIssueOther : undefined,
       reliability: reliability || undefined,
-      notes,
       lastUpdated: Date.now(),
     };
 
@@ -436,8 +431,8 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
       {/* 1. Drivetrain */}
       <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-2.5">
-        <label className="text-xs font-bold text-slate-100 uppercase tracking-wider block font-mono">
-          What drivetrain are you running?
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 tracking-wide block font-mono">
+          What drivetrain does your robot have?
         </label>
         <div className="flex flex-wrap gap-1.5">
           {DRIVETRAIN_OPTIONS.map((opt) => {
@@ -472,8 +467,8 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
       {/* 2. Shooter */}
       <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-2.5">
-        <label className="text-xs font-bold text-slate-100 uppercase tracking-wider block font-mono">
-          What kind of shooter do you have?
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 tracking-wide block font-mono">
+          What type of shooter does your robot have?
         </label>
         <div className="flex flex-wrap gap-1.5">
           {SHOOTER_OPTIONS.map((opt) => {
@@ -509,8 +504,8 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
       {/* 3. Hopper Capacity */}
       <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-2.5">
-        <label className="text-xs font-bold text-slate-100 uppercase tracking-wider block font-mono">
-          How much fuel can your hopper hold?
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 tracking-wide block font-mono">
+          How much fuel can your robot hold?
         </label>
         <div className="flex items-center gap-2">
           <button
@@ -559,10 +554,10 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
         </div>
       </div>
 
-      {/* 4. Shooting Accuracy */}
+      {/* 4. Shooting Accuracy of the Robot */}
       <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-2.5">
-        <label className="text-xs font-bold text-slate-100 uppercase tracking-wider block font-mono">
-          About what is your shooting accuracy?
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 tracking-wide block font-mono">
+          Shooting Accuracy of the Robot
         </label>
         <div className="flex flex-wrap gap-1.5">
           {ACCURACY_OPTIONS.map((opt) => {
@@ -585,10 +580,10 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
         </div>
       </div>
 
-      {/* 5. Where can you shoot from? */}
+      {/* 5. What is your robot's shooting range? */}
       <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-2.5">
-        <label className="text-xs font-bold text-slate-100 uppercase tracking-wider block font-mono">
-          Where can you shoot from?
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 tracking-wide block font-mono">
+          What is your robot's shooting range?
         </label>
         <div className="flex flex-wrap gap-1.5">
           {SHOOT_FROM_OPTIONS.map((opt) => {
@@ -613,8 +608,8 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
       {/* 6. Bump and Trench */}
       <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-2.5">
-        <label className="text-xs font-bold text-slate-100 uppercase tracking-wider block font-mono">
-          Can you go over the bump or through the trench?
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 tracking-wide block font-mono">
+          Can your robot go over the bump or through the trench?
         </label>
         <div className="flex flex-wrap gap-1.5">
           {BUMP_TRENCH_OPTIONS.map((opt) => {
@@ -639,8 +634,8 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
       {/* 7. Autonomous Capability */}
       <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-2.5">
-        <label className="text-xs font-bold text-slate-100 uppercase tracking-wider block font-mono">
-          Do you have an autonomous routine?
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 tracking-wide block font-mono">
+          Does your robot have an autonomous routine?
         </label>
         <div className="flex flex-wrap gap-1.5">
           {(['YES', 'NO', 'STILL DEVELOPING'] as const).map((opt) => {
@@ -664,7 +659,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
         {hasAutonomous === 'YES' && (
           <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
-            <span className="text-[11px] text-slate-400 block font-medium">
+            <span className="text-xs text-slate-400 block font-medium">
               How many routines got?
             </span>
             <div className="flex gap-1.5">
@@ -689,7 +684,7 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
       {/* 8. Auto Consistency */}
       <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-2.5">
-        <label className="text-xs font-bold text-slate-100 uppercase tracking-wider block font-mono">
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 tracking-wide block font-mono">
           How consistent is your autonomous?
         </label>
         <div className="flex flex-wrap gap-1.5">
@@ -715,8 +710,8 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
       {/* 9. Biggest Issue */}
       <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-2.5">
-        <label className="text-xs font-bold text-slate-100 uppercase tracking-wider block font-mono">
-          What is the biggest issue with your robot?
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 tracking-wide block font-mono">
+          What is the biggest issue you're still working on?
         </label>
         <div className="flex flex-wrap gap-1.5">
           {BIGGEST_ISSUES_OPTIONS.map((opt) => {
@@ -752,8 +747,8 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
 
       {/* 10. Reliability */}
       <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-2.5">
-        <label className="text-xs font-bold text-slate-100 uppercase tracking-wider block font-mono">
-          How reliable would you say the robot is?
+        <label className="text-sm sm:text-[15px] font-bold text-slate-100 tracking-wide block font-mono">
+          How reliable has your robot been?
         </label>
         <div className="flex flex-wrap gap-1.5">
           {RELIABILITY_OPTIONS.map((opt) => {
@@ -774,20 +769,6 @@ export const PitScoutForm: React.FC<PitScoutFormProps> = ({
             );
           })}
         </div>
-      </div>
-
-      {/* NOTES */}
-      <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-sm space-y-1.5">
-        <label className="text-xs font-bold text-slate-100 uppercase tracking-wider block font-mono">
-          Anything else we should know?
-        </label>
-        <textarea
-          rows={2}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notes..."
-          className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-slate-600 resize-none"
-        />
       </div>
 
       {/* SAVE & QR */}

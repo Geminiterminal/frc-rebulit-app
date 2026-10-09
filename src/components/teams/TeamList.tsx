@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { TeamProfile, MatchScoutingRecord } from '../../types/scouting';
 import { scoutingDB } from '../../db/indexedDB';
 import { scoutingAssignments } from '../../db/scoutingAssignments';
@@ -16,9 +16,10 @@ import {
 interface TeamListProps {
   onNavigate: (view: string, teamNumber?: number, extraParam?: any) => void;
   onBack: () => void;
+  appMode?: 'captain' | 'scout';
 }
 
-export const TeamList: React.FC<TeamListProps> = ({ onNavigate, onBack }) => {
+export const TeamList: React.FC<TeamListProps> = ({ onNavigate, onBack, appMode }) => {
   const [teams, setTeams] = useState<TeamProfile[]>([]);
   const [matches, setMatches] = useState<MatchScoutingRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -85,72 +86,77 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate, onBack }) => {
     }
   };
 
-  const matchCountMap = new Map<number, number>();
-  const teamAccuracyMap = new Map<number, string>();
-  matches.forEach((m) => {
-    matchCountMap.set(m.teamNumber, (matchCountMap.get(m.teamNumber) || 0) + 1);
-    const acc = m.shootingAccuracy || (typeof m.shooterAccuracy === 'string' ? m.shooterAccuracy : undefined);
-    if (acc) teamAccuracyMap.set(m.teamNumber, acc);
-  });
-
-  const filteredTeams = teams
-    .filter((t) => {
-      const matchSearch =
-        searchQuery === '' ||
-        t.teamNumber.toString().includes(searchQuery) ||
-        (t.teamName && t.teamName.toLowerCase().includes(searchQuery.toLowerCase()));
-
-      if (!matchSearch) return false;
-
-      if (filterAssignedOnly) {
-        if (!assignedTeams.includes(t.teamNumber)) return false;
-      }
-
-      if (filterDrivetrain !== 'ALL') {
-        if (t.pit?.drivetrain !== filterDrivetrain) return false;
-      }
-
-      if (filterCapability === 'TRENCH') {
-        if (t.pit?.bumpTrench !== 'BUMP AND TRENCH' && t.pit?.bumpTrench !== 'BOTH' && t.pit?.bumpTrench !== 'TRENCH ONLY') return false;
-      } else if (filterCapability === 'TURRET') {
-        if (!t.pit?.shooter?.includes('TURRET')) return false;
-      } else if (filterCapability === 'AUTO') {
-        if (t.pit?.hasAutonomous !== 'YES') return false;
-      } else if (filterCapability === 'PIT') {
-        if (!t.pit || Object.keys(t.pit).length === 0) return false;
-      } else if (filterCapability === 'NOT_SCOUTED') {
-        if (t.pit && Object.keys(t.pit).length > 0) return false;
-      } else if (filterCapability === 'MATCHES') {
-        if ((matchCountMap.get(t.teamNumber) || 0) === 0) return false;
-      }
-
-      return true;
-    })
-    .sort((a, b) => {
-      if (sortBy === 'number') {
-        return a.teamNumber - b.teamNumber;
-      } else if (sortBy === 'matches') {
-        return (matchCountMap.get(b.teamNumber) || 0) - (matchCountMap.get(a.teamNumber) || 0);
-      } else if (sortBy === 'reliability') {
-        const score = (t: TeamProfile) => {
-          if (t.pit?.reliability === 'VERY RELIABLE') return 4;
-          if (t.pit?.reliability === 'MOSTLY RELIABLE') return 3;
-          if (t.pit?.reliability === 'SOMEWHAT RELIABLE') return 2;
-          if (t.pit?.reliability === 'UNRELIABLE') return 1;
-          return 0;
-        };
-        return score(b) - score(a);
-      } else if (sortBy === 'scouted') {
-        const getScoutScore = (t: TeamProfile) => {
-          let s = 0;
-          if (t.pit && Object.keys(t.pit).length > 0) s += 2;
-          if ((matchCountMap.get(t.teamNumber) || 0) > 0) s += 1;
-          return s;
-        };
-        return getScoutScore(b) - getScoutScore(a);
-      }
-      return 0;
+  const { matchCountMap, teamAccuracyMap } = useMemo(() => {
+    const counts = new Map<number, number>();
+    const accuracies = new Map<number, string>();
+    matches.forEach((m) => {
+      counts.set(m.teamNumber, (counts.get(m.teamNumber) || 0) + 1);
+      const acc = m.shootingAccuracy || (typeof m.shooterAccuracy === 'string' ? m.shooterAccuracy : undefined);
+      if (acc) accuracies.set(m.teamNumber, acc);
     });
+    return { matchCountMap: counts, teamAccuracyMap: accuracies };
+  }, [matches]);
+
+  const filteredTeams = useMemo(() => {
+    return teams
+      .filter((t) => {
+        const matchSearch =
+          searchQuery === '' ||
+          t.teamNumber.toString().includes(searchQuery) ||
+          (t.teamName && t.teamName.toLowerCase().includes(searchQuery.toLowerCase()));
+
+        if (!matchSearch) return false;
+
+        if (filterAssignedOnly) {
+          if (!assignedTeams.includes(t.teamNumber)) return false;
+        }
+
+        if (filterDrivetrain !== 'ALL') {
+          if (t.pit?.drivetrain !== filterDrivetrain) return false;
+        }
+
+        if (filterCapability === 'TRENCH') {
+          if (t.pit?.bumpTrench !== 'BUMP AND TRENCH' && t.pit?.bumpTrench !== 'BOTH' && t.pit?.bumpTrench !== 'TRENCH ONLY') return false;
+        } else if (filterCapability === 'TURRET') {
+          if (!t.pit?.shooter?.includes('TURRET')) return false;
+        } else if (filterCapability === 'AUTO') {
+          if (t.pit?.hasAutonomous !== 'YES') return false;
+        } else if (filterCapability === 'PIT') {
+          if (!t.pit || Object.keys(t.pit).length === 0) return false;
+        } else if (filterCapability === 'NOT_SCOUTED') {
+          if (t.pit && Object.keys(t.pit).length > 0) return false;
+        } else if (filterCapability === 'MATCHES') {
+          if ((matchCountMap.get(t.teamNumber) || 0) === 0) return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'number') {
+          return a.teamNumber - b.teamNumber;
+        } else if (sortBy === 'matches') {
+          return (matchCountMap.get(b.teamNumber) || 0) - (matchCountMap.get(a.teamNumber) || 0);
+        } else if (sortBy === 'reliability') {
+          const score = (t: TeamProfile) => {
+            if (t.pit?.reliability === 'VERY RELIABLE') return 4;
+            if (t.pit?.reliability === 'MOSTLY RELIABLE') return 3;
+            if (t.pit?.reliability === 'SOMEWHAT RELIABLE') return 2;
+            if (t.pit?.reliability === 'UNRELIABLE') return 1;
+            return 0;
+          };
+          return score(b) - score(a);
+        } else if (sortBy === 'scouted') {
+          const getScoutScore = (t: TeamProfile) => {
+            let s = 0;
+            if (t.pit && Object.keys(t.pit).length > 0) s += 2;
+            if ((matchCountMap.get(t.teamNumber) || 0) > 0) s += 1;
+            return s;
+          };
+          return getScoutScore(b) - getScoutScore(a);
+        }
+        return 0;
+      });
+  }, [teams, searchQuery, filterAssignedOnly, assignedTeams, filterDrivetrain, filterCapability, sortBy, matchCountMap]);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-5 pb-32 flex flex-col gap-4">
@@ -162,14 +168,16 @@ export const TeamList: React.FC<TeamListProps> = ({ onNavigate, onBack }) => {
           </h1>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Add Team</span>
-        </button>
+        {appMode !== 'scout' && (
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Team</span>
+          </button>
+        )}
       </div>
 
       {/* Search Input */}
